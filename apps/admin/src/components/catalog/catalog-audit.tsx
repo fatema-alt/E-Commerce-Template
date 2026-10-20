@@ -1,4 +1,5 @@
 "use client";
+import { useToastState } from "@/components/admin/toast-provider";
 import { useEffect, useState } from "react";
 import { api, button } from "./catalog-ui";
 type Event = {
@@ -17,7 +18,7 @@ export function CatalogAudit({
 }) {
   const [page, setPage] = useState(1);
   const [rows, setRows] = useState<Event[]>([]);
-  const [error, setError] = useState("");
+  const [, setError] = useToastState("error");
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     const controller = new AbortController();
@@ -53,15 +54,11 @@ export function CatalogAudit({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [entity, id, page]);
+  }, [entity, id, page, setError]);
   return (
     <div className="space-y-3">
       <h3 className="text-sm font-semibold">Audit and price history</h3>
-      {error && (
-        <p role="alert" className="text-sm text-red-700">
-          {error}
-        </p>
-      )}
+
       {loading ? (
         <p className="text-sm text-slate-500">Loading history…</p>
       ) : rows.length ? (

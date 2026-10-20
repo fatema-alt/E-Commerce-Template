@@ -1,4 +1,5 @@
 "use client";
+import { useToastState } from "@/components/admin/toast-provider";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -21,8 +22,8 @@ export default function OrderDetailsClient() {
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [role, setRole] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setError] = useToastState("error");
+  const [, setSuccess] = useToastState("success");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [note, setNote] = useState("");
@@ -52,7 +53,7 @@ export default function OrderDetailsClient() {
       .finally(() => {
         if (sequence === loadSequence.current) setLoading(false);
       });
-  }, [id]);
+  }, [id, setError]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -134,22 +135,8 @@ export default function OrderDetailsClient() {
           </button>
         </div>
       </div>
-      {error && (
-        <p
-          role="alert"
-          className="rounded-lg bg-red-50 p-4 text-sm text-red-700"
-        >
-          {error}
-        </p>
-      )}
-      {success && (
-        <p
-          role="status"
-          className="rounded-lg bg-emerald-50 p-4 text-sm text-emerald-700"
-        >
-          {success}
-        </p>
-      )}
+
+
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Panel title="Items and totals">

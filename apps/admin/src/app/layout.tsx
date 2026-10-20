@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { ToastProvider } from "@/components/admin/toast-provider";
 import { themeScript } from "@/lib/theme-init";
 import "./globals.css";
 
@@ -24,13 +25,15 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
-        <Suspense
-          fallback={
-            <div className="p-6 text-sm text-slate-500">Loading admin...</div>
-          }
-        >
-          <AdminShell>{children}</AdminShell>
-        </Suspense>
+        <ToastProvider>
+          <Suspense
+            fallback={
+              <div className="p-6 text-sm text-slate-500">Loading admin...</div>
+            }
+          >
+            <AdminShell>{children}</AdminShell>
+          </Suspense>
+        </ToastProvider>
       </body>
     </html>
   );

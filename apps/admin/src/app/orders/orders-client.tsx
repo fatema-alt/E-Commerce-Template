@@ -1,4 +1,5 @@
 "use client";
+import { useToastState } from "@/components/admin/toast-provider";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
@@ -178,7 +179,7 @@ export default function OrdersClient() {
   const [status, setStatus] = useState("");
   const [refreshing, setLoading] = useState(false);
   const [loadedKey, setLoadedKey] = useState("");
-  const [error, setError] = useState("");
+  const [, setError] = useToastState("error");
   const limit = 20;
   const filterKey = JSON.stringify({
     page,
@@ -213,17 +214,7 @@ export default function OrdersClient() {
           setLoadedKey(filterKey);
         }
       });
-  }, [
-    page,
-    status,
-    search,
-    paymentStatus,
-    paymentMethod,
-    from,
-    to,
-    sort,
-    filterKey,
-  ]);
+  }, [page, status, search, paymentStatus, paymentMethod, from, to, sort, setError, filterKey]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -421,14 +412,7 @@ export default function OrdersClient() {
           sort,
         }}
       />
-      {error && (
-        <div
-          role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
-        >
-          {error}
-        </div>
-      )}
+
       <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">

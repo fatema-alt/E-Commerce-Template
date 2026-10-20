@@ -1,4 +1,5 @@
 "use client";
+import { useToastState } from "@/components/admin/toast-provider";
 /* eslint-disable @next/next/no-img-element -- Media is served by the configured API storage provider. */
 import { useEffect, useState } from "react";
 import type { Product } from "./products-page";
@@ -83,7 +84,7 @@ export function ProductList({
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastState("error");
   const [results, setResults] = useState<
     { id: string; success: boolean; error?: string }[]
   >([]);
@@ -195,7 +196,7 @@ export function ProductList({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [query, page, pageSize, revision, refresh]);
+  }, [query, page, pageSize, revision, refresh, setError]);
 
   function change(key: string, value: string) {
     setQuery((prev) => ({ ...prev, [key]: value }));

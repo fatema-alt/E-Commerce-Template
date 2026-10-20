@@ -1,4 +1,5 @@
 "use client";
+import { useToastState } from "@/components/admin/toast-provider";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -14,7 +15,7 @@ export default function CatalogEditPage({
   id: string;
 }) {
   const [record, setRecord] = useState<Product | Category | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useToastState("error");
   const [retry, setRetry] = useState(0);
 
   useEffect(() => {
@@ -37,7 +38,7 @@ export default function CatalogEditPage({
           );
       });
     return () => controller.abort();
-  }, [entity, id, retry]);
+  }, [entity, id, retry, setError]);
 
   if (error)
     return (

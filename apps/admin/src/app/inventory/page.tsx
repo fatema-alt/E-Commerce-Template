@@ -1,4 +1,5 @@
 "use client";
+import { useToastState } from "@/components/admin/toast-provider";
 
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import { Modal, useCatalogRole } from "@/components/catalog/catalog-ui";
@@ -57,8 +58,8 @@ export default function InventoryPage() {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [, setError] = useToastState("error");
+  const [, setSuccess] = useToastState("success");
 
   const refresh = useCallback(() => {
     return Promise.all([
@@ -80,7 +81,7 @@ export default function InventoryPage() {
       .finally(() => {
         setLoading(false);
       });
-  }, []);
+  }, [setError]);
 
   useEffect(() => {
     void refresh();
@@ -205,16 +206,8 @@ export default function InventoryPage() {
           Refresh
         </button>
       </header>
-      {error && (
-        <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-700">
-          {error}
-        </p>
-      )}
-      {success && (
-        <p role="status" className="rounded-lg bg-green-50 p-4 text-green-700">
-          {success}
-        </p>
-      )}
+
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
           ["Inventory Items", data?.summary.inventoryItems ?? 0],
@@ -474,11 +467,7 @@ export default function InventoryPage() {
                 onChange={(event) => setThresholdValue(event.target.value)}
               />
             </label>
-            {error && (
-              <p role="alert" className="text-sm text-red-700">
-                {error}
-              </p>
-            )}
+
             <button
               disabled={busy}
               className="rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white"

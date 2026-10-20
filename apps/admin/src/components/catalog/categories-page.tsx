@@ -1,4 +1,5 @@
 "use client";
+import { useToastState } from "@/components/admin/toast-provider";
 /* eslint-disable @next/next/no-img-element -- Category images use API storage URLs. */
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -91,8 +92,8 @@ export default function CategoriesPage({
   const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setError] = useToastState("error");
+  const [, setSuccess] = useToastState("success");
   const [editing, setEditing] = useState<Category | null>(
     initialCategory ?? null,
   );
@@ -165,7 +166,7 @@ export default function CategoriesPage({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [search, active, page, pageSize, sortBy, refresh]);
+  }, [search, active, page, pageSize, sortBy, refresh, setError]);
   useEffect(() => {
     const controller = new AbortController();
     void api<Category[]>("/categories/tree", { signal: controller.signal })
@@ -179,7 +180,7 @@ export default function CategoriesPage({
           );
       });
     return () => controller.abort();
-  }, [refresh]);
+  }, [refresh, setError]);
   function flatten(
     nodes: Category[],
     depth = 0,
@@ -515,14 +516,7 @@ export default function CategoriesPage({
               </button>
             </p>
           )}
-          {success && (
-            <p
-              role="status"
-              className="rounded-xl bg-green-50 p-4 text-green-700"
-            >
-              {success}
-            </p>
-          )}
+
           <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="flex flex-wrap gap-3 border-b p-5">
               <input
@@ -659,14 +653,7 @@ export default function CategoriesPage({
       {showEditor && canEdit && (
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <form onSubmit={save} className="space-y-5">
-            {error && (
-              <p
-                role="alert"
-                className="rounded-xl bg-red-50 p-3 text-sm text-red-700"
-              >
-                {error}
-              </p>
-            )}
+
             <nav
               aria-label="Category breadcrumb"
               className="text-xs text-slate-500"

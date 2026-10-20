@@ -1,4 +1,5 @@
 "use client";
+import { useToastState } from "@/components/admin/toast-provider";
 /* eslint-disable @next/next/no-img-element -- CMS assets support local and configured remote storage. */
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -48,8 +49,8 @@ export function CmsWorkspace({ kind }: { kind: string }) {
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [, setError] = useToastState("error");
+  const [, setNotice] = useToastState("success");
   const [scheduledAt, setScheduledAt] = useState("");
   const [block, setBlock] = useState("hero");
   const [preview, setPreview] = useState(false);
@@ -94,7 +95,7 @@ export function CmsWorkspace({ kind }: { kind: string }) {
     return () => {
       live = false;
     };
-  }, [kind]);
+  }, [kind, setError]);
   useEffect(() => {
     let live = true;
     Promise.resolve()
@@ -108,7 +109,7 @@ export function CmsWorkspace({ kind }: { kind: string }) {
     return () => {
       live = false;
     };
-  }, [refreshList]);
+  }, [refreshList, setError]);
   useEffect(() => {
     if (!dirty) return;
     const prevent = (event: BeforeUnloadEvent) => {
@@ -317,22 +318,8 @@ export function CmsWorkspace({ kind }: { kind: string }) {
           </Link>
         ))}
       </nav>
-      {error && (
-        <div
-          role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
-        >
-          {error}
-        </div>
-      )}
-      {notice && (
-        <div
-          role="status"
-          className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
-        >
-          {notice}
-        </div>
-      )}
+
+
       {loading ? (
         <p role="status">Loading CMS…</p>
       ) : kind === "MEDIA" ? (

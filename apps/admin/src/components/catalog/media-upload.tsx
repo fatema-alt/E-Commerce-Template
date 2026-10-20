@@ -1,4 +1,5 @@
 "use client";
+import { useToastState } from "@/components/admin/toast-provider";
 /* eslint-disable @next/next/no-img-element -- Local blob URLs are upload previews. */
 import { useEffect, useRef, useState } from "react";
 import { API, control } from "./catalog-ui";
@@ -18,7 +19,8 @@ export function MediaUpload({
 }) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [, setError] = useToastState("error");
+  const [, setSuccess] = useToastState("success");
   const urls = useRef<string[]>([]);
   useEffect(
     () => () => {
@@ -104,12 +106,16 @@ export function MediaUpload({
         update({ done: true, progress: 100 });
         uploaded = true;
       } catch (error) {
+        setError(error instanceof Error ? error.message : "Upload failed");
         update({
           error: error instanceof Error ? error.message : "Upload failed",
         });
       }
     }
-    if (uploaded) onUploaded();
+    if (uploaded) {
+      setSuccess("Product images uploaded");
+      onUploaded();
+    }
     setBusy(false);
   }
   return (
@@ -135,11 +141,7 @@ export function MediaUpload({
       <p className="text-xs text-slate-500">
         Up to 20 images per product · 5 MB each · Decoded and optimized to WebP
       </p>
-      {error && (
-        <p role="alert" className="text-sm text-red-700">
-          {error}
-        </p>
-      )}
+
       {entries.map((entry, index) => (
         <div key={index} className="flex items-center gap-3 text-sm">
           <img

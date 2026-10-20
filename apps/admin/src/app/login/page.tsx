@@ -1,4 +1,5 @@
 'use client';
+import { useToastState } from "@/components/admin/toast-provider";
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { authenticatedFetch } from '@/lib/authenticated-fetch';
@@ -6,7 +7,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState(''); const [password, setPassword] = useState('');
-  const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+  const [error, setError] = useToastState("error"); const [busy, setBusy] = useState(false);
   async function submit(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError('');
     try {

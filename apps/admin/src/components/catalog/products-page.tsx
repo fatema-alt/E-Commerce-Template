@@ -1,5 +1,7 @@
 "use client";
+import { useToastState } from "@/components/admin/toast-provider";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
+import { PendingProductImages } from "@/components/catalog/pending-product-images";
 import { MediaUpload } from "@/components/catalog/media-upload";
 import {
   api as catalogApi,
@@ -233,7 +235,7 @@ export default function ProductsPage({
   const [editingId, setEditingId] = useState<string | null>(
     initialProduct?.id ?? null,
   );
-  const [editingVersion] = useState<string | null>(
+  const [editingVersion, setEditingVersion] = useState<string | null>(
     initialProduct?.updatedAt ?? null,
   );
   const [showForm, setShowForm] = useState(createMode);
@@ -249,9 +251,10 @@ export default function ProductsPage({
     | "activity"
   >("general");
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [pendingImages, setPendingImages] = useState<File[]>([]);
+  const [, setError] = useToastState("error");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [success, setSuccess] = useState("");
+  const [, setSuccess] = useToastState("success");
   const [stockAction, setStockAction] = useState<StockAction | null>(null);
   const [stockQuantity, setStockQuantity] = useState("1");
   const [stockReason, setStockReason] = useState("");
@@ -268,8 +271,8 @@ export default function ProductsPage({
   );
   const [imagesLoading, setImagesLoading] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
-  const [imageError, setImageError] = useState("");
-  const [imageSuccess, setImageSuccess] = useState("");
+  const [, setImageError] = useToastState("error");
+  const [, setImageSuccess] = useToastState("success");
 
   // Variants
   const [variants, setVariants] = useState<ProductVariant[]>(
@@ -277,20 +280,20 @@ export default function ProductsPage({
   );
   const [variantLoading, setVariantLoading] = useState(false);
   const [variantBusy, setVariantBusy] = useState(false);
-  const [variantError, setVariantError] = useState("");
-  const [variantSuccess, setVariantSuccess] = useState("");
+  const [, setVariantError] = useToastState("error");
+  const [, setVariantSuccess] = useToastState("success");
   const [variantModal, setVariantModal] = useState(false);
   const [variantSearch, setVariantSearch] = useState("");
   const [variantPrice, setVariantPrice] = useState("");
   const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
   const [variantForm, setVariantForm] =
     useState<VariantForm>(initialVariantForm);
-  const [variantFormError, setVariantFormError] = useState("");
+  const [, setVariantFormError] = useToastState("error");
 
   const loadProducts = useCallback(async () => {
     setRevision((value) => value + 1);
   }, []);
-  useUnsavedChanges(showForm && JSON.stringify({ form, extra }) !== baseline);
+  useUnsavedChanges(showForm && (pendingImages.length > 0 || JSON.stringify({ form, extra }) !== baseline));
   useEffect(() => {
     async function loadCategories() {
       try {
@@ -318,7 +321,7 @@ export default function ProductsPage({
       }
     }
     void loadCategories();
-  }, []);
+  }, [setError]);
 
   const loadImages = useCallback(async (productId: string) => {
     setImagesLoading(true);
@@ -338,7 +341,7 @@ export default function ProductsPage({
     } finally {
       setImagesLoading(false);
     }
-  }, []);
+  }, [setImageError]);
 
   const loadVariants = useCallback(async (productId: string) => {
     setVariantLoading(true);
@@ -358,7 +361,7 @@ export default function ProductsPage({
     } finally {
       setVariantLoading(false);
     }
-  }, []);
+  }, [setVariantError]);
 
   async function readApiError(response: Response, fallback: string) {
     const data = await response.json().catch(() => ({}));
@@ -710,6 +713,7 @@ export default function ProductsPage({
   function resetForm() {
     if (createMode) router.push("/products");
     setFieldErrors({});
+    setPendingImages([]);
     setExtra(extraDefaults);
     setForm(initialForm);
     setEditingId(null);
@@ -724,6 +728,7 @@ export default function ProductsPage({
 
   async function saveProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving) return;
     const errors: Record<string, string> = {};
     if (form.name.trim().length < 2 || form.name.length > 200)
       errors.name = "Use a product name of 2?200 characters.";
@@ -794,11 +799,29 @@ export default function ProductsPage({
       );
       if (!response.ok)
         throw new Error(await readApiError(response, "Failed to save product"));
-      setSuccess(
-        editingId
-          ? "Product updated successfully"
-          : "Product created successfully",
-      );
+      const saved: Product = await response.json();
+      // Preserve the saved ID/version so retrying an image never creates another product.
+      setEditingId(saved.id);
+      setEditingVersion(saved.updatedAt);
+      const remaining = [...pendingImages];
+      while (remaining.length) {
+        const body = new FormData();
+        body.append("file", remaining[0]);
+        try {
+          const upload = await authenticatedFetch(API + "/products/" + saved.id + "/images", {
+            method: "POST", body, signal: AbortSignal.timeout(60000),
+          });
+          if (!upload.ok) throw new Error(await readApiError(upload, "Image upload failed"));
+        } catch (error) {
+          setPendingImages([...remaining]);
+          setEditorTab("media");
+          void loadImages(saved.id);
+          throw new Error("Product saved. " + remaining.length + " image(s) still need uploading. Save again to retry. " + (error instanceof Error ? error.message : "Image upload failed"));
+        }
+        remaining.shift();
+        setPendingImages([...remaining]);
+      }
+      setSuccess(editingId ? "Product updated successfully" : pendingImages.length ? "Product and images saved successfully" : "Product created successfully");
       resetForm();
       await loadProducts();
     } catch (err) {
@@ -930,7 +953,7 @@ export default function ProductsPage({
             type="button"
             onClick={async () => {
               if (
-                JSON.stringify({ form, extra }) === baseline ||
+                (pendingImages.length === 0 && JSON.stringify({ form, extra }) === baseline) ||
                 (await confirm("Discard unsaved product changes?"))
               )
                 resetForm();
@@ -951,19 +974,8 @@ export default function ProductsPage({
           )
         )}
       </div>
-      {error && (
-        <div role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">
-          {error}
-        </div>
-      )}
-      {success && (
-        <div
-          role="status"
-          className="rounded-xl bg-green-50 p-4 text-green-700"
-        >
-          {success}
-        </div>
-      )}
+
+
       {createMode && role === "STAFF" && (
         <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">
           You do not have permission to edit products.
@@ -1012,7 +1024,7 @@ export default function ProductsPage({
             {editorTab === "seo" &&
               "Search-engine title and description are saved to the product database."}
             {editorTab === "media" &&
-              "Upload JPG, PNG or WebP images (up to 5 MB). Save a new product before uploading images."}
+              "Choose JPG, PNG or WebP images (up to 5 MB). Images upload when you save a new product."}
             {editorTab === "variants" &&
               "Manage size/color variants with their own SKU, price and attributes. Save the product first to add variants."}
           </div>
@@ -1328,12 +1340,10 @@ export default function ProductsPage({
             </div>
             {editorTab === "media" && (
               <div className="md:col-span-2 space-y-5">
-                {!editingId ? (
-                  <div className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50 p-6 text-sm text-indigo-800">
-                    First complete the required product fields and click Create
-                    Product. Then edit the saved product to upload images.
-                  </div>
-                ) : (
+                {(!editingId || pendingImages.length > 0) && (
+                  <PendingProductImages files={pendingImages} onChange={setPendingImages} disabled={saving} />
+                )}
+                {editingId && (
                   <>
                     <MediaUpload
                       productId={editingId}
@@ -1342,22 +1352,8 @@ export default function ProductsPage({
                         void loadProducts();
                       }}
                     />
-                    {imageError && (
-                      <p
-                        role="alert"
-                        className="rounded-lg bg-red-50 p-3 text-sm text-red-700"
-                      >
-                        {imageError}
-                      </p>
-                    )}
-                    {imageSuccess && (
-                      <p
-                        role="status"
-                        className="rounded-lg bg-green-50 p-3 text-sm text-green-700"
-                      >
-                        {imageSuccess}
-                      </p>
-                    )}
+
+
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold">
                         Image gallery ({images.length})
@@ -1582,22 +1578,8 @@ export default function ProductsPage({
                         Price all variants
                       </button>
                     </div>
-                    {variantError && (
-                      <p
-                        role="alert"
-                        className="rounded-lg bg-red-50 p-3 text-sm text-red-700"
-                      >
-                        {variantError}
-                      </p>
-                    )}
-                    {variantSuccess && (
-                      <p
-                        role="status"
-                        className="rounded-lg bg-green-50 p-3 text-sm text-green-700"
-                      >
-                        {variantSuccess}
-                      </p>
-                    )}
+
+
                     {variantLoading ? (
                       <p className="text-sm text-slate-500">
                         Loading variants...
@@ -1750,7 +1732,7 @@ export default function ProductsPage({
               type="button"
               onClick={async () => {
                 if (
-                  JSON.stringify({ form, extra }) === baseline ||
+                  (pendingImages.length === 0 && JSON.stringify({ form, extra }) === baseline) ||
                   (await confirm("Discard unsaved product changes?"))
                 )
                   resetForm();
@@ -1795,14 +1777,7 @@ export default function ProductsPage({
             <h2 className="text-xl font-bold">
               {editingVariantId ? "Edit Variant" : "Add Variant"}
             </h2>
-            {variantFormError && (
-              <p
-                role="alert"
-                className="rounded-lg bg-red-50 p-3 text-sm text-red-700"
-              >
-                {variantFormError}
-              </p>
-            )}
+
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block space-y-2 text-sm font-medium">
                 Variant Name

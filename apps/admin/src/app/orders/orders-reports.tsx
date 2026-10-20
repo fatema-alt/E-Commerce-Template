@@ -1,4 +1,5 @@
 "use client";
+import { useToastState } from "@/components/admin/toast-provider";
 import { useEffect, useState } from "react";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import { formatMoney, orderFetch } from "./orders-client";
@@ -35,7 +36,7 @@ export function OrdersReports({
     report: Report | null;
     error: string;
   } | null>(null);
-  const [exportError, setError] = useState("");
+  const [exportError, setError] = useToastState("error");
   const report = result?.key === key ? result.report : null;
   const error = exportError || (result?.key === key ? result.error : "");
   const [busy, setBusy] = useState(false);
