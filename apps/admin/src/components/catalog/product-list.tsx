@@ -83,8 +83,10 @@ export function ProductList({
   const [action, setAction] = useState("DRAFT");
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
+  const [statusSaving, setStatusSaving] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useToastState("error");
+  const [, setSuccess] = useToastState("success");
   const [results, setResults] = useState<
     { id: string; success: boolean; error?: string }[]
   >([]);
@@ -219,6 +221,43 @@ export function ProductList({
       setError("Browser preferences could not be saved");
     }
   }
+  async function changeStatus(product: Product, status: Product["status"]) {
+    if (!canEdit || busy || status === product.status) return;
+    setBusy(true);
+    setStatusSaving(product.id);
+    setError("");
+    try {
+      const updated = await api<Product>(
+        "/products/" + product.id,
+        json("PATCH", { status, expectedUpdatedAt: product.updatedAt }),
+      );
+      setItems((current) =>
+        current.map((item) =>
+          item.id === product.id
+            ? {
+                ...item,
+                status: updated.status,
+                isActive: updated.isActive,
+                updatedAt: updated.updatedAt,
+              }
+            : item,
+        ),
+      );
+      setSuccess(`${product.name}: status changed to ${status.toLowerCase()}`);
+      setRefresh((current) => current + 1);
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Could not change product status",
+      );
+      setRefresh((current) => current + 1);
+    } finally {
+      setBusy(false);
+      setStatusSaving(null);
+    }
+  }
+
   async function bulk() {
     if (
       !selected.length ||
@@ -744,7 +783,34 @@ export function ProductList({
                         {product.availableStock} available
                       </span>
                     ),
-                    Status: (
+                    Status: canEdit ? (
+                      <div className="space-y-1">
+                        <select
+                          aria-label={`Status for ${product.name}`}
+                          className={control}
+                          value={product.status}
+                          disabled={busy || loading}
+                          onChange={(event) =>
+                            void changeStatus(
+                              product,
+                              event.target.value as Product["status"],
+                            )
+                          }
+                        >
+                          <option value="DRAFT">Draft</option>
+                          <option value="ACTIVE">Active</option>
+                          <option value="ARCHIVED">Archived</option>
+                        </select>
+                        {statusSaving === product.id && (
+                          <span
+                            role="status"
+                            className="block text-xs text-slate-500"
+                          >
+                            Updating status…
+                          </span>
+                        )}
+                      </div>
+                    ) : (
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold">
                         {product.status}
                       </span>

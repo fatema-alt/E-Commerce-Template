@@ -92,6 +92,7 @@ export default function CategoriesPage({
   const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [statusSaving, setStatusSaving] = useState<string | null>(null);
   const [error, setError] = useToastState("error");
   const [, setSuccess] = useToastState("success");
   const [editing, setEditing] = useState<Category | null>(
@@ -265,16 +266,28 @@ export default function CategoriesPage({
       setBusy(false);
     }
   }
-  async function toggle(category: Category) {
+  async function changeStatus(category: Category, isActive: boolean) {
+    if (!canEdit || busy || isActive === category.isActive) return;
     setBusy(true);
+    setStatusSaving(category.id);
     setError("");
     try {
-      await api(
+      const updated = await api<Category>(
         "/categories/" + category.id,
-        json("PATCH", { isActive: !category.isActive }),
+        json("PATCH", { isActive, expectedUpdatedAt: category.updatedAt }),
       );
+      const updateRows = (rows: Category[]): Category[] =>
+        rows.map((item) => ({
+          ...item,
+          ...(item.id === category.id
+            ? { isActive: updated.isActive, updatedAt: updated.updatedAt }
+            : {}),
+          ...(item.children ? { children: updateRows(item.children) } : {}),
+        }));
+      setItems(updateRows);
+      setTree(updateRows);
       setSuccess(
-        category.isActive
+        !isActive
           ? "Category deactivated; products and history retained"
           : "Category activated",
       );
@@ -283,8 +296,10 @@ export default function CategoriesPage({
       setError(
         error instanceof Error ? error.message : "Could not update category",
       );
+      setRefresh((n) => n + 1);
     } finally {
       setBusy(false);
+      setStatusSaving(null);
     }
   }
   const text = (
@@ -391,7 +406,29 @@ export default function CategoriesPage({
         </Link>
       </td>
       <td className="p-4">
-        {category.isActive ? "Active" : "Inactive"}
+        {canEdit ? (
+          <select
+            aria-label={`Status for ${category.name}`}
+            className={control}
+            value={category.isActive ? "active" : "inactive"}
+            disabled={busy || loading}
+            onChange={(event) =>
+              void changeStatus(category, event.target.value === "active")
+            }
+          >
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        ) : category.isActive ? (
+          "Active"
+        ) : (
+          "Inactive"
+        )}
+        {statusSaving === category.id && (
+          <span role="status" className="block text-xs text-slate-500">
+            Updating status…
+          </span>
+        )}
         <span className="block text-xs text-slate-400">
           {category.isVisible ? "Public" : "Hidden"}
         </span>
@@ -411,9 +448,6 @@ export default function CategoriesPage({
                 }
               >
                 Edit / move
-              </button>
-              <button disabled={busy} onClick={() => void toggle(category)}>
-                {category.isActive ? "Deactivate" : "Activate"}
               </button>
             </>
           )}
@@ -653,7 +687,6 @@ export default function CategoriesPage({
       {showEditor && canEdit && (
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <form onSubmit={save} className="space-y-5">
-
             <nav
               aria-label="Category breadcrumb"
               className="text-xs text-slate-500"
