@@ -768,9 +768,10 @@ export function ProductList({
                     }
                   />
                 </th>
+                <th className="p-4">Product ID</th>
                 <th className="p-4">Product</th>
                 {columns
-                  .filter((column) => visible.includes(column))
+                  .filter((column) => column !== "Product ID" && visible.includes(column))
                   .map((column) => (
                     <th className="p-4" key={column}>
                       {column}
@@ -788,7 +789,7 @@ export function ProductList({
                   const values: Record<string, React.ReactNode> = {
                     "Product ID": (
                       <div className="space-y-1">
-                        <code className="block max-w-[15rem] select-text whitespace-normal break-all text-xs">
+                        <code className="block select-text whitespace-nowrap text-xs">
                           {product.id}
                         </code>
                         <button
@@ -874,6 +875,9 @@ export function ProductList({
                           }
                         />
                       </td>
+                      <td className="p-4 text-slate-600">
+                        {values["Product ID"]}
+                      </td>
                       <td className="p-4">
                         <div className="flex items-center gap-3">
                           {image ? (
@@ -900,7 +904,7 @@ export function ProductList({
                         </div>
                       </td>
                       {columns
-                        .filter((column) => visible.includes(column))
+                        .filter((column) => column !== "Product ID" && visible.includes(column))
                         .map((column) => (
                           <td key={column} className="p-4 text-slate-600">
                             {values[column]}

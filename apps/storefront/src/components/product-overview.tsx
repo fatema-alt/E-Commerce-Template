@@ -29,7 +29,7 @@ export function ProductOverview({ product }: { product: Product }) {
     <div className="product-detail-grid pdp-overview">
       <ProductGallery key={variantId} images={gallery} name={product.name} />
       <section className="pdp-information" aria-labelledby="product-title">
-        <p className="eyebrow">{product.brand || "THE DS MART EDIT"}</p>
+        <p className="eyebrow">{product.brand || "DS Mart pick"}</p>
         <h1 id="product-title">{product.name}</h1>
         {product.shortDescription && (
           <p className="pdp-intro">{product.shortDescription}</p>

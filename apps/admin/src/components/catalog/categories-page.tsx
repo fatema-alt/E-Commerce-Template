@@ -355,6 +355,26 @@ export default function CategoriesPage({
   );
   const row = (category: Category, depth = 0) => (
     <tr key={category.id} className="border-t hover:bg-slate-50/60">
+      <td className="p-4 text-slate-600">
+        <code className="block select-text whitespace-nowrap text-xs">
+          {category.id}
+        </code>
+        <button
+          type="button"
+          aria-label={`Copy Category ID for ${category.name}`}
+          className="mt-1 whitespace-nowrap text-xs font-medium text-indigo-600 hover:underline"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(category.id);
+              setSuccess("Category ID copied");
+            } catch {
+              setError("Could not copy Category ID. Select and copy the displayed ID manually.");
+            }
+          }}
+        >
+          Copy ID
+        </button>
+      </td>
       <td className="p-4">
         <div
           className="flex items-center gap-3"
@@ -626,6 +646,7 @@ export default function CategoriesPage({
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                   <tr>
                     {[
+                      "Category ID",
                       "Category",
                       "Parent",
                       "Products",

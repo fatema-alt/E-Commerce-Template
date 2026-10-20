@@ -69,11 +69,11 @@ async function RelatedProducts({ product }: { product: Product }) {
     <section className="section pdp-related" aria-labelledby="related-title">
       <div className="section-head">
         <div>
-          <p className="eyebrow">KEEP EXPLORING</p>
+          <p className="eyebrow">Keep exploring</p>
           <h2 id="related-title">You might also like</h2>
         </div>
         <Link href={`/category/${encodeURIComponent(product.category.slug)}`}>
-          View collection →
+          View collection
         </Link>
       </div>
       <div className="products-grid">
@@ -134,7 +134,7 @@ async function Content({ params }: Props) {
           className="shop-panel pdp-details"
           aria-labelledby="details-title"
         >
-          <p className="eyebrow">THE FINER DETAILS</p>
+          <p className="eyebrow">The details</p>
           <h2 id="details-title">About this product</h2>
           <p className="pdp-description">
             {product.description ||
@@ -159,7 +159,7 @@ async function Content({ params }: Props) {
           className="shop-panel pdp-help"
           aria-labelledby="delivery-title"
         >
-          <p className="eyebrow">GOOD TO KNOW</p>
+          <p className="eyebrow">Good to know</p>
           <h2 id="delivery-title">Delivery & support</h2>
           <details open>
             <summary>Delivery and payment</summary>
@@ -176,7 +176,7 @@ async function Content({ params }: Props) {
               help with an existing order. Include your order number if you have
               one.
             </p>
-            <Link href="/contact">Contact DS Mart →</Link>
+            <Link href="/contact">Contact DS Mart</Link>
           </details>
           <details>
             <summary>Tracking your order</summary>
@@ -184,7 +184,7 @@ async function Content({ params }: Props) {
               Signed-in customers can view account orders. For a guest order,
               use the browser you placed it from.
             </p>
-            <Link href="/orders">View your orders →</Link>
+            <Link href="/orders">View your orders</Link>
           </details>
           <Link className="pdp-help-link" href="/help">
             More shopping help ↗

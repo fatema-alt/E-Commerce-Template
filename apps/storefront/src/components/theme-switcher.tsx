@@ -10,7 +10,7 @@ function read(): Preference {
     const value = localStorage.getItem(key);
     return value === "light" || value === "dark" ? value : "system";
   } catch {
-    return 'system';
+    return "system";
   }
 }
 function apply() {
@@ -24,7 +24,7 @@ function apply() {
 }
 function subscribe(callback: () => void) {
   const update = (received: Event) => {
-    if (received.type === 'storage') fallback = null;
+    if (received.type === "storage") fallback = null;
     apply();
     callback();
   };
@@ -35,8 +35,9 @@ function subscribe(callback: () => void) {
     window.removeEventListener(event, update);
   };
 }
+const isDark = () => document.documentElement.dataset.theme === "dark";
 export function ThemeSwitcher() {
-  const preference = useSyncExternalStore(subscribe, read, () => "system");
+  const dark = useSyncExternalStore(subscribe, isDark, () => false);
   useEffect(() => {
     apply();
     const media = matchMedia("(prefers-color-scheme: dark)");
@@ -44,26 +45,29 @@ export function ThemeSwitcher() {
     return () => media.removeEventListener("change", apply);
   }, []);
   return (
-    <label className="theme-switcher">
-      <span aria-hidden="true">◐</span>
-      <span className="theme-switcher-label">Theme</span>
-      <select
-        aria-label="Color theme"
-        value={preference}
-        onChange={(event) => {
-          fallback = event.target.value as Preference;
-          try {
-            localStorage.setItem(key, fallback);
-            fallback = null;
-          } catch {}
-          apply();
-          window.dispatchEvent(new Event("commerce-theme-change"));
-        }}
-      >
-        <option value="system">System</option>
-        <option value="light">Light</option>
-        <option value="dark">Dark</option>
-      </select>
-    </label>
+    <button
+      type="button"
+      className="theme-switcher"
+      role="switch"
+      aria-checked={dark}
+      aria-label="Dark mode"
+      onClick={() => {
+        fallback = isDark() ? "light" : "dark";
+        try {
+          localStorage.setItem(key, fallback);
+          fallback = null;
+        } catch {}
+        apply();
+        window.dispatchEvent(new Event(event));
+      }}
+    >
+      <span className="ts-knob" aria-hidden="true" />
+      <span className="ts-icon sun" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+      </span>
+      <span className="ts-icon moon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>
+      </span>
+    </button>
   );
 }

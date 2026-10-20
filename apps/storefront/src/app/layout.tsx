@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense, type CSSProperties, type ReactNode } from "react";
+import { Hanken_Grotesk } from "next/font/google";
 import { getCmsConfig, type CmsConfig } from "../lib/cms";
 import { fallbackConfig } from "../lib/storefront";
 import { unstable_rethrow } from "next/navigation";
@@ -9,12 +10,15 @@ import { themeScript } from "../lib/theme-init";
 import { connection } from "next/server";
 import { StoreAnalytics } from "../components/store-analytics";
 import "./globals.css";
+
 export const metadata: Metadata = {
   title: { default: "DS Mart | Shop smart. Live smart.", template: "%s | DS Mart" },
   description: "Shop electronics, fashion, home essentials and more at DS Mart. Shop smart. Live smart.",
   applicationName: "DS Mart",
   icons: { icon: "/brand/icon.svg", apple: "/brand/ds-symbol.png" },
 };
+
+const hanken = Hanken_Grotesk({ subsets: ["latin"], variable: "--font-hanken", display: "swap" });
 const fonts: Record<string, string> = {
   system: "system-ui, sans-serif",
   sans: "Arial, sans-serif",
@@ -60,7 +64,7 @@ async function StoreFrame({ children }: { children: ReactNode }) {
       </a>
       <Header config={config} />
       <StoreAnalytics />
-      {unavailable ? <main id="main" className="container main-content"><div className="shop-panel store-unavailable"><p className="eyebrow">DS MART</p><h1>We’ll be right back.</h1><p>Our store is temporarily unavailable. Please try again shortly.</p><a className="primary-button" href="/">Try again</a><a className="secondary-button" href="/help">Shopping help</a></div></main> : children}
+      {unavailable ? <main id="main" className="container main-content"><div className="shop-panel store-unavailable"><p className="eyebrow">DS Mart</p><h1>We’ll be right back.</h1><p>Our store is temporarily unavailable. Please try again shortly.</p><a className="primary-button" href="/">Try again</a><a className="secondary-button" href="/help">Shopping help</a></div></main> : children}
       <StoreBenefits />
       <Footer config={config} />
     </div>
@@ -68,7 +72,7 @@ async function StoreFrame({ children }: { children: ReactNode }) {
 }
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={hanken.variable} data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

@@ -76,9 +76,6 @@ export function Header({ config }: { config: CmsConfig }) {
           </Link>
           {(!settings.header ||
             settings.header.searchPlacement === "header") && <Search />}
-          <Link className="header-action" href="/shop">
-            Shop all
-          </Link>
           <ShoppingLinks />
           <ThemeSwitcher />
         </div>
@@ -114,7 +111,7 @@ export function Footer({ config }: { config: CmsConfig }) {
         <div>
           <Link href="/" className="wordmark" aria-label="DS Mart homepage"><BrandLogo /></Link>
           <p className="footer-tagline">Shop smart. Live smart.</p>
-          <p>Everyday essentials. Fresh discoveries.<br />A little more for your everyday.</p>
+          <p>Everyday essentials and fresh discoveries, delivered.</p>
           {settings.contact?.address && <p>{settings.contact.address}</p>}
           {settings.contact?.email && (
             <p>
@@ -160,7 +157,7 @@ export function Footer({ config }: { config: CmsConfig }) {
       </div>
       <div className="container footer-bottom">
         <span>© {new Date().getUTCFullYear()} DS Mart. All rights reserved.</span>
-        <span>SHOP SMART. LIVE SMART.</span>
+        <span>Shop smart. Live smart.</span>
       </div>
     </footer>
   );
