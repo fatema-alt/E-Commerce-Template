@@ -34,6 +34,7 @@ const initial: Query = {
   sortDirection: "desc",
 };
 const columns = [
+  "Product ID",
   "SKU",
   "Type",
   "Category",
@@ -47,6 +48,7 @@ const columns = [
   "Created",
   "Updated",
 ];
+const requiredColumns = ["Product ID", "Category"];
 
 export function ProductList({
   revision,
@@ -77,7 +79,7 @@ export function ProductList({
     { currency: string; value: string }[]
   >([]);
   const [selected, setSelected] = useState<string[]>([]);
-  const [visible, setVisible] = useState(columns.slice(0, 10));
+  const [visible, setVisible] = useState(columns.slice(0, 11));
   const [saved, setSaved] = useState<Record<string, Query>>({});
   const [filterName, setFilterName] = useState("");
   const [action, setAction] = useState("DRAFT");
@@ -105,9 +107,12 @@ export function ProductList({
         );
         if (category) setQuery((prev) => ({ ...prev, categoryId: category }));
         if (Array.isArray(prefs.columns))
-          setVisible(
-            prefs.columns.filter((item: string) => columns.includes(item)),
-          );
+          setVisible([
+            ...new Set([
+              ...requiredColumns,
+              ...prefs.columns.filter((item: string) => columns.includes(item)),
+            ]),
+          ]);
         if (prefs.filters && typeof prefs.filters === "object")
           setSaved(prefs.filters);
       } catch {
@@ -210,6 +215,7 @@ export function ProductList({
     nextColumns: string[],
     nextSaved: Record<string, Query>,
   ) {
+    nextColumns = [...new Set([...requiredColumns, ...nextColumns])];
     setVisible(nextColumns);
     setSaved(nextSaved);
     try {
@@ -221,6 +227,17 @@ export function ProductList({
       setError("Browser preferences could not be saved");
     }
   }
+  async function copyProductId(product: Product) {
+    try {
+      await navigator.clipboard.writeText(product.id);
+      setSuccess("Product ID copied");
+    } catch {
+      setError(
+        "Could not copy Product ID. Select and copy the displayed ID manually.",
+      );
+    }
+  }
+
   async function changeStatus(product: Product, status: Product["status"]) {
     if (!canEdit || busy || status === product.status) return;
     setBusy(true);
@@ -306,6 +323,7 @@ export function ProductList({
     const rows = [
       [
         "Name",
+        "Product ID",
         "SKU",
         "Type",
         "Category",
@@ -320,6 +338,7 @@ export function ProductList({
         .filter((item) => selected.includes(item.id))
         .map((item) => [
           item.name,
+          item.id,
           item.sku,
           item.type,
           item.category.name,
@@ -567,6 +586,7 @@ export function ProductList({
                 <input
                   type="checkbox"
                   checked={visible.includes(column)}
+                  disabled={requiredColumns.includes(column)}
                   onChange={(e) =>
                     preferences(
                       e.target.checked
@@ -766,6 +786,21 @@ export function ProductList({
                     product.images?.find((item) => item.isPrimary) ??
                     product.images?.[0];
                   const values: Record<string, React.ReactNode> = {
+                    "Product ID": (
+                      <div className="space-y-1">
+                        <code className="block max-w-[15rem] select-text whitespace-normal break-all text-xs">
+                          {product.id}
+                        </code>
+                        <button
+                          type="button"
+                          aria-label={`Copy Product ID for ${product.name}`}
+                          onClick={() => void copyProductId(product)}
+                          className="text-xs font-medium text-indigo-600 hover:underline"
+                        >
+                          Copy ID
+                        </button>
+                      </div>
+                    ),
                     SKU: product.sku,
                     Type: product.type,
                     Category: product.category.name,
