@@ -16,6 +16,7 @@
     "start:prod": "node dist/main",
     "lint": "oxlint --type-aware src/ test/",
     "test": "vitest run",
+    "test:dashboard": "node scripts/test-dashboard.mjs",
     "test:catalog": "node scripts/test-catalog.mjs",
     "test:catalog:http": "node scripts/smoke-catalog.mjs",
     "test:orders": "tsx scripts/verify-orders.ts",

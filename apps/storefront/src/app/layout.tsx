@@ -7,6 +7,7 @@ import { Footer, Header } from "../components/store-shell";
 import { StoreBenefits } from "../components/store-benefits";
 import { themeScript } from "../lib/theme-init";
 import { connection } from "next/server";
+import { StoreAnalytics } from "../components/store-analytics";
 import "./globals.css";
 export const metadata: Metadata = {
   title: { default: "DS Mart | Shop smart. Live smart.", template: "%s | DS Mart" },
@@ -58,6 +59,7 @@ async function StoreFrame({ children }: { children: ReactNode }) {
         Skip to content
       </a>
       <Header config={config} />
+      <StoreAnalytics />
       {unavailable ? <main id="main" className="container main-content"><div className="shop-panel store-unavailable"><p className="eyebrow">DS MART</p><h1>We’ll be right back.</h1><p>Our store is temporarily unavailable. Please try again shortly.</p><a className="primary-button" href="/">Try again</a><a className="secondary-button" href="/help">Shopping help</a></div></main> : children}
       <StoreBenefits />
       <Footer config={config} />

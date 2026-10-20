@@ -390,6 +390,9 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 
 export const ModelName = {
+  AnalyticsSession: 'AnalyticsSession',
+  AnalyticsEvent: 'AnalyticsEvent',
+  DashboardTarget: 'DashboardTarget',
   AdminUser: 'AdminUser',
   AdminSession: 'AdminSession',
   Category: 'Category',
@@ -442,10 +445,232 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "adminUser" | "adminSession" | "category" | "product" | "productImage" | "productVariant" | "inventory" | "inventoryMovement" | "catalogAuditLog" | "catalogRedirect" | "catalogSku" | "customer" | "customerAddress" | "customerNote" | "customerAuditEvent" | "order" | "orderItem" | "orderAddress" | "orderPaymentTransaction" | "orderShipment" | "orderReturn" | "orderReturnItem" | "orderEvent" | "orderAdminNote" | "orderStockReservation" | "orderIdempotencyKey" | "cmsDocument" | "cmsVersion" | "cmsAuditEvent" | "cmsMediaAsset" | "cmsAssetReference" | "cmsPublicationEvent" | "shopperAccount" | "shopperSession" | "shopperOrderAccess" | "newsletterSubscription" | "storefrontThrottle"
+    modelProps: "analyticsSession" | "analyticsEvent" | "dashboardTarget" | "adminUser" | "adminSession" | "category" | "product" | "productImage" | "productVariant" | "inventory" | "inventoryMovement" | "catalogAuditLog" | "catalogRedirect" | "catalogSku" | "customer" | "customerAddress" | "customerNote" | "customerAuditEvent" | "order" | "orderItem" | "orderAddress" | "orderPaymentTransaction" | "orderShipment" | "orderReturn" | "orderReturnItem" | "orderEvent" | "orderAdminNote" | "orderStockReservation" | "orderIdempotencyKey" | "cmsDocument" | "cmsVersion" | "cmsAuditEvent" | "cmsMediaAsset" | "cmsAssetReference" | "cmsPublicationEvent" | "shopperAccount" | "shopperSession" | "shopperOrderAccess" | "newsletterSubscription" | "storefrontThrottle"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
+    AnalyticsSession: {
+      payload: Prisma.$AnalyticsSessionPayload<ExtArgs>
+      fields: Prisma.AnalyticsSessionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AnalyticsSessionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsSessionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AnalyticsSessionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsSessionPayload>
+        }
+        findFirst: {
+          args: Prisma.AnalyticsSessionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsSessionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AnalyticsSessionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsSessionPayload>
+        }
+        findMany: {
+          args: Prisma.AnalyticsSessionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsSessionPayload>[]
+        }
+        create: {
+          args: Prisma.AnalyticsSessionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsSessionPayload>
+        }
+        createMany: {
+          args: Prisma.AnalyticsSessionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AnalyticsSessionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsSessionPayload>[]
+        }
+        delete: {
+          args: Prisma.AnalyticsSessionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsSessionPayload>
+        }
+        update: {
+          args: Prisma.AnalyticsSessionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsSessionPayload>
+        }
+        deleteMany: {
+          args: Prisma.AnalyticsSessionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AnalyticsSessionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AnalyticsSessionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsSessionPayload>[]
+        }
+        upsert: {
+          args: Prisma.AnalyticsSessionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsSessionPayload>
+        }
+        aggregate: {
+          args: Prisma.AnalyticsSessionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAnalyticsSession>
+        }
+        groupBy: {
+          args: Prisma.AnalyticsSessionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AnalyticsSessionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AnalyticsSessionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AnalyticsSessionCountAggregateOutputType> | number
+        }
+      }
+    }
+    AnalyticsEvent: {
+      payload: Prisma.$AnalyticsEventPayload<ExtArgs>
+      fields: Prisma.AnalyticsEventFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AnalyticsEventFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsEventPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AnalyticsEventFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsEventPayload>
+        }
+        findFirst: {
+          args: Prisma.AnalyticsEventFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsEventPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AnalyticsEventFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsEventPayload>
+        }
+        findMany: {
+          args: Prisma.AnalyticsEventFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsEventPayload>[]
+        }
+        create: {
+          args: Prisma.AnalyticsEventCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsEventPayload>
+        }
+        createMany: {
+          args: Prisma.AnalyticsEventCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AnalyticsEventCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsEventPayload>[]
+        }
+        delete: {
+          args: Prisma.AnalyticsEventDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsEventPayload>
+        }
+        update: {
+          args: Prisma.AnalyticsEventUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsEventPayload>
+        }
+        deleteMany: {
+          args: Prisma.AnalyticsEventDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AnalyticsEventUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AnalyticsEventUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsEventPayload>[]
+        }
+        upsert: {
+          args: Prisma.AnalyticsEventUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AnalyticsEventPayload>
+        }
+        aggregate: {
+          args: Prisma.AnalyticsEventAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAnalyticsEvent>
+        }
+        groupBy: {
+          args: Prisma.AnalyticsEventGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AnalyticsEventGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AnalyticsEventCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AnalyticsEventCountAggregateOutputType> | number
+        }
+      }
+    }
+    DashboardTarget: {
+      payload: Prisma.$DashboardTargetPayload<ExtArgs>
+      fields: Prisma.DashboardTargetFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DashboardTargetFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardTargetPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DashboardTargetFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardTargetPayload>
+        }
+        findFirst: {
+          args: Prisma.DashboardTargetFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardTargetPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DashboardTargetFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardTargetPayload>
+        }
+        findMany: {
+          args: Prisma.DashboardTargetFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardTargetPayload>[]
+        }
+        create: {
+          args: Prisma.DashboardTargetCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardTargetPayload>
+        }
+        createMany: {
+          args: Prisma.DashboardTargetCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.DashboardTargetCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardTargetPayload>[]
+        }
+        delete: {
+          args: Prisma.DashboardTargetDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardTargetPayload>
+        }
+        update: {
+          args: Prisma.DashboardTargetUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardTargetPayload>
+        }
+        deleteMany: {
+          args: Prisma.DashboardTargetDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DashboardTargetUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DashboardTargetUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardTargetPayload>[]
+        }
+        upsert: {
+          args: Prisma.DashboardTargetUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardTargetPayload>
+        }
+        aggregate: {
+          args: Prisma.DashboardTargetAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDashboardTarget>
+        }
+        groupBy: {
+          args: Prisma.DashboardTargetGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DashboardTargetGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DashboardTargetCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DashboardTargetCountAggregateOutputType> | number
+        }
+      }
+    }
     AdminUser: {
       payload: Prisma.$AdminUserPayload<ExtArgs>
       fields: Prisma.AdminUserFieldRefs
@@ -3223,6 +3448,34 @@ export const TransactionIsolationLevel = runtime.makeStrictEnum({
 export type TransactionIsolationLevel = (typeof TransactionIsolationLevel)[keyof typeof TransactionIsolationLevel]
 
 
+export const AnalyticsSessionScalarFieldEnum = {
+  id: 'id',
+  source: 'source',
+  createdAt: 'createdAt'
+} as const
+
+export type AnalyticsSessionScalarFieldEnum = (typeof AnalyticsSessionScalarFieldEnum)[keyof typeof AnalyticsSessionScalarFieldEnum]
+
+
+export const AnalyticsEventScalarFieldEnum = {
+  id: 'id',
+  sessionId: 'sessionId',
+  kind: 'kind',
+  createdAt: 'createdAt'
+} as const
+
+export type AnalyticsEventScalarFieldEnum = (typeof AnalyticsEventScalarFieldEnum)[keyof typeof AnalyticsEventScalarFieldEnum]
+
+
+export const DashboardTargetScalarFieldEnum = {
+  month: 'month',
+  amount: 'amount',
+  updatedAt: 'updatedAt'
+} as const
+
+export type DashboardTargetScalarFieldEnum = (typeof DashboardTargetScalarFieldEnum)[keyof typeof DashboardTargetScalarFieldEnum]
+
+
 export const AdminUserScalarFieldEnum = {
   id: 'id',
   email: 'email',
@@ -3893,6 +4146,34 @@ export type ListStringFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaMod
 
 
 /**
+ * Reference to a field of type 'DateTime'
+ */
+export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
+    
+
+
+/**
+ * Reference to a field of type 'DateTime[]'
+ */
+export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Decimal'
+ */
+export type DecimalFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Decimal'>
+    
+
+
+/**
+ * Reference to a field of type 'Decimal[]'
+ */
+export type ListDecimalFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Decimal[]'>
+    
+
+
+/**
  * Reference to a field of type 'AdminRole'
  */
 export type EnumAdminRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AdminRole'>
@@ -3914,20 +4195,6 @@ export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel,
 
 
 /**
- * Reference to a field of type 'DateTime'
- */
-export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
-    
-
-
-/**
- * Reference to a field of type 'DateTime[]'
- */
-export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime[]'>
-    
-
-
-/**
  * Reference to a field of type 'Int'
  */
 export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
@@ -3938,20 +4205,6 @@ export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'In
  * Reference to a field of type 'Int[]'
  */
 export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
-    
-
-
-/**
- * Reference to a field of type 'Decimal'
- */
-export type DecimalFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Decimal'>
-    
-
-
-/**
- * Reference to a field of type 'Decimal[]'
- */
-export type ListDecimalFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Decimal[]'>
     
 
 
@@ -4279,6 +4532,9 @@ export interface PrismaClientOptions {
   omit?: GlobalOmitConfig
 }
 export type GlobalOmitConfig = {
+  analyticsSession?: Prisma.AnalyticsSessionOmit
+  analyticsEvent?: Prisma.AnalyticsEventOmit
+  dashboardTarget?: Prisma.DashboardTargetOmit
   adminUser?: Prisma.AdminUserOmit
   adminSession?: Prisma.AdminSessionOmit
   category?: Prisma.CategoryOmit

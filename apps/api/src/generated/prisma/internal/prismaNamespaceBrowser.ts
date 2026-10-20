@@ -49,6 +49,9 @@ export const AnyNull = runtime.objectEnumValues.instances.AnyNull
 
 
 export const ModelName = {
+  AnalyticsSession: 'AnalyticsSession',
+  AnalyticsEvent: 'AnalyticsEvent',
+  DashboardTarget: 'DashboardTarget',
   AdminUser: 'AdminUser',
   AdminSession: 'AdminSession',
   Category: 'Category',
@@ -102,6 +105,34 @@ export const TransactionIsolationLevel = runtime.makeStrictEnum({
 } as const)
 
 export type TransactionIsolationLevel = (typeof TransactionIsolationLevel)[keyof typeof TransactionIsolationLevel]
+
+
+export const AnalyticsSessionScalarFieldEnum = {
+  id: 'id',
+  source: 'source',
+  createdAt: 'createdAt'
+} as const
+
+export type AnalyticsSessionScalarFieldEnum = (typeof AnalyticsSessionScalarFieldEnum)[keyof typeof AnalyticsSessionScalarFieldEnum]
+
+
+export const AnalyticsEventScalarFieldEnum = {
+  id: 'id',
+  sessionId: 'sessionId',
+  kind: 'kind',
+  createdAt: 'createdAt'
+} as const
+
+export type AnalyticsEventScalarFieldEnum = (typeof AnalyticsEventScalarFieldEnum)[keyof typeof AnalyticsEventScalarFieldEnum]
+
+
+export const DashboardTargetScalarFieldEnum = {
+  month: 'month',
+  amount: 'amount',
+  updatedAt: 'updatedAt'
+} as const
+
+export type DashboardTargetScalarFieldEnum = (typeof DashboardTargetScalarFieldEnum)[keyof typeof DashboardTargetScalarFieldEnum]
 
 
 export const AdminUserScalarFieldEnum = {

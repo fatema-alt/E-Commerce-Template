@@ -12,20 +12,39 @@ import { CatalogResponseInterceptor } from './catalog/catalog.interceptor.js';
 import { CatalogController } from './catalog/catalog.controller.js';
 import { StorefrontController } from './catalog/storefront.controller.js';
 import { CustomersModule } from './customers/customers.module.js';
-import { OrdersModule } from './orders/orders.module.js'; 
+import { OrdersModule } from './orders/orders.module.js';
 import { CmsModule } from './cms/cms.module.js';
 import { ShopModule } from './shop/shop.module.js';
+import {
+  AnalyticsController,
+  DashboardController,
+} from './dashboard/dashboard.controller.js';
+import { DashboardService } from './dashboard/dashboard.service.js';
 
-@Module({ imports: [
-  PrismaModule,
-  MediaModule,
-  AuthModule,
-  CategoriesModule,
-  ProductsModule,
-  InventoryModule,
-  CustomersModule,
-   OrdersModule,
-  CmsModule,
-  ShopModule,
-], controllers: [AppController, CatalogController, StorefrontController], providers: [AppService, { provide: APP_INTERCEPTOR, useClass: CatalogResponseInterceptor }] })
+@Module({
+  imports: [
+    PrismaModule,
+    MediaModule,
+    AuthModule,
+    CategoriesModule,
+    ProductsModule,
+    InventoryModule,
+    CustomersModule,
+    OrdersModule,
+    CmsModule,
+    ShopModule,
+  ],
+  controllers: [
+    AppController,
+    CatalogController,
+    StorefrontController,
+    AnalyticsController,
+    DashboardController,
+  ],
+  providers: [
+    AppService,
+    DashboardService,
+    { provide: APP_INTERCEPTOR, useClass: CatalogResponseInterceptor },
+  ],
+})
 export class AppModule {}

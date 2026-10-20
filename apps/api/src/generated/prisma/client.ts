@@ -29,8 +29,8 @@ export * from "./enums.js"
  * @example
  * ```
  * const prisma = new PrismaClient()
- * // Fetch zero or more AdminUsers
- * const adminUsers = await prisma.adminUser.findMany()
+ * // Fetch zero or more AnalyticsSessions
+ * const analyticsSessions = await prisma.analyticsSession.findMany()
  * ```
  * 
  * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client).
@@ -44,6 +44,21 @@ export { Prisma }
 path.join(__dirname, "query_engine-windows.dll.node")
 path.join(process.cwd(), "src/generated/prisma/query_engine-windows.dll.node")
 
+/**
+ * Model AnalyticsSession
+ * 
+ */
+export type AnalyticsSession = Prisma.AnalyticsSessionModel
+/**
+ * Model AnalyticsEvent
+ * 
+ */
+export type AnalyticsEvent = Prisma.AnalyticsEventModel
+/**
+ * Model DashboardTarget
+ * 
+ */
+export type DashboardTarget = Prisma.DashboardTargetModel
 /**
  * Model AdminUser
  * 

@@ -18,6 +18,21 @@ export { Prisma }
 export * as $Enums from './enums.js'
 export * from './enums.js';
 /**
+ * Model AnalyticsSession
+ * 
+ */
+export type AnalyticsSession = Prisma.AnalyticsSessionModel
+/**
+ * Model AnalyticsEvent
+ * 
+ */
+export type AnalyticsEvent = Prisma.AnalyticsEventModel
+/**
+ * Model DashboardTarget
+ * 
+ */
+export type DashboardTarget = Prisma.DashboardTargetModel
+/**
  * Model AdminUser
  * 
  */

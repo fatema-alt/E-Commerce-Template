@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useSyncExternalStore } from "react";
 import type { Product } from "./storefront";
+import { trackEvent } from "./analytics";
 export type CartLine = {
   productId: string;
   variantId?: string;
@@ -128,6 +129,7 @@ export function useCart() {
             )
           : [...current, line],
       );
+      trackEvent("ADD_TO_CART");
     },
     update(line: CartLine, quantity: number) {
       if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 10000)

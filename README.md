@@ -168,6 +168,7 @@ Generate the Prisma client before building the API. Database-backed regression a
 
 ## Documentation
 
+- [Dynamic dashboard and deployment](docs/dashboard.md)
 - [Catalog implementation](docs/catalog-implementation.md)
 - [Order management](docs/orders-implementation.md)
 - [CMS foundation](docs/cms-foundation.md)

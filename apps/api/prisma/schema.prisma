@@ -13,6 +13,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model AnalyticsSession {
+  id String @id @db.Uuid
+  source String @db.VarChar(20)
+  createdAt DateTime @default(now())
+  events AnalyticsEvent[]
+  @@index([createdAt, source])
+  @@map("analytics_sessions")
+}
+
+model AnalyticsEvent {
+  id String @id @db.Uuid
+  sessionId String @db.Uuid
+  session AnalyticsSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  kind String @db.VarChar(20)
+  createdAt DateTime @default(now())
+  @@index([createdAt, kind, sessionId])
+  @@index([sessionId, createdAt])
+  @@map("analytics_events")
+}
+
+model DashboardTarget {
+  month String @id @db.VarChar(7)
+  amount Decimal @db.Decimal(14, 2)
+  updatedAt DateTime @updatedAt
+  @@map("dashboard_targets")
+}
+
 enum AdminRole {
   SUPER_ADMIN
   ADMIN

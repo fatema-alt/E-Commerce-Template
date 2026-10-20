@@ -361,20 +361,12 @@ export type AdminUserScalarRelationFilter = {
   isNot?: Prisma.AdminUserWhereInput
 }
 
-export type StringFieldUpdateOperationsInput = {
-  set?: string
-}
-
 export type EnumAdminRoleFieldUpdateOperationsInput = {
   set?: $Enums.AdminRole
 }
 
 export type BoolFieldUpdateOperationsInput = {
   set?: boolean
-}
-
-export type DateTimeFieldUpdateOperationsInput = {
-  set?: Date | string
 }
 
 export type AdminUserCreateNestedOneWithoutSessionsInput = {
