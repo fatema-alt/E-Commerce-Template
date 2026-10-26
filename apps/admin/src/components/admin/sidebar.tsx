@@ -11,6 +11,7 @@ import {
   ShoppingCart,
   Users,
   Tag,
+  Star,
   Settings,
   CreditCard,
   X,
@@ -51,6 +52,7 @@ const navigation: NavItem[] = [
   { label: "Orders", href: "/orders", icon: ShoppingCart },
   { label: "Promotions", href: "/promotions", icon: Tag },
   { label: "Customers", href: "/customers", icon: Users },
+  { label: "Reviews & Q&A", href: "/reviews", icon: Star },
   {
     label: "Storefront CMS", href: "/cms", icon: LayoutDashboard,
     children: [

@@ -17,6 +17,7 @@ import { CmsModule } from './cms/cms.module.js';
 import { ShopModule } from './shop/shop.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { PromotionsModule } from './promotions/promotions.module.js';
+import { ReviewsModule } from './reviews/reviews.module.js';
 import {
   AnalyticsController,
   DashboardController,
@@ -37,6 +38,7 @@ import { DashboardService } from './dashboard/dashboard.service.js';
     ShopModule,
     PaymentsModule,
     PromotionsModule,
+    ReviewsModule,
   ],
   controllers: [
     AppController,

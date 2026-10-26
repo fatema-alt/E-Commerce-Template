@@ -9,8 +9,8 @@ async function proxy(
   const path = (await context.params).path.join("/");
   const allowed =
     req.method === "GET"
-      ? /^(me|newsletter|payment-methods|orders(?:\/[a-f0-9-]{36})?|payments\/methods|payments\/status\/[a-f0-9-]{36})$/
-      : /^(register|login|logout|password|quote|orders|coupons\/validate|payments\/initiate|newsletter(?:\/preferences)?)$/;
+      ? /^(me|newsletter|payment-methods|orders(?:\/[a-f0-9-]{36})?|payments\/methods|payments\/status\/[a-f0-9-]{36}|products\/[a-f0-9-]{36}\/(?:reviews|reviews\/summary|qa))$/
+      : /^(register|login|logout|password|quote|orders|coupons\/validate|payments\/initiate|newsletter(?:\/preferences)?|products\/[a-f0-9-]{36}\/(?:reviews|qa)|reviews\/[a-f0-9-]{36}\/helpful)$/;
   if (!allowed.test(path))
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   let body: string | undefined;
@@ -52,14 +52,11 @@ async function proxy(
     headers.Cookie = `commerce_shopper=${cookie}`;
   const key = req.headers.get("idempotency-key");
   if (key) headers["Idempotency-Key"] = key;
-  const page =
-    path === "orders" && req.method === "GET"
-      ? `?page=${encodeURIComponent(req.nextUrl.searchParams.get("page") || "1")}`
-      : "";
+  const search = req.nextUrl.search;
   try {
     const targetUrl = path.startsWith("payments/")
-      ? `${api}/${path}${page}`
-      : `${api}/shop/${path}${page}`;
+      ? `${api}/${path}${search}`
+      : `${api}/shop/${path}${search}`;
     const upstream = await fetch(targetUrl, {
       method: req.method,
       headers,

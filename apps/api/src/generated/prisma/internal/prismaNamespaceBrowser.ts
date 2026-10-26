@@ -91,7 +91,9 @@ export const ModelName = {
   StorefrontThrottle: 'StorefrontThrottle',
   Coupon: 'Coupon',
   CouponUsage: 'CouponUsage',
-  PaymentGatewayConfig: 'PaymentGatewayConfig'
+  PaymentGatewayConfig: 'PaymentGatewayConfig',
+  ProductReview: 'ProductReview',
+  ProductQuestion: 'ProductQuestion'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -788,6 +790,48 @@ export const PaymentGatewayConfigScalarFieldEnum = {
 } as const
 
 export type PaymentGatewayConfigScalarFieldEnum = (typeof PaymentGatewayConfigScalarFieldEnum)[keyof typeof PaymentGatewayConfigScalarFieldEnum]
+
+
+export const ProductReviewScalarFieldEnum = {
+  id: 'id',
+  productId: 'productId',
+  customerId: 'customerId',
+  authorName: 'authorName',
+  authorEmail: 'authorEmail',
+  rating: 'rating',
+  title: 'title',
+  content: 'content',
+  photos: 'photos',
+  isVerifiedPurchase: 'isVerifiedPurchase',
+  status: 'status',
+  helpfulCount: 'helpfulCount',
+  adminReply: 'adminReply',
+  adminRepliedAt: 'adminRepliedAt',
+  adminReplyAuthor: 'adminReplyAuthor',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ProductReviewScalarFieldEnum = (typeof ProductReviewScalarFieldEnum)[keyof typeof ProductReviewScalarFieldEnum]
+
+
+export const ProductQuestionScalarFieldEnum = {
+  id: 'id',
+  productId: 'productId',
+  customerId: 'customerId',
+  authorName: 'authorName',
+  authorEmail: 'authorEmail',
+  question: 'question',
+  answer: 'answer',
+  isAnswered: 'isAnswered',
+  answeredAt: 'answeredAt',
+  answeredBy: 'answeredBy',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ProductQuestionScalarFieldEnum = (typeof ProductQuestionScalarFieldEnum)[keyof typeof ProductQuestionScalarFieldEnum]
 
 
 export const SortOrder = {

@@ -10,6 +10,7 @@ import {
 import { ProductOverview } from "../../../components/product-overview";
 import { ProductCard } from "../../../components/home-sections";
 import { ProductSkeleton } from "../../../components/product-skeleton";
+import { ProductReviewsSection } from "../../../components/product-reviews";
 import { productStructuredData, productUrl } from "../../../lib/product-seo";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -191,6 +192,10 @@ async function Content({ params }: Props) {
           </Link>
         </section>
       </div>
+      <ProductReviewsSection
+        productId={product.id}
+        productName={product.name}
+      />
       <Suspense fallback={null}>
         <RelatedProducts product={product} />
       </Suspense>

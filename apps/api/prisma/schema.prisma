@@ -184,6 +184,8 @@ model Product {
   inventory   Inventory?
   movements   InventoryMovement[]
   orderItems OrderItem[]
+  reviews     ProductReview[]
+  questions   ProductQuestion[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -353,6 +355,8 @@ model Customer {
   notes CustomerNote[]
   events CustomerAuditEvent[]
   orders Order[]
+  reviews ProductReview[]
+  questions ProductQuestion[]
   @@index([status, createdAt])
   @@index([deletedAt])
   @@map("customers")
@@ -908,3 +912,66 @@ model PaymentGatewayConfig {
 
   @@map("payment_gateway_configs")
 }
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SPAM
+}
+
+enum QuestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ProductReview {
+  id                 String       @id @default(uuid())
+  productId          String
+  product            Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customerId         String?
+  customer           Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  authorName         String
+  authorEmail        String
+  rating             Int          // 1 to 5
+  title              String?
+  content            String
+  photos             String[]     @default([])
+  isVerifiedPurchase Boolean      @default(false)
+  status             ReviewStatus @default(PENDING)
+  helpfulCount       Int          @default(0)
+  adminReply         String?
+  adminRepliedAt     DateTime?
+  adminReplyAuthor   String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([productId, status])
+  @@index([status, createdAt])
+  @@index([authorEmail])
+  @@map("product_reviews")
+}
+
+model ProductQuestion {
+  id                 String         @id @default(uuid())
+  productId          String
+  product            Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customerId         String?
+  customer           Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  authorName         String
+  authorEmail        String
+  question           String
+  answer             String?
+  isAnswered         Boolean        @default(false)
+  answeredAt         DateTime?
+  answeredBy         String?
+  status             QuestionStatus @default(PENDING)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([productId, status])
+  @@index([status, createdAt])
+  @@map("product_questions")
+}
+

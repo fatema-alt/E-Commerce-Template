@@ -232,3 +232,13 @@ export type CouponUsage = Prisma.CouponUsageModel
  * 
  */
 export type PaymentGatewayConfig = Prisma.PaymentGatewayConfigModel
+/**
+ * Model ProductReview
+ * 
+ */
+export type ProductReview = Prisma.ProductReviewModel
+/**
+ * Model ProductQuestion
+ * 
+ */
+export type ProductQuestion = Prisma.ProductQuestionModel
