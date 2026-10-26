@@ -254,3 +254,8 @@ export type Coupon = Prisma.CouponModel
  * 
  */
 export type CouponUsage = Prisma.CouponUsageModel
+/**
+ * Model PaymentGatewayConfig
+ * 
+ */
+export type PaymentGatewayConfig = Prisma.PaymentGatewayConfigModel

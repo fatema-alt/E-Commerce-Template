@@ -18,24 +18,64 @@ export class BkashAdapter implements PaymentProvider {
   readonly providerName = 'BKASH';
   private readonly logger = new Logger(BkashAdapter.name);
   private tokenCache: BkashTokenCache | null = null;
+  private dynamicConfig: {
+    appKey?: string;
+    appSecret?: string;
+    username?: string;
+    password?: string;
+    baseUrl?: string;
+    isSandbox?: boolean;
+    isEnabled?: boolean;
+  } | null = null;
+
+  setConfig(
+    config: {
+      appKey?: string;
+      appSecret?: string;
+      username?: string;
+      password?: string;
+      baseUrl?: string;
+      isSandbox?: boolean;
+      isEnabled?: boolean;
+    } | null,
+  ) {
+    this.dynamicConfig = config;
+    this.tokenCache = null;
+  }
+
+  getConfig() {
+    return {
+      appKey: this.appKey,
+      appSecret: this.appSecret,
+      username: this.username,
+      password: this.password,
+      baseUrl: this.baseUrl,
+      isSandbox: this.dynamicConfig?.isSandbox ?? true,
+      isEnabled: this.isEnabled(),
+    };
+  }
 
   private get appKey(): string {
-    return process.env.BKASH_APP_KEY || '';
+    return this.dynamicConfig?.appKey || process.env.BKASH_APP_KEY || '';
   }
 
   private get appSecret(): string {
-    return process.env.BKASH_APP_SECRET || '';
+    return this.dynamicConfig?.appSecret || process.env.BKASH_APP_SECRET || '';
   }
 
   private get username(): string {
-    return process.env.BKASH_USERNAME || '';
+    return this.dynamicConfig?.username || process.env.BKASH_USERNAME || '';
   }
 
   private get password(): string {
-    return process.env.BKASH_PASSWORD || '';
+    return this.dynamicConfig?.password || process.env.BKASH_PASSWORD || '';
   }
 
   private get baseUrl(): string {
+    if (this.dynamicConfig?.baseUrl) return this.dynamicConfig.baseUrl;
+    if (this.dynamicConfig?.isSandbox === false) {
+      return 'https://tokenized.pay.bka.sh/v1.2.0-beta';
+    }
     return (
       process.env.BKASH_BASE_URL ||
       'https://tokenized.sandbox.bka.sh/v1.2.0-beta'
@@ -43,6 +83,9 @@ export class BkashAdapter implements PaymentProvider {
   }
 
   isEnabled(): boolean {
+    if (this.dynamicConfig?.isEnabled !== undefined) {
+      return this.dynamicConfig.isEnabled;
+    }
     const configured = Boolean(
       this.appKey && this.appSecret && this.username && this.password,
     );
@@ -106,6 +149,72 @@ export class BkashAdapter implements PaymentProvider {
     } catch (err) {
       this.logger.error('bKash token grant error', err);
       throw err;
+    }
+  }
+
+  async testCredentials(creds: {
+    appKey: string;
+    appSecret: string;
+    username: string;
+    password: string;
+    isSandbox?: boolean;
+  }): Promise<{ success: boolean; message: string }> {
+    const baseUrl =
+      creds.isSandbox === false
+        ? 'https://tokenized.pay.bka.sh/v1.2.0-beta'
+        : 'https://tokenized.sandbox.bka.sh/v1.2.0-beta';
+
+    if (
+      !creds.appKey ||
+      !creds.appSecret ||
+      !creds.username ||
+      !creds.password
+    ) {
+      return {
+        success: false,
+        message:
+          'All fields (App Key, App Secret, Username, Password) are required',
+      };
+    }
+
+    try {
+      const response = await fetch(`${baseUrl}/tokenized/checkout/token/grant`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          username: creds.username,
+          password: creds.password,
+        },
+        body: JSON.stringify({
+          app_key: creds.appKey,
+          app_secret: creds.appSecret,
+        }),
+      });
+
+      const data = (await response.json()) as {
+        id_token?: string;
+        statusMessage?: string;
+      };
+
+      if (!response.ok || !data.id_token) {
+        return {
+          success: false,
+          message:
+            data.statusMessage ||
+            `Token grant failed with HTTP ${response.status}`,
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Successfully authenticated with bKash API',
+      };
+    } catch (err) {
+      return {
+        success: false,
+        message: (err as Error).message,
+      };
     }
   }
 

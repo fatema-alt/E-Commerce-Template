@@ -12,6 +12,7 @@ import {
   Users,
   Tag,
   Settings,
+  CreditCard,
   X,
   ChevronDown,
   Plus,
@@ -60,7 +61,15 @@ const navigation: NavItem[] = [
       { label: "Media Library", href: "/cms/media", icon: Package },
     ],
   },
-  { label: "Settings", href: "/settings", icon: Settings },
+  {
+    label: "Settings",
+    href: "/settings",
+    icon: Settings,
+    children: [
+      { label: "Payment Gateways", href: "/settings/payments", icon: CreditCard },
+      { label: "Site Settings", href: "/cms/settings", icon: Settings },
+    ],
+  },
 ];
 
 export function Sidebar({
@@ -75,6 +84,7 @@ export function Sidebar({
     "/products": true,
     "/categories": true,
     "/cms": true,
+    "/settings": true,
   });
 
   return (

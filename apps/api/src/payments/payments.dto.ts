@@ -1,4 +1,11 @@
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export enum OnlinePaymentMethod {
   BKASH = 'BKASH',
@@ -20,4 +27,28 @@ export class InitiatePaymentDto {
 export class QueryPaymentDto {
   @IsUUID()
   orderId!: string;
+}
+
+export class UpdatePaymentSettingDto {
+  @IsOptional()
+  @IsBoolean()
+  isEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isSandbox?: boolean;
+
+  @IsOptional()
+  @IsObject()
+  config?: Record<string, any>;
+}
+
+export class TestGatewayDto {
+  @IsOptional()
+  @IsBoolean()
+  isSandbox?: boolean;
+
+  @IsOptional()
+  @IsObject()
+  config?: Record<string, any>;
 }

@@ -90,7 +90,8 @@ export const ModelName = {
   NewsletterSubscription: 'NewsletterSubscription',
   StorefrontThrottle: 'StorefrontThrottle',
   Coupon: 'Coupon',
-  CouponUsage: 'CouponUsage'
+  CouponUsage: 'CouponUsage',
+  PaymentGatewayConfig: 'PaymentGatewayConfig'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -773,6 +774,20 @@ export const CouponUsageScalarFieldEnum = {
 } as const
 
 export type CouponUsageScalarFieldEnum = (typeof CouponUsageScalarFieldEnum)[keyof typeof CouponUsageScalarFieldEnum]
+
+
+export const PaymentGatewayConfigScalarFieldEnum = {
+  id: 'id',
+  provider: 'provider',
+  isEnabled: 'isEnabled',
+  isSandbox: 'isSandbox',
+  config: 'config',
+  updatedBy: 'updatedBy',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PaymentGatewayConfigScalarFieldEnum = (typeof PaymentGatewayConfigScalarFieldEnum)[keyof typeof PaymentGatewayConfigScalarFieldEnum]
 
 
 export const SortOrder = {

@@ -4,17 +4,22 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { BkashAdapter } from './adapters/bkash.adapter.js';
 import { SslCommerzAdapter } from './adapters/sslcommerz.adapter.js';
-import { OnlinePaymentMethod } from './payments.dto.js';
+import {
+  OnlinePaymentMethod,
+  TestGatewayDto,
+  UpdatePaymentSettingDto,
+} from './payments.dto.js';
 import type { PaymentProvider } from './payment-provider.interface.js';
 
 @Injectable()
-export class PaymentsService {
+export class PaymentsService implements OnModuleInit {
   private readonly logger = new Logger(PaymentsService.name);
   private readonly adapters: Map<string, PaymentProvider> = new Map();
 
@@ -27,23 +32,83 @@ export class PaymentsService {
     this.adapters.set(OnlinePaymentMethod.SSLCOMMERZ, this.sslcommerz);
   }
 
-  getMethods() {
+  async onModuleInit() {
+    await this.syncAdaptersWithDatabase();
+  }
+
+  async syncAdaptersWithDatabase() {
+    try {
+      const configs = await this.db.paymentGatewayConfig.findMany();
+      for (const row of configs) {
+        const cfg = (row.config as Record<string, any>) || {};
+        if (row.provider === 'BKASH') {
+          this.bkash.setConfig({
+            appKey: cfg.appKey,
+            appSecret: cfg.appSecret,
+            username: cfg.username,
+            password: cfg.password,
+            baseUrl: cfg.baseUrl,
+            isSandbox: row.isSandbox,
+            isEnabled: row.isEnabled,
+          });
+        } else if (row.provider === 'SSLCOMMERZ') {
+          this.sslcommerz.setConfig({
+            storeId: cfg.storeId,
+            storePassword: cfg.storePassword,
+            isSandbox: row.isSandbox,
+            isEnabled: row.isEnabled,
+          });
+        }
+      }
+    } catch {
+      // If table is not created yet or db unavailable during bootstrap, graceful fallback
+    }
+  }
+
+  async getMethods() {
+    await this.syncAdaptersWithDatabase();
+
+    let bankDb: any = null;
+    let codDb: any = null;
+
+    try {
+      bankDb = await this.db.paymentGatewayConfig.findUnique({
+        where: { provider: 'BANK_TRANSFER' },
+      });
+      codDb = await this.db.paymentGatewayConfig.findUnique({
+        where: { provider: 'COD' },
+      });
+    } catch {
+      // Fallback to env
+    }
+
+    const bankConfig = (bankDb?.config as Record<string, string>) || {};
     const bank =
-      process.env.BANK_NAME &&
-      process.env.BANK_ACCOUNT_NAME &&
-      process.env.BANK_ACCOUNT_NUMBER
+      bankConfig.name && bankConfig.accountNumber
         ? {
-            name: process.env.BANK_NAME,
-            accountName: process.env.BANK_ACCOUNT_NAME,
-            accountNumber: process.env.BANK_ACCOUNT_NUMBER,
-            branch: process.env.BANK_BRANCH || '',
+            name: bankConfig.name,
+            accountName: bankConfig.accountName || '',
+            accountNumber: bankConfig.accountNumber,
+            branch: bankConfig.branch || '',
           }
-        : null;
+        : process.env.BANK_NAME && process.env.BANK_ACCOUNT_NUMBER
+          ? {
+              name: process.env.BANK_NAME,
+              accountName: process.env.BANK_ACCOUNT_NAME || '',
+              accountNumber: process.env.BANK_ACCOUNT_NUMBER,
+              branch: process.env.BANK_BRANCH || '',
+            }
+          : null;
+
+    const codEnabled = codDb ? codDb.isEnabled : true;
+    const bankEnabled = bankDb
+      ? bankDb.isEnabled && Boolean(bank)
+      : Boolean(bank);
 
     return {
       methods: [
-        { id: 'COD', label: 'Cash on Delivery', enabled: true },
-        { id: 'BANK_TRANSFER', label: 'Bank Transfer', enabled: Boolean(bank) },
+        { id: 'COD', label: 'Cash on Delivery', enabled: codEnabled },
+        { id: 'BANK_TRANSFER', label: 'Bank Transfer', enabled: bankEnabled },
         {
           id: 'BKASH',
           label: 'bKash',
@@ -59,6 +124,176 @@ export class PaymentsService {
       ],
       bank,
     };
+  }
+
+  async getAdminSettings() {
+    await this.syncAdaptersWithDatabase();
+    const rows = await this.db.paymentGatewayConfig.findMany();
+    const configsMap = new Map(rows.map((r) => [r.provider, r]));
+
+    const bkashRow = configsMap.get('BKASH');
+    const bkashCfg = (bkashRow?.config as Record<string, any>) || {};
+    const bkashAppSecret = bkashCfg.appSecret || process.env.BKASH_APP_SECRET || '';
+    const bkashPassword = bkashCfg.password || process.env.BKASH_PASSWORD || '';
+
+    const sslRow = configsMap.get('SSLCOMMERZ');
+    const sslCfg = (sslRow?.config as Record<string, any>) || {};
+    const sslStorePasswd =
+      sslCfg.storePassword || process.env.SSLCOMMERZ_STORE_PASSWORD || '';
+
+    const bankRow = configsMap.get('BANK_TRANSFER');
+    const bankCfg = (bankRow?.config as Record<string, any>) || {};
+
+    const codRow = configsMap.get('COD');
+
+    return {
+      gateways: [
+        {
+          provider: 'COD',
+          title: 'Cash on Delivery (COD)',
+          isEnabled: codRow ? codRow.isEnabled : true,
+          isSandbox: false,
+          config: {},
+          updatedAt: codRow?.updatedAt,
+        },
+        {
+          provider: 'BKASH',
+          title: 'bKash Tokenized Checkout',
+          isEnabled: bkashRow ? bkashRow.isEnabled : this.bkash.isEnabled(),
+          isSandbox: bkashRow ? bkashRow.isSandbox : true,
+          config: {
+            appKey: bkashCfg.appKey || process.env.BKASH_APP_KEY || '',
+            hasAppSecret: Boolean(bkashAppSecret),
+            appSecretMasked: bkashAppSecret
+              ? `••••••••${bkashAppSecret.slice(-4)}`
+              : '',
+            username: bkashCfg.username || process.env.BKASH_USERNAME || '',
+            hasPassword: Boolean(bkashPassword),
+            baseUrl: bkashCfg.baseUrl || process.env.BKASH_BASE_URL || '',
+          },
+          updatedAt: bkashRow?.updatedAt,
+        },
+        {
+          provider: 'SSLCOMMERZ',
+          title: 'SSLCommerz EasyCheckout',
+          isEnabled: sslRow ? sslRow.isEnabled : this.sslcommerz.isEnabled(),
+          isSandbox: sslRow ? sslRow.isSandbox : true,
+          config: {
+            storeId: sslCfg.storeId || process.env.SSLCOMMERZ_STORE_ID || '',
+            hasStorePassword: Boolean(sslStorePasswd),
+            storePasswordMasked: sslStorePasswd
+              ? `••••••••${sslStorePasswd.slice(-4)}`
+              : '',
+          },
+          updatedAt: sslRow?.updatedAt,
+        },
+        {
+          provider: 'BANK_TRANSFER',
+          title: 'Bank Transfer (Direct BDT Deposit)',
+          isEnabled: bankRow
+            ? bankRow.isEnabled
+            : Boolean(process.env.BANK_NAME && process.env.BANK_ACCOUNT_NUMBER),
+          isSandbox: false,
+          config: {
+            name: bankCfg.name || process.env.BANK_NAME || '',
+            accountName:
+              bankCfg.accountName || process.env.BANK_ACCOUNT_NAME || '',
+            accountNumber:
+              bankCfg.accountNumber || process.env.BANK_ACCOUNT_NUMBER || '',
+            branch: bankCfg.branch || process.env.BANK_BRANCH || '',
+          },
+          updatedAt: bankRow?.updatedAt,
+        },
+      ],
+    };
+  }
+
+  async updateAdminSetting(
+    provider: string,
+    dto: UpdatePaymentSettingDto,
+    actorId?: string,
+  ) {
+    const existing = await this.db.paymentGatewayConfig.findUnique({
+      where: { provider },
+    });
+    const currentCfg = (existing?.config as Record<string, any>) || {};
+    const newCfg = dto.config || {};
+
+    const mergedConfig: Record<string, any> = { ...currentCfg };
+
+    for (const [k, v] of Object.entries(newCfg)) {
+      if (typeof v === 'string' && v.startsWith('••••')) {
+        continue;
+      }
+      if (v !== '' && v !== undefined) {
+        mergedConfig[k] = v;
+      }
+    }
+
+    const updated = await this.db.paymentGatewayConfig.upsert({
+      where: { provider },
+      create: {
+        provider,
+        isEnabled: dto.isEnabled ?? false,
+        isSandbox: dto.isSandbox ?? true,
+        config: mergedConfig,
+        updatedBy: actorId,
+      },
+      update: {
+        ...(dto.isEnabled !== undefined ? { isEnabled: dto.isEnabled } : {}),
+        ...(dto.isSandbox !== undefined ? { isSandbox: dto.isSandbox } : {}),
+        config: mergedConfig,
+        updatedBy: actorId,
+      },
+    });
+
+    await this.syncAdaptersWithDatabase();
+    return updated;
+  }
+
+  async testGateway(provider: string, dto: TestGatewayDto) {
+    const existing = await this.db.paymentGatewayConfig.findUnique({
+      where: { provider },
+    });
+    const savedConfig = (existing?.config as Record<string, any>) || {};
+    const inputConfig = dto.config || {};
+
+    if (provider === 'BKASH') {
+      const appKey = inputConfig.appKey || savedConfig.appKey || process.env.BKASH_APP_KEY || '';
+      let appSecret = inputConfig.appSecret;
+      if (!appSecret || appSecret.startsWith('••••')) {
+        appSecret = savedConfig.appSecret || process.env.BKASH_APP_SECRET || '';
+      }
+      const username = inputConfig.username || savedConfig.username || process.env.BKASH_USERNAME || '';
+      let password = inputConfig.password;
+      if (!password || password.startsWith('••••')) {
+        password = savedConfig.password || process.env.BKASH_PASSWORD || '';
+      }
+
+      return this.bkash.testCredentials({
+        appKey,
+        appSecret,
+        username,
+        password,
+        isSandbox: dto.isSandbox ?? existing?.isSandbox ?? true,
+      });
+    }
+
+    if (provider === 'SSLCOMMERZ') {
+      const storeId = inputConfig.storeId || savedConfig.storeId || process.env.SSLCOMMERZ_STORE_ID || '';
+      let storePassword = inputConfig.storePassword;
+      if (!storePassword || storePassword.startsWith('••••')) {
+        storePassword = savedConfig.storePassword || process.env.SSLCOMMERZ_STORE_PASSWORD || '';
+      }
+
+      return this.sslcommerz.testCredentials({
+        storeId,
+        storePassword,
+        isSandbox: dto.isSandbox ?? existing?.isSandbox ?? true,
+      });
+    }
+
+    return { success: true, message: 'Settings saved' };
   }
 
   async initiate(

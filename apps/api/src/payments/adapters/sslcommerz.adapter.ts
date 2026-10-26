@@ -12,15 +12,49 @@ export class SslCommerzAdapter implements PaymentProvider {
   readonly providerName = 'SSLCOMMERZ';
   private readonly logger = new Logger(SslCommerzAdapter.name);
 
+  private dynamicConfig: {
+    storeId?: string;
+    storePassword?: string;
+    isSandbox?: boolean;
+    isEnabled?: boolean;
+  } | null = null;
+
+  setConfig(
+    config: {
+      storeId?: string;
+      storePassword?: string;
+      isSandbox?: boolean;
+      isEnabled?: boolean;
+    } | null,
+  ) {
+    this.dynamicConfig = config;
+  }
+
+  getConfig() {
+    return {
+      storeId: this.storeId,
+      storePassword: this.storePassword,
+      isSandbox: this.dynamicConfig?.isSandbox ?? !this.isLive,
+      isEnabled: this.isEnabled(),
+    };
+  }
+
   private get storeId(): string {
-    return process.env.SSLCOMMERZ_STORE_ID || '';
+    return this.dynamicConfig?.storeId || process.env.SSLCOMMERZ_STORE_ID || '';
   }
 
   private get storePassword(): string {
-    return process.env.SSLCOMMERZ_STORE_PASSWORD || '';
+    return (
+      this.dynamicConfig?.storePassword ||
+      process.env.SSLCOMMERZ_STORE_PASSWORD ||
+      ''
+    );
   }
 
   private get isLive(): boolean {
+    if (this.dynamicConfig?.isSandbox !== undefined) {
+      return !this.dynamicConfig.isSandbox;
+    }
     return process.env.SSLCOMMERZ_IS_SANDBOX === 'false';
   }
 
@@ -31,6 +65,9 @@ export class SslCommerzAdapter implements PaymentProvider {
   }
 
   isEnabled(): boolean {
+    if (this.dynamicConfig?.isEnabled !== undefined) {
+      return this.dynamicConfig.isEnabled;
+    }
     const configured = Boolean(this.storeId && this.storePassword);
     const simulationAllowed =
       process.env.SSLCOMMERZ_SIMULATE === 'true' ||
@@ -41,6 +78,78 @@ export class SslCommerzAdapter implements PaymentProvider {
   isSimulated(): boolean {
     const configured = Boolean(this.storeId && this.storePassword);
     return !configured || process.env.SSLCOMMERZ_SIMULATE === 'true';
+  }
+
+  async testCredentials(creds: {
+    storeId: string;
+    storePassword: string;
+    isSandbox?: boolean;
+  }): Promise<{ success: boolean; message: string }> {
+    const baseUrl =
+      creds.isSandbox === false
+        ? 'https://securepay.sslcommerz.com'
+        : 'https://sandbox.sslcommerz.com';
+
+    if (!creds.storeId || !creds.storePassword) {
+      return {
+        success: false,
+        message: 'Store ID and Store Password are required',
+      };
+    }
+
+    try {
+      const formData = new URLSearchParams();
+      formData.append('store_id', creds.storeId);
+      formData.append('store_passwd', creds.storePassword);
+      formData.append('total_amount', '10.00');
+      formData.append('currency', 'BDT');
+      formData.append('tran_id', `TEST_${Date.now()}`);
+      formData.append('success_url', 'http://localhost/test');
+      formData.append('fail_url', 'http://localhost/test');
+      formData.append('cancel_url', 'http://localhost/test');
+      formData.append('shipping_method', 'NO');
+      formData.append('product_name', 'Test');
+      formData.append('product_category', 'Test');
+      formData.append('product_profile', 'general');
+      formData.append('cus_name', 'Test');
+      formData.append('cus_email', 'test@example.com');
+      formData.append('cus_add1', 'Dhaka');
+      formData.append('cus_city', 'Dhaka');
+      formData.append('cus_country', 'Bangladesh');
+      formData.append('cus_phone', '01700000000');
+
+      const response = await fetch(`${baseUrl}/gwprocess/v4/api.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData.toString(),
+      });
+
+      const data = (await response.json()) as {
+        status?: string;
+        failedreason?: string;
+      };
+
+      if (!response.ok || data.status !== 'SUCCESS') {
+        return {
+          success: false,
+          message:
+            data.failedreason ||
+            `Store authentication failed (${response.status})`,
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Successfully verified SSLCommerz credentials',
+      };
+    } catch (err) {
+      return {
+        success: false,
+        message: (err as Error).message,
+      };
+    }
   }
 
   async initiatePayment(

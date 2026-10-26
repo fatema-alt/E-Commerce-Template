@@ -112,6 +112,11 @@ describe('Payments Module Unit Tests', () => {
         orderEvent: {
           create: vi.fn(),
         },
+        paymentGatewayConfig: {
+          findMany: vi.fn().mockResolvedValue([]),
+          findUnique: vi.fn().mockResolvedValue(null),
+          upsert: vi.fn().mockImplementation((args) => Promise.resolve(args.create)),
+        },
         $transaction: vi.fn(async (cb) => cb(mockDb)),
       };
 
@@ -120,8 +125,8 @@ describe('Payments Module Unit Tests', () => {
       service = new PaymentsService(mockDb, bkashAdapter, sslAdapter);
     });
 
-    it('returns enabled methods list including bKash and SSLCommerz', () => {
-      const methods = service.getMethods();
+    it('returns enabled methods list including bKash and SSLCommerz', async () => {
+      const methods = await service.getMethods();
       expect(methods.methods.some((m) => m.id === 'BKASH' && m.enabled)).toBe(
         true,
       );
@@ -131,6 +136,19 @@ describe('Payments Module Unit Tests', () => {
       expect(methods.methods.some((m) => m.id === 'COD' && m.enabled)).toBe(
         true,
       );
+    });
+
+    it('returns and updates admin payment settings', async () => {
+      const settings = await service.getAdminSettings();
+      expect(settings.gateways.length).toBe(4);
+      expect(settings.gateways.find((g) => g.provider === 'BKASH')).toBeDefined();
+
+      await service.updateAdminSetting('BKASH', {
+        isEnabled: true,
+        isSandbox: true,
+        config: { appKey: 'test_app_key' },
+      });
+      expect(mockDb.paymentGatewayConfig.upsert).toHaveBeenCalled();
     });
 
     it('initiates payment for an unpaid order', async () => {

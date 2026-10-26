@@ -45,7 +45,7 @@ const publicUser = {
 } as const;
 @Injectable()
 export class ShopService {
-  payments() {
+  async payments() {
     return this.paymentsService.getMethods();
   }
   constructor(
@@ -399,7 +399,8 @@ export class ShopService {
       throw new ConflictException(
         'Your cart changed or quote expired. Review it again.',
       );
-    if (dto.paymentMethod === 'BANK_TRANSFER' && !this.payments().bank)
+    const availablePayments = await this.payments();
+    if (dto.paymentMethod === 'BANK_TRANSFER' && !availablePayments.bank)
       throw new BadRequestException('Bank transfer is not available');
     const { quoteToken: _quote, ...data } = dto;
     const order = await this.orders.create(
