@@ -2,6 +2,7 @@ import { BrandArtwork } from "./brand-artwork";
 import Link from "next/link";
 import type { Category, ContentBlock, Product } from "../lib/storefront";
 import { Newsletter } from "./newsletter";
+import { HeroBanner } from "./hero-banner";
 
 const money = new Intl.NumberFormat("en-BD", {
   style: "currency",
@@ -72,28 +73,7 @@ export function HomeSections({
     <main id="main" className="container main-content space-y-12">
       {blocks.map((block) => {
         if (block.type === "hero") {
-          return (
-            <section
-              key={block.id}
-              className="hero"
-              aria-labelledby={`title-${block.id}`}
-            >
-              <div className="hero-content">
-                {block.eyebrow && <p className="eyebrow">{block.eyebrow}</p>}
-                <h1 id={`title-${block.id}`}>{block.title}</h1>
-                {block.description && <p>{block.description}</p>}
-                {block.ctaLabel && block.ctaHref && (
-                  <Link className="primary-button" href={block.ctaHref}>
-                    {block.ctaLabel}
-                    <span className="btn-arrow" aria-hidden="true">
-                      ↗
-                    </span>
-                  </Link>
-                )}
-              </div>
-              <BrandArtwork />
-            </section>
-          );
+          return <HeroBanner key={block.id} block={block} />;
         }
 
         if (block.type === "categories") {

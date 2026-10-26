@@ -14,6 +14,7 @@ import { ProductCard } from "./home-sections";
 import { BannerSlider, SaleCountdown } from "./cms-interactive";
 import { Newsletter } from './newsletter';
 import { BrandArtwork } from "./brand-artwork";
+import { HeroBanner } from "./hero-banner";
 function Picture({ image, assets }: { image?: Image; assets: Asset[] }) {
   const src = assetSource(assets, image?.assetId);
   if (!src) return null;
@@ -71,7 +72,7 @@ async function Block({
 }) {
   const c = section.config;
   const title = typeof c.title === "string" ? <h2>{c.title}</h2> : null;
-  if (section.type === "hero") return <Hero config={c} assets={assets} />;
+  if (section.type === "hero") return <HeroBanner config={c} assets={assets} />;
   if (section.type === "bannerSlider")
     return (
       <BannerSlider
