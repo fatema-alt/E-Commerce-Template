@@ -153,6 +153,23 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
       },
     },
     {
+      id: "customer-feedback",
+      type: "customerReviews",
+      visible: true,
+      responsive: {
+        desktop: true,
+        tablet: true,
+        mobile: true,
+        width: "contained",
+        padding: 4,
+      },
+      config: {
+        title: "What Our Customers Are Saying",
+        subtitle: "Genuine feedback and verified purchases from shoppers all across Bangladesh.",
+        limit: 6,
+      },
+    },
+    {
       id: "faq-home",
       type: "faq",
       visible: true,

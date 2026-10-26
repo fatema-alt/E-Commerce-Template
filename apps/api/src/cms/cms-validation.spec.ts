@@ -31,8 +31,8 @@ describe('CMS content validation', () => {
   it('rejects unsupported page publishing', () => {
     expect(() => validateCmsContent('PAGE', { sections: [] })).toThrow();
   });
-  it('registers all fourteen data-only block schemas', () => {
-    expect(Object.keys(BLOCK_SCHEMAS)).toHaveLength(14);
+  it('registers all sixteen data-only block schemas', () => {
+    expect(Object.keys(BLOCK_SCHEMAS)).toHaveLength(16);
   });
   it('accepts validated pages, settings and nested navigation', () => {
     expect(

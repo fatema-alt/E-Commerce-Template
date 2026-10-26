@@ -53,7 +53,7 @@ const image = object({ assetId: uuid, alt: text(200, 0), href: link }, [
 ]);
 const productSource = {
   title: text(),
-  source: choice('featured', 'latest', 'category', 'selected', 'sale'),
+  source: choice('featured', 'latest', 'category', 'selected', 'sale', 'trending', 'recommended'),
   categoryId: uuid,
   productIds: array(uuid, 100, 0),
   limit: number(1, 100),
@@ -167,6 +167,21 @@ export const BLOCK_SCHEMAS: Record<string, Schema> = {
       ),
     },
     ['items'],
+  ),
+  recentlyViewed: object(
+    {
+      title: text(),
+      limit: number(1, 24),
+    },
+    ['title'],
+  ),
+  customerReviews: object(
+    {
+      title: text(),
+      subtitle: text(1000, 0),
+      limit: number(1, 20),
+    },
+    ['title'],
   ),
 };
 

@@ -1,16 +1,98 @@
 "use client";
-import { useId } from "react";
+import { useId, useState } from "react";
 import {
   type Asset,
   type Schema,
   type Value,
+  assetUrl,
   initialValue,
   label,
 } from "./cms-api";
+import { MediaPickerModal } from "./media-picker-modal";
 export const input =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900";
 export const button =
   "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50";
+function AssetField({
+  id,
+  name,
+  value,
+  assets,
+  onChange,
+}: {
+  id: string;
+  name: string;
+  value: Value;
+  assets: Asset[];
+  onChange: (value: Value) => void;
+}) {
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const selectedAsset = assets.find((a) => a.id === value);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-3">
+        {selectedAsset?.url ? (
+          <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+            <img
+              src={assetUrl(selectedAsset.url)}
+              alt={selectedAsset.altText || ""}
+              className="h-full w-full object-cover"
+            />
+          </div>
+        ) : null}
+
+        <div className="flex-1 space-y-1">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsPickerOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition shadow-xs"
+            >
+              <span>🖼️ Choose from Media Library</span>
+            </button>
+            {value && (
+              <button
+                type="button"
+                onClick={() => onChange("")}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-50 hover:text-red-600 transition"
+                title="Remove image"
+              >
+                ✕ Clear
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-slate-500 truncate max-w-xs">
+            {selectedAsset?.altText || (value ? String(value) : "No image selected")}
+          </p>
+        </div>
+      </div>
+
+      <select
+        id={id}
+        className={input + " text-xs"}
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">Or pick from list: (None selected)</option>
+        {assets.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.altText || a.id}
+          </option>
+        ))}
+      </select>
+
+      <MediaPickerModal
+        isOpen={isPickerOpen}
+        onClose={() => setIsPickerOpen(false)}
+        onSelect={(assetId) => onChange(assetId)}
+        assets={assets}
+        currentAssetId={String(value ?? "")}
+      />
+    </div>
+  );
+}
+
 export function SchemaField({
   schema,
   value,
@@ -161,19 +243,13 @@ export function SchemaField({
         {label(name)}
       </label>
       {asset ? (
-        <select
+        <AssetField
           id={id}
-          className={input}
-          value={String(value ?? "")}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          <option value="">Select uploaded image</option>
-          {assets.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.altText || a.id}
-            </option>
-          ))}
-        </select>
+          name={name}
+          value={value}
+          assets={assets}
+          onChange={onChange}
+        />
       ) : schema.enum ? (
         <select
           id={id}

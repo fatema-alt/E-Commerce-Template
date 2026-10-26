@@ -2,7 +2,7 @@ import { IsIn, IsOptional, Matches, MaxLength } from 'class-validator';
 import { CatalogQueryDto } from './catalog-query.dto.js';
 export class StorefrontQueryDto extends CatalogQueryDto {
   @IsOptional()
-  @IsIn(['featured', 'latest', 'category', 'selected', 'sale'])
+  @IsIn(['featured', 'latest', 'category', 'selected', 'sale', 'trending', 'recommended'])
   source?: string;
   @IsOptional()
   @MaxLength(3699)

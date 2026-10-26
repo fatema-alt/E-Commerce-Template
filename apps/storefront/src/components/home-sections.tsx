@@ -28,37 +28,8 @@ function SafeImage({
   );
 }
 
-export function ProductCard({ product }: { product: Product }) {
-  return (
-    <article className="product-card">
-      <Link
-        href={`/product/${slug(product.slug)}`}
-        className="product-image-wrap"
-      >
-        <SafeImage src={product.imageUrl} alt={product.name} />
-      </Link>
-      <div className="product-body">
-        {product.brand && <span className="muted small">{product.brand}</span>}
-        <Link
-          className="product-name"
-          href={`/product/${slug(product.slug)}`}
-        >
-          {product.name}
-        </Link>
-        <div className="price-row">
-          <strong>{money.format(product.price)}</strong>
-          {typeof product.compareAtPrice === "number" &&
-            product.compareAtPrice > product.price && (
-              <del>{money.format(product.compareAtPrice)}</del>
-            )}
-        </div>
-        <span className={`stock ${product.inStock ? "" : "out"}`}>
-          {product.inStock ? "Available" : "Out of stock"}
-        </span>
-      </div>
-    </article>
-  );
-}
+import { ProductCard } from "./product-card";
+export { ProductCard };
 
 export function HomeSections({
   blocks,

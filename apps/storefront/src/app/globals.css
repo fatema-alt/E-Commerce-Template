@@ -212,15 +212,37 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .products-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:var(--gap)}
 .product-card{display:flex;flex-direction:column;padding:10px;border-radius:var(--r-xl);background:var(--glass);border:1px solid var(--c-line);box-shadow:var(--shadow);transition:transform .3s,box-shadow .3s}
 .product-card:hover{transform:translateY(-4px)}
-.product-image-wrap{display:block;aspect-ratio:1;border-radius:calc(var(--r-xl) - 10px);overflow:hidden;background:var(--glass-solid)}
+.product-image-container{position:relative;border-radius:calc(var(--r-xl) - 10px);overflow:hidden}
+.product-image-wrap{display:block;aspect-ratio:1;background:var(--glass-solid);overflow:hidden}
 .product-image{width:100%;height:100%;object-fit:cover;transition:transform .5s}
 .product-card:hover .product-image{transform:scale(1.05)}
-.product-body{display:flex;flex-direction:column;gap:6px;padding:14px 10px 8px}
-.product-name{font-weight:600;line-height:1.3;letter-spacing:-.01em}
-.price-row{display:flex;gap:10px;align-items:baseline}
-.price-row strong{font-size:1.1rem}.price-row del{color:var(--c-muted);font-size:.88rem}
-.stock{width:fit-content;font-size:.78rem;padding:3px 10px;border-radius:var(--r-pill);background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ok)}
-.stock.out{background:color-mix(in srgb,var(--danger) 12%,transparent);color:var(--danger)}
+.product-card-badges{position:absolute;top:8px;left:8px;z-index:2;display:flex;flex-direction:column;gap:4px}
+.card-badge{padding:3px 8px;border-radius:var(--r-pill);font-size:.72rem;font-weight:700;text-transform:uppercase}
+.badge-sale{background:#ef4444;color:#fff}
+.badge-out{background:rgba(15,20,17,.75);color:#fff;backdrop-filter:blur(4px)}
+.card-wishlist-btn{position:absolute;top:8px;right:8px;z-index:2;width:32px;height:32px;border-radius:50%;background:var(--glass-solid);border:1px solid var(--c-line);display:grid;place-items:center;cursor:pointer;color:var(--c-ink);box-shadow:0 2px 6px rgba(0,0,0,.08);transition:transform .15s,background .15s}
+.card-wishlist-btn:hover{transform:scale(1.1)}
+.card-quick-add-wrap{position:absolute;bottom:8px;left:8px;right:8px;z-index:2;opacity:0;transform:translateY(6px);transition:all .25s ease;pointer-events:none}
+.product-card:hover .card-quick-add-wrap,.product-card:focus-within .card-quick-add-wrap{opacity:1;transform:translateY(0);pointer-events:auto}
+@media(hover:none){.card-quick-add-wrap{opacity:1;transform:translateY(0);pointer-events:auto}}
+.card-quick-add-btn{width:100%;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 12px;border-radius:var(--r-pill);background:var(--c-ink);color:var(--bg-c);border:0;font-size:.8rem;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.18);transition:all .2s}
+.card-quick-add-btn.success{background:#059669;color:#fff}
+.product-body{display:flex;flex-direction:column;gap:4px;padding:12px 8px 6px}
+.product-brand{font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;color:var(--c-muted);font-weight:600}
+.product-name{font-weight:600;line-height:1.3;letter-spacing:-.01em;font-size:.95rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.product-card-rating{display:flex;align-items:center;gap:4px;font-size:.76rem;margin:2px 0}
+.stars-row{color:#f59e0b;letter-spacing:1px;font-size:.82rem}
+.rating-score{font-weight:700;color:var(--c-ink)}
+.reviews-count{color:var(--c-muted);font-size:.72rem}
+.price-row{display:flex;gap:8px;align-items:baseline;margin-top:2px}
+.current-price{font-size:1.12rem;font-weight:700;color:var(--c-ink)}
+.compare-price{color:var(--c-muted);font-size:.88rem;text-decoration:line-through}
+.product-card-footer{display:flex;align-items:center;justify-content:space-between;margin-top:4px}
+.stock-indicator{display:inline-flex;align-items:center;gap:5px;font-size:.74rem;font-weight:600}
+.stock-indicator.in-stock{color:#059669}
+.stock-indicator.out-of-stock{color:#dc2626}
+.stock-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.card-cart-error{font-size:.72rem;color:#dc2626;margin:2px 0 0}
 
 /* shop filters */
 .catalog-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end;padding:16px;margin:20px 0;border-radius:var(--r-xl);background:var(--glass);border:1px solid var(--c-line)}
@@ -313,6 +335,21 @@ input[type=checkbox],input[type=radio]{width:auto;accent-color:var(--c-ink)}
 .footer a:hover{color:var(--lime)}
 .footer-tagline{font-size:1.6rem;letter-spacing:-.03em;font-weight:600;margin:16px 0 8px}
 .footer-bottom{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:40px;padding-top:20px;border-top:1px solid rgba(255,255,255,.14);font-size:.85rem;opacity:.75}
+
+/* customer reviews */
+.customer-reviews-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:var(--gap);margin-top:16px}
+.customer-review-card{border-radius:var(--r-xl);background:var(--glass);border:1px solid var(--c-line);box-shadow:var(--shadow);padding:20px;display:flex;flex-direction:column;justify-content:space-between;gap:12px;transition:transform .25s,box-shadow .25s}
+.customer-review-card:hover{transform:translateY(-3px)}
+.review-card-header{display:flex;align-items:center;gap:12px}
+.reviewer-avatar{width:40px;height:40px;border-radius:50%;background:var(--c-ink);color:var(--bg-c);display:grid;place-items:center;font-weight:700;font-size:1.1rem;flex-shrink:0}
+.reviewer-meta{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.reviewer-name{font-size:.9rem;font-weight:600;color:var(--c-ink)}
+.reviewer-location{font-size:.76rem;color:var(--c-muted)}
+.verified-badge{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:var(--r-pill);background:rgba(16,185,129,.15);color:#047857;white-space:nowrap}
+:root[data-theme=dark] .verified-badge{background:rgba(16,185,129,.25);color:#6ee7b7}
+.review-stars-row{color:#f59e0b;font-size:.92rem;letter-spacing:1px}
+.review-comment-text{font-size:.88rem;line-height:1.5;color:var(--c-ink-2);margin:0}
+.review-product-pill{display:flex;align-items:center;gap:6px;font-size:.76rem;color:var(--c-muted);background:var(--glass-solid);padding:6px 10px;border-radius:var(--r-pill);border:1px solid var(--c-line);width:fit-content;max-width:100%}
 
 /* responsive */
 @media (max-width:900px){

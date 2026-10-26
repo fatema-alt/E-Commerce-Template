@@ -15,6 +15,8 @@ import { BannerSlider, SaleCountdown } from "./cms-interactive";
 import { Newsletter } from './newsletter';
 import { BrandArtwork } from "./brand-artwork";
 import { HeroBanner } from "./hero-banner";
+import { RecentlyViewedSection } from "./recently-viewed";
+import { CustomerReviewsSection } from "./customer-reviews-section";
 function Picture({ image, assets }: { image?: Image; assets: Asset[] }) {
   const src = assetSource(assets, image?.assetId);
   if (!src) return null;
@@ -269,6 +271,23 @@ async function Block({
           ))}
         </div>
       </>
+    );
+  }
+  if (section.type === "recentlyViewed") {
+    return (
+      <RecentlyViewedSection
+        title={typeof c.title === "string" ? c.title : undefined}
+        limit={Number(c.limit) || 8}
+      />
+    );
+  }
+  if (section.type === "customerReviews") {
+    return (
+      <CustomerReviewsSection
+        title={typeof c.title === "string" ? c.title : undefined}
+        subtitle={typeof c.subtitle === "string" ? c.subtitle : undefined}
+        limit={Number(c.limit) || 6}
+      />
     );
   }
   return null;

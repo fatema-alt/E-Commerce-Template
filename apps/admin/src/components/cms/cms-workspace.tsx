@@ -15,6 +15,7 @@ import {
 } from "./cms-api";
 import { button, input, SchemaField } from "./schema-fields";
 import { getStandardEcommerceTemplate } from "./standard-template";
+import { VisualHomepageBuilder } from "./visual-homepage-builder";
 
 const tabs = [
   ["SITE_SETTINGS", "Site Settings", "settings"],
@@ -55,6 +56,7 @@ export function CmsWorkspace({ kind }: { kind: string }) {
   const [scheduledAt, setScheduledAt] = useState("");
   const [block, setBlock] = useState("hero");
   const [preview, setPreview] = useState(false);
+  const [builderMode, setBuilderMode] = useState(true);
   const sequence = useRef(0);
   const editable = role === "ADMIN" || role === "SUPER_ADMIN";
   const publisher = role === "SUPER_ADMIN";
@@ -487,6 +489,79 @@ export function CmsWorkspace({ kind }: { kind: string }) {
             )}
           </aside>
           {key && registry ? (
+            kind === "PAGE" && builderMode ? (
+              <div className="min-w-0 space-y-4">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setBuilderMode(false)}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
+                  >
+                    ← Switch to Classic Form View
+                  </button>
+                  <button
+                    className={button}
+                    disabled={busy || !doc}
+                    onClick={() => open(key)}
+                  >
+                    Reload
+                  </button>
+                </div>
+
+                <VisualHomepageBuilder
+                  pageTitle={content.title ? String(content.title) : key}
+                  sections={sections as unknown as Section[]}
+                  onUpdateSections={(next) => updateSections(next as unknown as Section[])}
+                  registry={registry}
+                  assets={assets}
+                  dirty={dirty}
+                  busy={busy}
+                  doc={doc}
+                  onSaveDraft={() => mutate("draft")}
+                  onPublish={() => mutate("publish")}
+                  editable={editable}
+                  publisher={publisher}
+                  onNotice={(msg) => setNotice(msg)}
+                />
+
+                {doc && (
+                  <details className="rounded-xl border bg-white p-4 text-xs">
+                    <summary className="cursor-pointer font-semibold text-slate-700">
+                      Version History & Audit ({versions.length} versions recorded)
+                    </summary>
+                    <div className="mt-3 space-y-2">
+                      {versions.map((version) => (
+                        <div key={version.id} className="flex items-center justify-between border-b pb-2">
+                          <span>
+                            Version {version.version} {version.id === doc.publishedVersionId ? "· Live" : ""} — {new Date(version.createdAt).toLocaleString()}
+                          </span>
+                          <div className="flex gap-2">
+                            {editable && (
+                              <button
+                                className="text-indigo-600 hover:underline font-semibold"
+                                disabled={busy}
+                                onClick={() => restore(version.version)}
+                              >
+                                Load version
+                              </button>
+                            )}
+                            {publisher && (
+                              <button
+                                className="text-emerald-600 hover:underline font-semibold"
+                                disabled={busy || dirty}
+                                onClick={() => mutate("rollback", version.version)}
+                              >
+                                Publish version
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            ) : (
             <div className="min-w-0 space-y-5">
               <section className="rounded-xl border bg-white p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -501,6 +576,15 @@ export function CmsWorkspace({ kind }: { kind: string }) {
                     </p>
                   </div>
                   <div className="flex gap-2">
+                    {kind === "PAGE" && (
+                      <button
+                        type="button"
+                        className="rounded-lg bg-indigo-50 border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
+                        onClick={() => setBuilderMode(true)}
+                      >
+                        🎨 Visual Builder Mode
+                      </button>
+                    )}
                     <button
                       className={button}
                       disabled={busy || !doc}
@@ -930,6 +1014,7 @@ export function CmsWorkspace({ kind }: { kind: string }) {
                 </section>
               )}
             </div>
+            )
           ) : (
             <div className="rounded-xl border border-dashed bg-white p-12 text-center text-slate-500">
               Select a document or create one to start editing.

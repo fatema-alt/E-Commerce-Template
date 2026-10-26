@@ -84,7 +84,7 @@ export class StorefrontController {
       );
     if (query.categoryId)
       conditions.push(Prisma.sql`p."categoryId" = ${query.categoryId}`);
-    if (query.source === 'featured')
+    if (query.source === 'featured' || query.source === 'trending' || query.source === 'recommended')
       conditions.push(Prisma.sql`p."isFeatured" = true`);
     if (query.ids)
       conditions.push(
