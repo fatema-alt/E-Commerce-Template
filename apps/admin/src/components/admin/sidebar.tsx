@@ -18,6 +18,9 @@ import {
   ChevronDown,
   Plus,
   List,
+  Sparkles,
+  Palette,
+  Image as ImageIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -30,6 +33,11 @@ type NavItem = {
 
 const navigation: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
+  {
+    label: "Homepage Builder",
+    href: "/cms/pages?key=home",
+    icon: Sparkles,
+  },
   {
     label: "Products",
     href: "/products",
@@ -54,13 +62,16 @@ const navigation: NavItem[] = [
   { label: "Customers", href: "/customers", icon: Users },
   { label: "Reviews & Q&A", href: "/reviews", icon: Star },
   {
-    label: "Storefront CMS", href: "/cms", icon: LayoutDashboard,
+    label: "Storefront CMS",
+    href: "/cms",
+    icon: LayoutDashboard,
     children: [
+      { label: "Homepage Builder", href: "/cms/pages?key=home", icon: Sparkles },
+      { label: "All Pages", href: "/cms/pages", icon: List },
+      { label: "Theme Customizer", href: "/cms/theme", icon: Palette },
+      { label: "Navigation Menus", href: "/cms/navigation", icon: FolderTree },
+      { label: "Media Library", href: "/cms/media", icon: ImageIcon },
       { label: "Site Settings", href: "/cms/settings", icon: Settings },
-      { label: "Theme", href: "/cms/theme", icon: LayoutDashboard },
-      { label: "Pages", href: "/cms/pages", icon: List },
-      { label: "Navigation", href: "/cms/navigation", icon: FolderTree },
-      { label: "Media Library", href: "/cms/media", icon: Package },
     ],
   },
   {
@@ -126,11 +137,14 @@ export function Sidebar({
         >
           {navigation.map((item) => {
             const Icon = item.icon;
+            const itemPath = item.href.split("?")[0];
             const active =
               item.href === "/"
                 ? pathname === "/"
-                : pathname === item.href ||
-                  pathname.startsWith(`${item.href}/`);
+                : item.href.includes("?")
+                  ? pathname === itemPath
+                  : pathname === item.href ||
+                    pathname.startsWith(`${item.href}/`);
 
             if (item.children) {
               const groupId = `sidebar-${item.label.toLowerCase()}`;
@@ -162,8 +176,10 @@ export function Sidebar({
                   >
                     {item.children.map((child) => {
                       const ChildIcon = child.icon;
+                      const childPath = child.href.split("?")[0];
                       const childActive =
                         pathname === child.href ||
+                        (child.href.includes("?") && pathname === childPath) ||
                         (child.href === item.href &&
                           pathname.startsWith(item.href + "/") &&
                           pathname !== item.href + "/add");

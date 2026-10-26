@@ -32,7 +32,13 @@ type Section = {
   config: Record<string, Value>;
   responsive?: Record<string, Value>;
 };
-export function CmsWorkspace({ kind }: { kind: string }) {
+export function CmsWorkspace({
+  kind,
+  defaultKey,
+}: {
+  kind: string;
+  defaultKey?: string;
+}) {
   const [registry, setRegistry] = useState<Registry | null>(null);
   const [role, setRole] = useState("STAFF");
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -178,11 +184,42 @@ export function CmsWorkspace({ kind }: { kind: string }) {
       setDirty(false);
       setPreview(false);
     } catch (e) {
-      setError((e as Error).message);
+      if (documentKey === "home" && kind === "PAGE") {
+        if (current !== sequence.current) return;
+        setKey("home");
+        setDoc(null);
+        setContent({
+          title: "Home",
+          description: "Production E-commerce Homepage",
+          sections: getStandardEcommerceTemplate() as unknown as Value,
+        });
+        setVersions([]);
+        setHistoryTotal(0);
+        setDirty(true);
+        setNotice(
+          "Loaded Pre-built Standard Homepage Template. Customize sections and click 'Save Draft' or 'Publish Now' to activate.",
+        );
+      } else {
+        setError((e as Error).message);
+      }
     } finally {
       if (current === sequence.current) setBusy(false);
     }
   }
+
+  const initialOpenedRef = useRef(false);
+  useEffect(() => {
+    if (initialOpenedRef.current || loading) return;
+    initialOpenedRef.current = true;
+    const urlKey =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("key")
+        : null;
+    const targetKey = urlKey || defaultKey || (kind === "PAGE" ? "home" : "");
+    if (targetKey) {
+      open(targetKey);
+    }
+  }, [loading, kind, defaultKey]);
   function create() {
     if (!registry || !canLeave()) return;
     if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(newKey)) {
