@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
     instantInsights: {
       validationLevel: 'manual-warning',
     },
+    agentUpgrade: 'security',
   },
 };
 
