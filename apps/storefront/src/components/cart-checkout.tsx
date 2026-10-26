@@ -323,6 +323,34 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                   );
                   setPlaced(order.id);
                   cart.clear();
+
+                  if (
+                    paymentMethod === "BKASH" ||
+                    paymentMethod === "SSLCOMMERZ"
+                  ) {
+                    try {
+                      const initRes = await shopRequest<{
+                        redirectUrl: string;
+                        provider: string;
+                        transactionReference: string;
+                      }>("payments/initiate", {
+                        orderId: order.id,
+                        method: paymentMethod,
+                      });
+                      if (initRes.redirectUrl) {
+                        window.location.href = initRes.redirectUrl;
+                        return;
+                      }
+                    } catch (payErr) {
+                      router.push(
+                        `/orders/${order.id}?payment=initiate_failed&reason=${encodeURIComponent(
+                          (payErr as Error).message || "Initiation failed",
+                        )}`,
+                      );
+                      return;
+                    }
+                  }
+
                   router.push(`/orders/${order.id}`);
                 } catch (e) {
                   setError((e as Error).message);
@@ -463,8 +491,12 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                   disabled={!validQuote || busy || !payments}
                 >
                   {busy
-                    ? "Placing your order…"
-                    : `Place order${validQuote ? " · " + money(quote.total) : ""}`}
+                    ? "Processing your order…"
+                    : paymentMethod === "BKASH"
+                      ? `Pay with bKash${validQuote ? " · " + money(quote.total) : ""}`
+                      : paymentMethod === "SSLCOMMERZ"
+                        ? `Pay with SSLCommerz${validQuote ? " · " + money(quote.total) : ""}`
+                        : `Place order${validQuote ? " · " + money(quote.total) : ""}`}
                 </button>
               </fieldset>
             </form>

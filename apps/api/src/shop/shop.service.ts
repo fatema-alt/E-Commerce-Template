@@ -16,6 +16,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
 import { OrdersService } from '../orders/orders.service.js';
+import { PaymentsService } from '../payments/payments.service.js';
 import type {
   QuoteDto,
   RegisterShopperDto,
@@ -43,31 +44,12 @@ const publicUser = {
 @Injectable()
 export class ShopService {
   payments() {
-    const bank =
-      process.env.BANK_NAME &&
-      process.env.BANK_ACCOUNT_NAME &&
-      process.env.BANK_ACCOUNT_NUMBER
-        ? {
-            name: process.env.BANK_NAME,
-            accountName: process.env.BANK_ACCOUNT_NAME,
-            accountNumber: process.env.BANK_ACCOUNT_NUMBER,
-            branch: process.env.BANK_BRANCH || '',
-          }
-        : null;
-    return {
-      methods: [
-        { id: 'COD', label: 'Cash on Delivery', enabled: true },
-        { id: 'BANK_TRANSFER', label: 'Bank Transfer', enabled: !!bank },
-        { id: 'SSLCOMMERZ', label: 'SSLCommerz', enabled: false },
-        { id: 'BKASH', label: 'bKash', enabled: false },
-        { id: 'NAGAD', label: 'Nagad', enabled: false },
-      ],
-      bank,
-    };
+    return this.paymentsService.getMethods();
   }
   constructor(
     private readonly db: PrismaService,
     private readonly orders: OrdersService,
+    private readonly paymentsService: PaymentsService,
   ) {}
   async throttle(
     operation: string,

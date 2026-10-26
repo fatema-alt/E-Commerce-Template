@@ -86,7 +86,10 @@ export const OrderPaymentMethod = {
   COD: 'COD',
   ONLINE: 'ONLINE',
   BANK_TRANSFER: 'BANK_TRANSFER',
-  MANUAL: 'MANUAL'
+  MANUAL: 'MANUAL',
+  BKASH: 'BKASH',
+  NAGAD: 'NAGAD',
+  SSLCOMMERZ: 'SSLCOMMERZ'
 } as const
 
 export type OrderPaymentMethod = (typeof OrderPaymentMethod)[keyof typeof OrderPaymentMethod]

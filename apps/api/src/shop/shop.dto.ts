@@ -38,8 +38,15 @@ export class ShopCheckoutDto extends OmitType(CreateOrderDto, [
   'customerId',
   'paymentMethod',
 ] as const) {
-  @IsOptional() @IsIn(['COD', 'BANK_TRANSFER']) paymentMethod:
-    'COD' | 'BANK_TRANSFER' = 'COD';
+  @IsOptional()
+  @IsIn(['COD', 'BANK_TRANSFER', 'BKASH', 'SSLCOMMERZ', 'NAGAD', 'ONLINE'])
+  paymentMethod:
+    | 'COD'
+    | 'BANK_TRANSFER'
+    | 'BKASH'
+    | 'SSLCOMMERZ'
+    | 'NAGAD'
+    | 'ONLINE' = 'COD';
   @IsString() @MaxLength(10000) quoteToken!: string;
 }
 export class ChangeShopPasswordDto {

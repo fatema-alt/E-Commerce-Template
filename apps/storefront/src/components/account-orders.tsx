@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { NewsletterPreferences } from "./newsletter";
 import { useEffect, useState } from "react";
 import {
@@ -218,12 +219,16 @@ export function Account() {
   );
 }
 export function OrderHistory({ id }: { id?: string }) {
+  const searchParams = useSearchParams();
+  const paymentQuery = searchParams.get("payment");
+  const paymentReason = searchParams.get("reason");
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<Order[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
   useEffect(() => {
     let live = true;
     const load = async () => {
@@ -268,6 +273,16 @@ export function OrderHistory({ id }: { id?: string }) {
           </p>
         </div>
       )}
+      {paymentQuery === "success" && (
+        <div role="status" className="shop-success" style={{ marginBottom: "1rem" }}>
+          Payment received successfully! Your order is confirmed.
+        </div>
+      )}
+      {paymentQuery === "failed" && (
+        <div role="alert" className="shop-error" style={{ marginBottom: "1rem" }}>
+          Payment could not be completed{paymentReason ? `: ${paymentReason}` : "."} You can retry paying below.
+        </div>
+      )}
       {order && (
         <div className="checkout-grid">
           <section className="shop-panel">
@@ -280,6 +295,40 @@ export function OrderHistory({ id }: { id?: string }) {
                 {order.paymentStatus.replaceAll("_", " ")}
               </span>
             </div>
+            {order.paymentStatus === "UNPAID" &&
+              (order.paymentMethod === "BKASH" ||
+                order.paymentMethod === "SSLCOMMERZ") && (
+                <div style={{ margin: "1rem 0" }}>
+                  <button
+                    type="button"
+                    className="primary-button"
+                    disabled={paying}
+                    onClick={async () => {
+                      setPaying(true);
+                      try {
+                        const res = await shopRequest<{ redirectUrl: string }>(
+                          "payments/initiate",
+                          {
+                            orderId: order.id,
+                            method: order.paymentMethod,
+                          },
+                        );
+                        if (res.redirectUrl) {
+                          window.location.href = res.redirectUrl;
+                        }
+                      } catch (payErr) {
+                        alert((payErr as Error).message || "Payment initiation failed");
+                      } finally {
+                        setPaying(false);
+                      }
+                    }}
+                  >
+                    {paying
+                      ? "Connecting to gateway…"
+                      : `Complete Payment with ${order.paymentMethod === "BKASH" ? "bKash" : "SSLCommerz"} (${money(order.grandTotal)})`}
+                  </button>
+                </div>
+              )}
             {order.items.map((item, i) => (
               <div className="cart-line" key={i}>
                 <div>

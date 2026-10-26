@@ -9,8 +9,8 @@ async function proxy(
   const path = (await context.params).path.join("/");
   const allowed =
     req.method === "GET"
-      ? /^(me|newsletter|payment-methods|orders(?:\/[a-f0-9-]{36})?)$/
-      : /^(register|login|logout|password|quote|orders|newsletter(?:\/preferences)?)$/;
+      ? /^(me|newsletter|payment-methods|orders(?:\/[a-f0-9-]{36})?|payments\/methods|payments\/status\/[a-f0-9-]{36})$/
+      : /^(register|login|logout|password|quote|orders|payments\/initiate|newsletter(?:\/preferences)?)$/;
   if (!allowed.test(path))
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   let body: string | undefined;
@@ -57,7 +57,10 @@ async function proxy(
       ? `?page=${encodeURIComponent(req.nextUrl.searchParams.get("page") || "1")}`
       : "";
   try {
-    const upstream = await fetch(`${api}/shop/${path}${page}`, {
+    const targetUrl = path.startsWith("payments/")
+      ? `${api}/${path}${page}`
+      : `${api}/shop/${path}${page}`;
+    const upstream = await fetch(targetUrl, {
       method: req.method,
       headers,
       body,

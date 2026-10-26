@@ -423,6 +423,9 @@ enum OrderPaymentMethod {
   ONLINE
   BANK_TRANSFER
   MANUAL
+  BKASH
+  NAGAD
+  SSLCOMMERZ
 }
 
 enum OrderPaymentTransactionType {

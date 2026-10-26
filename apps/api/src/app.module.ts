@@ -15,6 +15,7 @@ import { CustomersModule } from './customers/customers.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { CmsModule } from './cms/cms.module.js';
 import { ShopModule } from './shop/shop.module.js';
+import { PaymentsModule } from './payments/payments.module.js';
 import {
   AnalyticsController,
   DashboardController,
@@ -33,6 +34,7 @@ import { DashboardService } from './dashboard/dashboard.service.js';
     OrdersModule,
     CmsModule,
     ShopModule,
+    PaymentsModule,
   ],
   controllers: [
     AppController,
