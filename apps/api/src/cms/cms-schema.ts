@@ -64,13 +64,15 @@ const productSource = {
 export const BLOCK_SCHEMAS: Record<string, Schema> = {
   hero: object(
     {
-      title: text(),
+      bannerType: choice('with_button', 'without_button'),
+      title: text(200, 0),
       subtitle: text(1000, 0),
       image: image,
+      bannerLink: link,
       button,
       align: choice('left', 'center', 'right'),
     },
-    ['title'],
+    [],
   ),
   bannerSlider: object(
     {

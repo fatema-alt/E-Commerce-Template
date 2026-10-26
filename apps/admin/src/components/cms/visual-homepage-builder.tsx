@@ -422,22 +422,45 @@ export function VisualHomepageBuilder({
 
                       {/* Visual Preview Content based on type */}
                       {section.type === "hero" ? (
-                        <div className="p-8 rounded-xl bg-gradient-to-r from-lime-100/60 to-emerald-50 border border-slate-200 min-h-[220px] flex flex-col justify-center">
-                          <span className="inline-block px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-800 text-[10px] font-bold w-fit mb-2">
-                            PROMOTIONAL HERO BANNER
-                          </span>
-                          <h2 className="text-2xl font-bold text-slate-900">
-                            {String(c.title || "Shop Smart. Live Smart.")}
-                          </h2>
-                          <p className="text-xs text-slate-600 mt-1.5 max-w-md">
-                            {String(c.subtitle || "Premium multi-category lifestyle and tech store.")}
-                          </p>
-                          <div className="mt-4 flex gap-2">
-                            <span className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white">
-                              {(c.button as any)?.label || "Start Shopping ↗"}
+                        c.bannerType === "without_button" ? (
+                          <div className="relative rounded-xl overflow-hidden border border-slate-200 min-h-[220px] bg-slate-900 flex flex-col justify-center items-center text-center p-6">
+                            <span className="absolute top-3 right-3 px-2 py-0.5 rounded bg-black/60 text-white text-[10px] font-bold">
+                              🖼️ বাটন ছাড়া (Pure Graphic Banner)
                             </span>
+                            {c.image && (c.image as any).assetId ? (
+                              <div className="text-white text-xs">
+                                <span className="font-bold text-sm block">Banner Image Selected</span>
+                                <span className="text-slate-400 text-[11px]">Click Destination: {String(c.bannerLink || (c.button as any)?.href || "/shop")}</span>
+                              </div>
+                            ) : (
+                              <div className="text-white space-y-1.5">
+                                <span className="text-xs font-bold text-lime-400">DSMART PROMOTIONAL BANNER</span>
+                                <h3 className="text-xl font-black">{String(c.title || "Full Width Graphic Banner")}</h3>
+                                <p className="text-xs text-slate-300">পুরো ব্যানারটি ক্লিকযোগ্য (Click to open link)</p>
+                                <span className="text-[11px] font-mono text-indigo-300 block">Link: {String(c.bannerLink || (c.button as any)?.href || "/shop")}</span>
+                              </div>
+                            )}
                           </div>
-                        </div>
+                        ) : (
+                          <div className="p-8 rounded-xl bg-gradient-to-r from-lime-100/60 to-emerald-50 border border-slate-200 min-h-[220px] flex flex-col justify-center">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="inline-block px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-800 text-[10px] font-bold">
+                                🔘 বাটন সহ (With CTA Button)
+                              </span>
+                            </div>
+                            <h2 className="text-2xl font-bold text-slate-900">
+                              {String(c.title || "Shop Smart. Live Smart.")}
+                            </h2>
+                            <p className="text-xs text-slate-600 mt-1.5 max-w-md">
+                              {String(c.subtitle || "Premium multi-category lifestyle and tech store.")}
+                            </p>
+                            <div className="mt-4 flex gap-2">
+                              <span className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white">
+                                {(c.button as any)?.label || "Start Shopping ↗"}
+                              </span>
+                            </div>
+                          </div>
+                        )
                       ) : section.type === "categoryGrid" ? (
                         <div className="p-5 rounded-xl bg-white border border-slate-200">
                           <h3 className="text-base font-bold text-slate-900 mb-3">
@@ -622,6 +645,67 @@ export function VisualHomepageBuilder({
                 {/* Content Configuration Schema Form */}
                 <div className="space-y-3">
                   <span className="text-xs font-bold text-slate-800 block">Content & Layout</span>
+
+                  {/* For HERO SECTION: 2 Banner Types (Button Soho & Button Chara) */}
+                  {selectedSection.type === "hero" && (
+                    <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 space-y-2">
+                      <label className="text-xs font-bold text-slate-800 block">
+                        ব্যানারের ধরন (Banner Style Option)
+                      </label>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = [...sections];
+                            next[selectedIndex] = {
+                              ...selectedSection,
+                              config: {
+                                ...selectedSection.config,
+                                bannerType: "with_button",
+                              },
+                            };
+                            onUpdateSections(next);
+                          }}
+                          className={`p-2.5 rounded-lg border text-left font-semibold transition ${
+                            (selectedSection.config.bannerType || "with_button") === "with_button"
+                              ? "border-indigo-600 bg-white text-indigo-700 shadow-xs ring-1 ring-indigo-600"
+                              : "border-slate-200 bg-white/60 text-slate-600 hover:bg-white"
+                          }`}
+                        >
+                          <span className="block font-bold">🔘 বাটন সহ</span>
+                          <span className="text-[10px] text-slate-500 font-normal">Title + CTA Button</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = [...sections];
+                            next[selectedIndex] = {
+                              ...selectedSection,
+                              config: {
+                                ...selectedSection.config,
+                                bannerType: "without_button",
+                              },
+                            };
+                            onUpdateSections(next);
+                          }}
+                          className={`p-2.5 rounded-lg border text-left font-semibold transition ${
+                            selectedSection.config.bannerType === "without_button"
+                              ? "border-indigo-600 bg-white text-indigo-700 shadow-xs ring-1 ring-indigo-600"
+                              : "border-slate-200 bg-white/60 text-slate-600 hover:bg-white"
+                          }`}
+                        >
+                          <span className="block font-bold">🖼️ বাটন ছাড়া</span>
+                          <span className="text-[10px] text-slate-500 font-normal">Pure Graphic Banner</span>
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-slate-600">
+                        {selectedSection.config.bannerType === "without_button"
+                          ? "💡 বাটন ছাড়া অপশন: আপনার ব্যানার ইমেজটি পুরো ফুল-উইডথ জুড়ে ক্লিকযোগ্য থাকবে। কোনো টেক্সট বা বাটন ওভারলে থাকবে না।"
+                          : "💡 বাটন সহ অপশন: ব্যানার টাইটেল, সাবটাইটেল এবং ক্লিকযোগ্য বাটন (যেমন: Start Shopping) দৃশ্যমান থাকবে।"}
+                      </p>
+                    </div>
+                  )}
+
                   <SchemaField
                     name={label(selectedSection.type)}
                     schema={registry.blocks[selectedSection.type]}

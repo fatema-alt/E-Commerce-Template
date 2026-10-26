@@ -114,9 +114,13 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
 /* cartup-inspired high-converting hero banner ecosystem */
 .hero-banner-ecosystem{margin-bottom:clamp(24px,3vw,36px);display:flex;flex-direction:column;gap:clamp(12px,1.5vw,18px)}
-.hero-banner-main-grid{display:grid;grid-template-columns:minmax(0,1fr) clamp(300px,28vw,360px);gap:clamp(12px,1.5vw,18px);align-items:stretch}
-.hero-carousel-card{position:relative;border-radius:var(--r-xl);overflow:hidden;border:1px solid var(--c-line);box-shadow:var(--shadow);background:var(--glass);display:flex;flex-direction:column;justify-content:space-between}
+.hero-banner-main-grid{display:block;width:100%}
+.hero-carousel-card{position:relative;width:100%;border-radius:var(--r-xl);overflow:hidden;border:1px solid var(--c-line);box-shadow:var(--shadow);background:var(--glass);display:flex;flex-direction:column;justify-content:space-between}
 .hero-slide-surface{display:grid;grid-template-columns:1.2fr .8fr;gap:var(--gap);align-items:center;min-height:clamp(380px,46vh,480px);padding:clamp(24px,3.5vw,48px);padding-bottom:clamp(48px,5vw,60px);transition:background .6s ease}
+.hero-slide-surface.is-graphic{display:block;padding:0;min-height:clamp(240px,36vw,460px);position:relative;overflow:hidden}
+.hero-graphic-link{display:block;width:100%;height:100%;min-height:inherit;position:relative}
+.hero-graphic-img{width:100%;height:100%;min-height:inherit;max-height:500px;object-fit:cover;display:block}
+.hero-graphic-placeholder{width:100%;height:100%;min-height:clamp(260px,36vw,460px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem;background:linear-gradient(135deg,#064e3b 0%,#0f172a 60%,#1e1b4b 100%);color:#fff;position:relative}
 .hero-slide-content{position:relative;z-index:2;max-width:580px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center}
 .hero-campaign-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:var(--r-pill);font-size:.76rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:14px;border:1px solid transparent}
 .badge-amber{background:rgba(245,158,11,.15);color:#b45309;border-color:rgba(245,158,11,.35)}

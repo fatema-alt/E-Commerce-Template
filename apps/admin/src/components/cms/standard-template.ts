@@ -26,6 +26,7 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
         padding: 4,
       },
       config: {
+        bannerType: "with_button",
         title: "Shop Smart. Live Smart.",
         subtitle:
           "Discover top-tier electronics, fashion, lifestyle, and daily essentials with lightning-fast delivery and Cash on Delivery all across Bangladesh.",
@@ -33,6 +34,7 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
           label: "Start Shopping ↗",
           href: "/shop",
         },
+        bannerLink: "/shop",
         align: "left",
       },
     },
