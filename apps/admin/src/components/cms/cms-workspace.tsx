@@ -159,7 +159,17 @@ export function CmsWorkspace({ kind }: { kind: string }) {
       if (current !== sequence.current) return;
       setKey(documentKey);
       setDoc(next);
-      setContent(next.latestVersion?.content ?? {});
+      const loadedContent = { ...(next.latestVersion?.content ?? {}) };
+      if (
+        kind === "PAGE" &&
+        (!loadedContent.title || !(loadedContent.title as string).trim())
+      ) {
+        loadedContent.title =
+          documentKey === "home"
+            ? "Home"
+            : documentKey.charAt(0).toUpperCase() + documentKey.slice(1);
+      }
+      setContent(loadedContent);
       setVersions(history.items);
       setHistoryTotal(history.total);
       setHistoryPage(1);
@@ -181,11 +191,21 @@ export function CmsWorkspace({ kind }: { kind: string }) {
     }
     setKey(newKey);
     setDoc(null);
-    setContent(
+    let initial =
       kind === "THEME"
         ? { ...registry.defaultTheme }
-        : (initialValue(registry.documents[kind]) as Record<string, Value>),
-    );
+        : (initialValue(registry.documents[kind]) as Record<string, Value>);
+    if (kind === "PAGE") {
+      initial = {
+        ...initial,
+        title:
+          newKey === "home"
+            ? "Home"
+            : newKey.charAt(0).toUpperCase() + newKey.slice(1),
+        sections: getStandardEcommerceTemplate() as unknown as Value,
+      };
+    }
+    setContent(initial);
     setVersions([]);
     setHistoryTotal(0);
     setDirty(true);
@@ -216,12 +236,23 @@ export function CmsWorkspace({ kind }: { kind: string }) {
     setBusy(true);
     setError("");
     setNotice("");
+    const payloadContent = { ...content };
+    if (kind === "PAGE") {
+      const currentTitle = (payloadContent.title as string)?.trim();
+      if (!currentTitle) {
+        payloadContent.title =
+          key === "home"
+            ? "Home"
+            : key.charAt(0).toUpperCase() + key.slice(1);
+        setContent(payloadContent);
+      }
+    }
     try {
       await request(`/admin/cms/${kind}/${key}/${action}`, {
         method: action === "draft" ? "PATCH" : "POST",
         body: JSON.stringify({
           expectedRevision: doc?.revision ?? 0,
-          ...(action === "draft" ? { content } : {}),
+          ...(action === "draft" ? { content: payloadContent } : {}),
           ...(version ? { version } : {}),
           ...(action === "schedule"
             ? { scheduledAt: new Date(scheduledAt).toISOString() }
