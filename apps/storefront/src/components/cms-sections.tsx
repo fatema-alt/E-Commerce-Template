@@ -120,10 +120,14 @@ async function Block({
     );
   }
   if (section.type === "categoryGrid") {
-    const all = await getCategories(c.categoryIds as string[]);
-    const selected = (c.categoryIds as string[])
-      .map((id) => all.find((category) => category.id === id))
-      .filter((category) => category !== undefined);
+    const rawCategoryIds = Array.isArray(c.categoryIds) ? (c.categoryIds as string[]) : [];
+    const all = await getCategories(rawCategoryIds.length > 0 ? rawCategoryIds : undefined);
+    const selected =
+      rawCategoryIds.length > 0
+        ? rawCategoryIds
+            .map((id) => all.find((category) => category.id === id))
+            .filter((category): category is (typeof all)[number] => category !== undefined)
+        : all.slice(0, 12);
     return (
       <>
         {title}

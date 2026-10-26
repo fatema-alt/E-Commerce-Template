@@ -79,6 +79,25 @@ describe('CMS content validation', () => {
       }),
     ).toBeTruthy();
   });
+  it('accepts categoryGrid with empty or omitted categoryIds', () => {
+    expect(
+      validateCmsContent('PAGE', {
+        title: 'Home',
+        sections: [
+          {
+            id: 'categories-showcase',
+            type: 'categoryGrid',
+            visible: true,
+            config: {
+              title: 'Shop by Department',
+              columns: 6,
+              categoryIds: [],
+            },
+          },
+        ],
+      }),
+    ).toBeTruthy();
+  });
   it('rejects executable fields, unknown blocks and duplicate section IDs', () => {
     const section = {
       id: 'same',

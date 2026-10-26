@@ -55,7 +55,7 @@ const productSource = {
   title: text(),
   source: choice('featured', 'latest', 'category', 'selected', 'sale'),
   categoryId: uuid,
-  productIds: array(uuid, 100, 1),
+  productIds: array(uuid, 100, 0),
   limit: number(1, 100),
   columns: number(1, 6),
 };
@@ -87,8 +87,8 @@ export const BLOCK_SCHEMAS: Record<string, Schema> = {
     ['slides'],
   ),
   categoryGrid: object(
-    { title: text(), categoryIds: array(uuid, 50, 1), columns: number(1, 8) },
-    ['title', 'categoryIds'],
+    { title: text(), categoryIds: array(uuid, 50, 0), columns: number(1, 8) },
+    ['title'],
   ),
   productGrid: object(productSource, ['title', 'source']),
   productCarousel: object(productSource, ['title', 'source']),
