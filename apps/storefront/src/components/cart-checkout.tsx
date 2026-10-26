@@ -13,7 +13,9 @@ import {
   type Quote,
   type Shopper,
 } from "../lib/shop-client";
+
 const pending = new Map<string, Promise<Quote>>();
+
 async function repairObsoleteVariants(lines: CartLine[]) {
   let repaired = false;
   const products = [
@@ -35,16 +37,20 @@ async function repairObsoleteVariants(lines: CartLine[]) {
   }
   return repaired;
 }
-function requestQuote(serialized: string) {
-  let promise = pending.get(serialized);
+
+function requestQuote(serialized: string, couponCode?: string) {
+  const cacheKey = serialized + (couponCode ? `::${couponCode.trim().toUpperCase()}` : "");
+  let promise = pending.get(cacheKey);
   if (!promise) {
     promise = shopRequest<Quote>("quote", {
       items: JSON.parse(serialized),
-    }).finally(() => pending.delete(serialized));
-    pending.set(serialized, promise);
+      ...(couponCode ? { couponCode: couponCode.trim().toUpperCase() } : {}),
+    }).finally(() => pending.delete(cacheKey));
+    pending.set(cacheKey, promise);
   }
   return promise;
 }
+
 export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
   const cart = useCart();
   const router = useRouter();
@@ -58,7 +64,12 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
   const [paymentMethod, setPayment] = useState("COD");
   const [user, setUser] = useState<Shopper | null>(null);
   const [placed, setPlaced] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState("");
+  const [couponError, setCouponError] = useState("");
+  const [couponBusy, setCouponBusy] = useState(false);
   const attempt = useRef({ fingerprint: "", key: "" });
+
   const serialized = JSON.stringify(
     cart.lines.map(({ productId, variantId, quantity }) => ({
       productId,
@@ -66,10 +77,11 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       quantity,
     })),
   );
+
   useEffect(() => {
     let live = true;
     if (serialized !== "[]")
-      requestQuote(serialized)
+      requestQuote(serialized, appliedCoupon)
         .then((result) => {
           if (live) {
             setQuote(result);
@@ -98,7 +110,8 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
     return () => {
       live = false;
     };
-  }, [serialized, review, cart.lines]);
+  }, [serialized, review, cart.lines, appliedCoupon]);
+
   useEffect(() => {
     let live = true;
     Promise.all([
@@ -118,7 +131,37 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       live = false;
     };
   }, []);
+
+  const handleApplyCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!couponCode.trim() || couponBusy) return;
+    setCouponBusy(true);
+    setCouponError("");
+    try {
+      const code = couponCode.trim().toUpperCase();
+      const res = await requestQuote(serialized, code);
+      if (res.coupon) {
+        setAppliedCoupon(code);
+        setQuote(res);
+        setCouponCode("");
+      } else {
+        setCouponError("Coupon code could not be applied");
+      }
+    } catch (err) {
+      setCouponError((err as Error).message || "Invalid coupon code");
+    } finally {
+      setCouponBusy(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon("");
+    setCouponError("");
+    setCouponCode("");
+  };
+
   const validQuote = quote && quotedItems === serialized;
+
   if (placed)
     return (
       <main id="main" className="container main-content">
@@ -128,6 +171,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
         </Link>
       </main>
     );
+
   return (
     <main id="main" className="container main-content">
       <nav className="breadcrumbs" aria-label="Breadcrumb">
@@ -250,6 +294,12 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                     <dt>Subtotal</dt>
                     <dd>{money(quote.subtotal)}</dd>
                   </div>
+                  {quote.coupon && (
+                    <div style={{ color: "#059669", fontWeight: 600 }}>
+                      <dt>Discount ({quote.coupon.code})</dt>
+                      <dd>-{money(quote.discount || "0")}</dd>
+                    </div>
+                  )}
                   <div>
                     <dt>Delivery</dt>
                     <dd>{money(quote.shipping)}</dd>
@@ -263,6 +313,54 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                     <dd>{money(quote.total)}</dd>
                   </div>
                 </dl>
+
+                {/* Coupon Code Section */}
+                <div style={{ margin: "1rem 0", borderTop: "1px solid #e2e8f0", paddingTop: "1rem" }}>
+                  {appliedCoupon ? (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f0fdf4", padding: "0.5rem 0.75rem", borderRadius: "0.5rem", border: "1px solid #bbf7d0" }}>
+                      <div>
+                        <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#166534" }}>
+                          🏷️ {appliedCoupon}
+                        </span>
+                        <p style={{ margin: 0, fontSize: "0.75rem", color: "#15803d" }}>
+                          Discount applied
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveCoupon}
+                        style={{ background: "none", border: "none", color: "#dc2626", fontSize: "0.75rem", cursor: "pointer", fontWeight: 600 }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleApplyCoupon} style={{ display: "flex", gap: "0.5rem" }}>
+                      <input
+                        type="text"
+                        placeholder="Coupon code"
+                        value={couponCode}
+                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                        maxLength={32}
+                        disabled={couponBusy}
+                        style={{ flex: 1, padding: "0.4rem 0.6rem", fontSize: "0.875rem", border: "1px solid #cbd5e1", borderRadius: "0.375rem" }}
+                      />
+                      <button
+                        type="submit"
+                        disabled={!couponCode.trim() || couponBusy}
+                        style={{ padding: "0.4rem 0.8rem", fontSize: "0.875rem", fontWeight: 600, background: "#4f46e5", color: "#fff", border: "none", borderRadius: "0.375rem", cursor: "pointer" }}
+                      >
+                        {couponBusy ? "…" : "Apply"}
+                      </button>
+                    </form>
+                  )}
+                  {couponError && (
+                    <p style={{ color: "#dc2626", fontSize: "0.75rem", marginTop: "0.35rem" }}>
+                      {couponError}
+                    </p>
+                  )}
+                </div>
+
                 <p className="muted small">
                   Delivery within Bangladesh. Your final total is verified again
                   when placing the order.
@@ -309,6 +407,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                       : {}),
                   },
                   ...(value("note") ? { customerNote: value("note") } : {}),
+                  ...(appliedCoupon ? { couponCode: appliedCoupon } : {}),
                 };
                 const fingerprint = JSON.stringify(payload);
                 if (attempt.current.fingerprint !== fingerprint)

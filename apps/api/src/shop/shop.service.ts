@@ -17,10 +17,12 @@ import { Prisma } from '../generated/prisma/client.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
 import { OrdersService } from '../orders/orders.service.js';
 import { PaymentsService } from '../payments/payments.service.js';
+import { PromotionsService } from '../promotions/promotions.service.js';
 import type {
   QuoteDto,
   RegisterShopperDto,
   ShopCheckoutDto,
+  ValidateCouponDto,
 } from './shop.dto.js';
 export const SHOP_COOKIE = 'commerce_shopper';
 export const digest = (value: string) =>
@@ -50,6 +52,7 @@ export class ShopService {
     private readonly db: PrismaService,
     private readonly orders: OrdersService,
     private readonly paymentsService: PaymentsService,
+    private readonly promotionsService: PromotionsService,
   ) {}
   async throttle(
     operation: string,
@@ -293,11 +296,34 @@ export class ShopService {
         lineTotal: lineTotal.toFixed(2),
       });
     }
+
+    let discount = new Prisma.Decimal(0);
+    let appliedCoupon:
+      | { code: string; discount: string; description?: string | null }
+      | undefined;
+
+    if (dto.couponCode) {
+      const evalRes = await this.promotionsService.evaluateCoupon(
+        dto.couponCode,
+        subtotal,
+      );
+      discount = evalRes.discountAmount;
+      appliedCoupon = {
+        code: evalRes.code,
+        discount: discount.toFixed(2),
+        description: evalRes.description,
+      };
+    }
+
+    const total = subtotal.minus(discount);
+
     const payload = Buffer.from(
       JSON.stringify({
         sessionId,
         items: dto.items,
         subtotal: subtotal.toFixed(2),
+        discount: discount.toFixed(2),
+        couponCode: appliedCoupon?.code,
         expires: Date.now() + 10 * 60000,
       }),
     ).toString('base64url');
@@ -308,11 +334,28 @@ export class ShopService {
     return {
       items,
       subtotal: subtotal.toFixed(2),
+      discount: discount.toFixed(2),
+      coupon: appliedCoupon,
       shipping: '0.00',
       tax: '0.00',
-      total: subtotal.toFixed(2),
+      total: total.toFixed(2),
       currency: 'BDT',
       quoteToken,
+    };
+  }
+
+  async validateCoupon(dto: ValidateCouponDto, token?: string) {
+    const session = await this.session(token);
+    const quoteRes = await this.quote(
+      { items: dto.items, couponCode: dto.code },
+      session?.id || 'guest',
+    );
+    return {
+      valid: true,
+      coupon: quoteRes.coupon,
+      subtotal: quoteRes.subtotal,
+      discount: quoteRes.discount,
+      total: quoteRes.total,
     };
   }
   async checkout(
@@ -339,6 +382,8 @@ export class ShopService {
       sessionId: string;
       items: QuoteDto['items'];
       subtotal: string;
+      discount?: string;
+      couponCode?: string;
       expires: number;
     };
     try {
@@ -362,6 +407,7 @@ export class ShopService {
         ...data,
         customerId: session.customerId || undefined,
         paymentMethod: dto.paymentMethod || 'COD',
+        couponCode: quote.couponCode || dto.couponCode,
       },
       key ? `shop:${session.id}:${key}` : undefined,
       session.id,
@@ -411,6 +457,8 @@ export class ShopService {
         paymentMethod: true,
         createdAt: true,
         grandTotal: true,
+        discountTotal: true,
+        couponCode: true,
         shippingTotal: true,
         taxTotal: true,
         subtotal: true,

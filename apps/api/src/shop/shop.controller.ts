@@ -25,6 +25,7 @@ import {
   RegisterShopperDto,
   ShopCheckoutDto,
   SubscribeDto,
+  ValidateCouponDto,
 } from './shop.dto.js';
 @Controller('shop')
 @SetMetadata('public', true)
@@ -114,6 +115,13 @@ export class ShopController {
       (await this.shop.session(this.cookie(req))) ||
       (await this.issue(res)).session;
     return this.shop.quote(dto, session.id);
+  }
+  @Post('coupons/validate') async validateCoupon(
+    @Body() dto: ValidateCouponDto,
+    @Req() req: Request,
+  ) {
+    await this.shop.throttle('coupon-validate-ip', req.ip || 'unknown', 100);
+    return this.shop.validateCoupon(dto, this.cookie(req));
   }
   @Post('orders') async checkout(
     @Body() dto: ShopCheckoutDto,

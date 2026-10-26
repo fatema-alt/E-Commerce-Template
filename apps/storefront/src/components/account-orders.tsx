@@ -345,6 +345,12 @@ export function OrderHistory({ id }: { id?: string }) {
                 <dt>Subtotal</dt>
                 <dd>{money(order.subtotal)}</dd>
               </div>
+              {Number(order.discountTotal || 0) > 0 && (
+                <div style={{ color: "#059669" }}>
+                  <dt>Discount {order.couponCode ? `(${order.couponCode})` : ""}</dt>
+                  <dd>-{money(order.discountTotal || 0)}</dd>
+                </div>
+              )}
               <div>
                 <dt>Delivery</dt>
                 <dd>{money(order.shippingTotal)}</dd>

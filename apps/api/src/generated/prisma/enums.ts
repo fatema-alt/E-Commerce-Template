@@ -160,3 +160,12 @@ export const CmsDocumentState = {
 } as const
 
 export type CmsDocumentState = (typeof CmsDocumentState)[keyof typeof CmsDocumentState]
+
+
+export const CouponType = {
+  PERCENTAGE: 'PERCENTAGE',
+  FIXED_AMOUNT: 'FIXED_AMOUNT',
+  FREE_SHIPPING: 'FREE_SHIPPING'
+} as const
+
+export type CouponType = (typeof CouponType)[keyof typeof CouponType]

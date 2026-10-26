@@ -25,6 +25,7 @@ export const orderInclude = {
   notes: true,
   payments: true,
   shipments: true,
+  coupon: true,
   returns: { include: { items: true }, orderBy: { createdAt: 'asc' as const } },
   events: { orderBy: { createdAt: 'asc' as const } },
 };
@@ -369,7 +370,90 @@ export class OrdersService {
               throw new ConflictException(
                 'Prices changed. Review your cart again.',
               );
-            // Shipping/tax/discount engine is NOT integrated yet: explicitly zero, never silently accept client totals.
+            let discountTotal = new D(0);
+            let appliedCouponId: string | undefined;
+            let appliedCouponCode: string | undefined;
+
+            if (dto.couponCode) {
+              const code = dto.couponCode.trim().toUpperCase();
+              const coupon = await tx.coupon.findUnique({
+                where: { code },
+              });
+              if (!coupon || !coupon.isActive) {
+                throw new BadRequestException('Invalid or inactive coupon code');
+              }
+              const now = new Date();
+              if (coupon.startsAt && coupon.startsAt > now) {
+                throw new BadRequestException(
+                  'Coupon promotion has not started yet',
+                );
+              }
+              if (coupon.expiresAt && coupon.expiresAt < now) {
+                throw new BadRequestException('Coupon code has expired');
+              }
+              if (
+                coupon.usageLimit !== null &&
+                coupon.usageLimit !== undefined &&
+                coupon.usageCount >= coupon.usageLimit
+              ) {
+                throw new BadRequestException('Coupon usage limit reached');
+              }
+              if (
+                coupon.minOrderAmount &&
+                subtotal.lessThan(coupon.minOrderAmount)
+              ) {
+                throw new BadRequestException(
+                  `Minimum order amount of ৳${coupon.minOrderAmount} required`,
+                );
+              }
+
+              const customerConditions: Prisma.CouponUsageWhereInput[] = [];
+              if (dto.customerId) {
+                customerConditions.push({ customerId: dto.customerId });
+              }
+              if (dto.customerPhone) {
+                customerConditions.push({ customerPhone: dto.customerPhone.trim() });
+              }
+              if (dto.customerEmail) {
+                customerConditions.push({
+                  customerEmail: dto.customerEmail.trim().toLowerCase(),
+                });
+              }
+
+              if (customerConditions.length > 0) {
+                const count = await tx.couponUsage.count({
+                  where: { couponId: coupon.id, OR: customerConditions },
+                });
+                if (count >= coupon.perCustomerLimit) {
+                  throw new BadRequestException(
+                    'Coupon usage limit exceeded for your account',
+                  );
+                }
+              }
+
+              if (coupon.type === 'PERCENTAGE') {
+                discountTotal = subtotal
+                  .mul(coupon.value)
+                  .div(100)
+                  .toDecimalPlaces(2);
+                if (
+                  coupon.maxDiscountAmount &&
+                  discountTotal.greaterThan(coupon.maxDiscountAmount)
+                ) {
+                  discountTotal = coupon.maxDiscountAmount;
+                }
+              } else if (coupon.type === 'FIXED_AMOUNT') {
+                discountTotal = coupon.value.greaterThan(subtotal)
+                  ? subtotal
+                  : coupon.value;
+              }
+
+              appliedCouponId = coupon.id;
+              appliedCouponCode = coupon.code;
+            }
+
+            const grandTotal = subtotal.minus(discountTotal);
+
             const order = await tx.order.create({
               data: {
                 orderNumber: `ORD-${randomUUID()}`,
@@ -380,7 +464,10 @@ export class OrdersService {
                 paymentMethod: dto.paymentMethod,
                 source: storefront ? 'STOREFRONT' : undefined,
                 subtotal,
-                grandTotal: subtotal,
+                discountTotal,
+                grandTotal,
+                couponId: appliedCouponId,
+                couponCode: appliedCouponCode,
                 customerNote: dto.customerNote,
                 items: {
                   create: lines.map((l) => ({
@@ -443,6 +530,35 @@ export class OrdersService {
                     quantity: line.quantity,
                   },
                 });
+            }
+            if (appliedCouponId) {
+              await tx.couponUsage.create({
+                data: {
+                  couponId: appliedCouponId,
+                  orderId: order.id,
+                  customerId: dto.customerId ?? null,
+                  customerPhone: dto.customerPhone.trim(),
+                  customerEmail:
+                    dto.customerEmail?.trim().toLowerCase() ?? null,
+                  discountAmount: discountTotal,
+                },
+              });
+              await tx.coupon.update({
+                where: { id: appliedCouponId },
+                data: { usageCount: { increment: 1 } },
+              });
+              await tx.orderEvent.create({
+                data: {
+                  orderId: order.id,
+                  action: 'COUPON_APPLIED',
+                  actorType: storefront ? 'CUSTOMER' : 'ADMIN',
+                  actorId,
+                  after: {
+                    couponCode: appliedCouponCode,
+                    discountAmount: discountTotal.toString(),
+                  },
+                },
+              });
             }
             await tx.orderIdempotencyKey.update({
               where: { key },

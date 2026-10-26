@@ -10,6 +10,7 @@ import {
   Boxes,
   ShoppingCart,
   Users,
+  Tag,
   Settings,
   X,
   ChevronDown,
@@ -47,6 +48,7 @@ const navigation: NavItem[] = [
   },
   { label: "Inventory", href: "/inventory", icon: Boxes },
   { label: "Orders", href: "/orders", icon: ShoppingCart },
+  { label: "Promotions", href: "/promotions", icon: Tag },
   { label: "Customers", href: "/customers", icon: Users },
   {
     label: "Storefront CMS", href: "/cms", icon: LayoutDashboard,

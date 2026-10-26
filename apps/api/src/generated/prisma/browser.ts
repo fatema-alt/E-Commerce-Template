@@ -217,3 +217,13 @@ export type NewsletterSubscription = Prisma.NewsletterSubscriptionModel
  * 
  */
 export type StorefrontThrottle = Prisma.StorefrontThrottleModel
+/**
+ * Model Coupon
+ * 
+ */
+export type Coupon = Prisma.CouponModel
+/**
+ * Model CouponUsage
+ * 
+ */
+export type CouponUsage = Prisma.CouponUsageModel

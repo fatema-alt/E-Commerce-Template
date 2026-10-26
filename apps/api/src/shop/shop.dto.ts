@@ -33,6 +33,26 @@ export class QuoteDto {
   @ValidateNested({ each: true })
   @Type(() => OrderLineDto)
   items!: OrderLineDto[];
+
+  @IsOptional()
+  @Trim()
+  @IsString()
+  @Length(2, 32)
+  couponCode?: string;
+}
+
+export class ValidateCouponDto {
+  @Trim()
+  @IsString()
+  @Length(2, 32)
+  code!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => OrderLineDto)
+  items!: OrderLineDto[];
 }
 export class ShopCheckoutDto extends OmitType(CreateOrderDto, [
   'customerId',

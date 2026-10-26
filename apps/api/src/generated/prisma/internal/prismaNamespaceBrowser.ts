@@ -88,7 +88,9 @@ export const ModelName = {
   ShopperSession: 'ShopperSession',
   ShopperOrderAccess: 'ShopperOrderAccess',
   NewsletterSubscription: 'NewsletterSubscription',
-  StorefrontThrottle: 'StorefrontThrottle'
+  StorefrontThrottle: 'StorefrontThrottle',
+  Coupon: 'Coupon',
+  CouponUsage: 'CouponUsage'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -432,7 +434,9 @@ export const OrderScalarFieldEnum = {
   cancelledAt: 'cancelledAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
-  version: 'version'
+  version: 'version',
+  couponId: 'couponId',
+  couponCode: 'couponCode'
 } as const
 
 export type OrderScalarFieldEnum = (typeof OrderScalarFieldEnum)[keyof typeof OrderScalarFieldEnum]
@@ -734,6 +738,41 @@ export const StorefrontThrottleScalarFieldEnum = {
 } as const
 
 export type StorefrontThrottleScalarFieldEnum = (typeof StorefrontThrottleScalarFieldEnum)[keyof typeof StorefrontThrottleScalarFieldEnum]
+
+
+export const CouponScalarFieldEnum = {
+  id: 'id',
+  code: 'code',
+  description: 'description',
+  type: 'type',
+  value: 'value',
+  minOrderAmount: 'minOrderAmount',
+  maxDiscountAmount: 'maxDiscountAmount',
+  usageLimit: 'usageLimit',
+  usageCount: 'usageCount',
+  perCustomerLimit: 'perCustomerLimit',
+  startsAt: 'startsAt',
+  expiresAt: 'expiresAt',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CouponScalarFieldEnum = (typeof CouponScalarFieldEnum)[keyof typeof CouponScalarFieldEnum]
+
+
+export const CouponUsageScalarFieldEnum = {
+  id: 'id',
+  couponId: 'couponId',
+  orderId: 'orderId',
+  customerId: 'customerId',
+  customerPhone: 'customerPhone',
+  customerEmail: 'customerEmail',
+  discountAmount: 'discountAmount',
+  usedAt: 'usedAt'
+} as const
+
+export type CouponUsageScalarFieldEnum = (typeof CouponUsageScalarFieldEnum)[keyof typeof CouponUsageScalarFieldEnum]
 
 
 export const SortOrder = {

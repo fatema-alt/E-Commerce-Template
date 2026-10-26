@@ -50,4 +50,5 @@ export class CreateOrderDto {
   @Type(() => CheckoutAddressDto)
   shippingAddress!: CheckoutAddressDto;
   @IsOptional() @Trim() @IsString() @Length(0, 2000) customerNote?: string;
+  @IsOptional() @Trim() @IsString() @Length(2, 32) couponCode?: string;
 }

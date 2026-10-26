@@ -39,6 +39,12 @@ export type Quote = {
     lineTotal: string;
   }[];
   subtotal: string;
+  discount?: string;
+  coupon?: {
+    code: string;
+    discount: string;
+    description?: string | null;
+  };
   shipping: string;
   tax: string;
   total: string;
@@ -60,6 +66,8 @@ export type Order = {
   createdAt: string;
   grandTotal: string;
   subtotal: string;
+  discountTotal?: string;
+  couponCode?: string;
   shippingTotal: string;
   taxTotal: string;
   customerName: string;
