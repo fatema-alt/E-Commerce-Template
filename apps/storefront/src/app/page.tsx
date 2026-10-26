@@ -29,7 +29,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 async function Home() {
   const page = await getHomePage();
-  if (page)
+  if (
+    page &&
+    Array.isArray(page.content?.sections) &&
+    page.content.sections.length > 0
+  )
     return (
       <main id="main" className="cms-page">
         <h1 className="sr-only">{page.content.title}</h1>

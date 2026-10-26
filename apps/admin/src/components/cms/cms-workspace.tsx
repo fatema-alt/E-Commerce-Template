@@ -14,6 +14,7 @@ import {
   request,
 } from "./cms-api";
 import { button, input, SchemaField } from "./schema-fields";
+import { getStandardEcommerceTemplate } from "./standard-template";
 
 const tabs = [
   ["SITE_SETTINGS", "Site Settings", "settings"],
@@ -174,7 +175,7 @@ export function CmsWorkspace({ kind }: { kind: string }) {
     if (!registry || !canLeave()) return;
     if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(newKey)) {
       setError(
-        "Use 1–64 lowercase letters, numbers, hyphens or underscores for the document key.",
+        "Use 1â€“64 lowercase letters, numbers, hyphens or underscores for the document key.",
       );
       return;
     }
@@ -298,7 +299,7 @@ export function CmsWorkspace({ kind }: { kind: string }) {
         <p className="mt-2 text-sm text-slate-500">
           Manage your storefront content. Save drafts and publish when ready.
         </p>
-          {kind === 'PAGE' && <p className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">Each page has its own URL: the key “hero” publishes at /hero. To display a page on the storefront homepage, choose its Home Page Key in <Link className="font-semibold underline" href="/cms/settings">Site Settings</Link> and publish those settings. The default homepage key is “home”.</p>}
+          {kind === 'PAGE' && <p className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">Each page has its own URL: the key â€œheroâ€ publishes at /hero. To display a page on the storefront homepage, choose its Home Page Key in <Link className="font-semibold underline" href="/cms/settings">Site Settings</Link> and publish those settings. The default homepage key is â€œhomeâ€.</p>}
       </div>
       <nav
         aria-label="CMS navigation"
@@ -321,7 +322,7 @@ export function CmsWorkspace({ kind }: { kind: string }) {
 
 
       {loading ? (
-        <p role="status">Loading CMS…</p>
+        <p role="status">Loading CMSâ€¦</p>
       ) : kind === "MEDIA" ? (
         <>
           <div className="rounded-xl border bg-white p-5">
@@ -422,7 +423,7 @@ export function CmsWorkspace({ kind }: { kind: string }) {
               >
                 <span className="block break-all font-medium">{item.key}</span>
                 <span className="text-xs text-slate-500">
-                  {item.state.toLowerCase()} · revision {item.revision}
+                  {item.state.toLowerCase()} Â· revision {item.revision}
                 </span>
               </button>
             ))}
@@ -461,10 +462,10 @@ export function CmsWorkspace({ kind }: { kind: string }) {
                   <div>
                     <h2 className="break-all text-xl font-semibold">{key}</h2>
                     <p className="mt-1 text-xs text-slate-500">
-                      {doc?.state ?? "NEW"} · revision {doc?.revision ?? 0} ·{" "}
+                      {doc?.state ?? "NEW"} Â· revision {doc?.revision ?? 0} Â·{" "}
                       {dirty ? "Unsaved changes" : "Saved"}
                       {doc?.scheduledAt
-                        ? ` · Scheduled ${new Date(doc.scheduledAt).toLocaleString()}`
+                        ? ` Â· Scheduled ${new Date(doc.scheduledAt).toLocaleString()}`
                         : ""}
                     </p>
                   </div>
@@ -565,21 +566,75 @@ export function CmsWorkspace({ kind }: { kind: string }) {
                         >
                           + Add section
                         </button>
+                        <button
+                          type="button"
+                          className="rounded-lg bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition shadow-sm"
+                          onClick={() => {
+                            if (
+                              sections.length > 0 &&
+                              !window.confirm(
+                                "Replace existing sections with the Standard E-Commerce Template?",
+                              )
+                            ) {
+                              return;
+                            }
+                            updateSections(
+                              getStandardEcommerceTemplate() as unknown as Section[],
+                            );
+                            setNotice(
+                              "Standard E-Commerce Template loaded. You can now customize each section.",
+                            );
+                          }}
+                        >
+                          ✨ Load Standard Template
+                        </button>
                       </div>
                       {!sections.length && (
-                        <p className="rounded-lg border border-dashed p-8 text-center text-sm text-slate-500">
-                          Add a section to start building this page.
-                        </p>
+                        <div className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50/50 p-8 text-center space-y-3">
+                          <p className="text-sm font-semibold text-slate-800">
+                            This page has no sections configured yet.
+                          </p>
+                          <p className="text-xs text-slate-500 max-w-md mx-auto">
+                            Instead of building from scratch, click below to load our standard e-commerce layout (Hero, Categories, Flash Deals, Best Sellers, Promo Banners, Value Features, FAQ, and Newsletter).
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateSections(
+                                getStandardEcommerceTemplate() as unknown as Section[],
+                              );
+                              setNotice(
+                                "Standard E-Commerce Template loaded. You can now customize each section.",
+                              );
+                            }}
+                            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition"
+                          >
+                            <span>✨ Start with Standard Template</span>
+                          </button>
+                        </div>
                       )}
                       {sections.map((section, index) => (
                         <details
                           key={section.id}
                           open
-                          className="rounded-xl border p-4"
+                          className="rounded-xl border p-4 bg-white shadow-sm"
                         >
-                          <summary className="cursor-pointer font-semibold">
-                            {index + 1}. {label(section.type)}{" "}
-                            {section.visible ? "" : "(hidden)"}
+                          <summary className="cursor-pointer font-semibold flex items-center justify-between text-slate-900">
+                            <span>
+                              {index + 1}. {label(section.type)}{" "}
+                              {section.config?.title
+                                ? `— "${section.config.title}"`
+                                : ""}{" "}
+                              <span
+                                className={`text-xs font-normal ${
+                                  section.visible
+                                    ? "text-emerald-600"
+                                    : "text-amber-600"
+                                }`}
+                              >
+                                {section.visible ? "(Active)" : "(Hidden)"}
+                              </span>
+                            </span>
                           </summary>
                           <div className="my-4 flex flex-wrap gap-2">
                             <label className="mr-auto flex items-center gap-2 text-sm">
@@ -617,7 +672,7 @@ export function CmsWorkspace({ kind }: { kind: string }) {
                                   updateSections(next);
                                 }}
                               >
-                                {delta < 0 ? "↑" : "↓"}
+                                {delta < 0 ? "â†‘" : "â†“"}
                               </button>
                             ))}
                             <button
@@ -716,7 +771,7 @@ export function CmsWorkspace({ kind }: { kind: string }) {
                     onClick={() => mutate("draft")}
                     className="mt-6 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                   >
-                    {busy ? "Working…" : "Save draft"}
+                    {busy ? "Workingâ€¦" : "Save draft"}
                   </button>
                 )}
                 {!editable && (
@@ -797,7 +852,7 @@ export function CmsWorkspace({ kind }: { kind: string }) {
                         <div className="mr-auto">
                           Version {version.version}
                           {version.id === doc.publishedVersionId
-                            ? " · Live"
+                            ? " Â· Live"
                             : ""}
                           <p className="text-xs text-slate-500">
                             {new Date(version.createdAt).toLocaleString()}
@@ -860,7 +915,7 @@ export function CmsWorkspace({ kind }: { kind: string }) {
           Previous
         </button>
         <span className="text-sm text-slate-500">
-          Page {listPage} · {total} {kind === "MEDIA" ? "images" : "documents"}
+          Page {listPage} Â· {total} {kind === "MEDIA" ? "images" : "documents"}
         </span>
         <button
           className={button}
@@ -981,7 +1036,7 @@ function DraftPreview({
   return (
     <div className="space-y-4 rounded-lg bg-slate-50 p-5">
       <p className="text-xs font-semibold uppercase text-slate-500">
-        Draft content preview · layout is illustrative
+        Draft content preview Â· layout is illustrative
       </p>
       {render(content)}
     </div>

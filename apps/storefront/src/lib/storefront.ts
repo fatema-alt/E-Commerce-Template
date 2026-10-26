@@ -59,8 +59,50 @@ export type HeroBlock = {
   ctaHref?: string;
 };
 export type CategoriesBlock = { type: "categories"; id: string; title: string };
-export type ProductsBlock = { type: "products"; id: string; title: string };
-export type ContentBlock = HeroBlock | CategoriesBlock | ProductsBlock;
+export type ProductsBlock = {
+  type: "products";
+  id: string;
+  title: string;
+  subtitle?: string;
+  source?: string;
+};
+export type PromoBannerBlock = {
+  type: "promoBanner";
+  id: string;
+  title: string;
+  description?: string;
+  ctaLabel?: string;
+  ctaHref?: string;
+};
+export type TrustBadgesBlock = {
+  type: "trustBadges";
+  id: string;
+  title?: string;
+  items?: { title: string; description: string; icon: string }[];
+};
+export type FaqBlock = {
+  type: "faq";
+  id: string;
+  title: string;
+  items: { question: string; answer: string }[];
+};
+export type NewsletterBlock = {
+  type: "newsletter";
+  id: string;
+  title: string;
+  description?: string;
+  buttonLabel?: string;
+  consentText?: string;
+};
+
+export type ContentBlock =
+  | HeroBlock
+  | CategoriesBlock
+  | ProductsBlock
+  | PromoBannerBlock
+  | TrustBadgesBlock
+  | FaqBlock
+  | NewsletterBlock;
 export type StorefrontConfig = {
   siteName: string;
   announcement?: string;
@@ -106,12 +148,89 @@ export const fallbackConfig: StorefrontConfig = {
       eyebrow: "YOUR EVERYDAY, UPGRADED",
       title: "Shop smart. Live smart.",
       description:
-        "From your next favourite gadget to the little things for home. Discover more of what you love, all at DS Mart.",
+        "From your next favourite gadget to the little things for home. Discover more of what you love, all at DS Mart with nationwide Cash on Delivery.",
       ctaHref: "/shop",
       ctaLabel: "Start shopping",
     },
     { type: "categories", id: "departments", title: "Explore our departments" },
-    { type: "products", id: "latest", title: "Latest products" },
+    {
+      type: "products",
+      id: "featured",
+      title: "Trending & Best Sellers",
+      subtitle: "Handpicked top sellers chosen by our customers.",
+    },
+    {
+      type: "promoBanner",
+      id: "promo",
+      title: "Save More With Checkout Coupons",
+      description:
+        "Enjoy up to 25% extra discount using verified promo codes. Fast 24-48h delivery inside Dhaka.",
+      ctaLabel: "View All Deals",
+      ctaHref: "/shop",
+    },
+    {
+      type: "trustBadges",
+      id: "trust",
+      title: "Why Choose DS Mart?",
+      items: [
+        {
+          title: "Cash on Delivery",
+          description:
+            "Pay upon parcel inspection at your doorstep all across Bangladesh.",
+          icon: "truck",
+        },
+        {
+          title: "100% Genuine",
+          description:
+            "Directly sourced authentic brand products with full warranty.",
+          icon: "shield",
+        },
+        {
+          title: "Easy 7-Day Returns",
+          description:
+            "Hassle-free replacement or quick refund if not fully satisfied.",
+          icon: "return",
+        },
+        {
+          title: "Dedicated Support",
+          description:
+            "Expert customer assistance ready 24/7 via call or WhatsApp.",
+          icon: "support",
+        },
+      ],
+    },
+    {
+      type: "faq",
+      id: "faq",
+      title: "Frequently Asked Questions",
+      items: [
+        {
+          question: "How does Cash on Delivery (COD) work?",
+          answer:
+            "Select Cash on Delivery during checkout. Our delivery agent collects the payment in cash or via bKash upon delivering your package.",
+        },
+        {
+          question: "What are the shipping charges and delivery timelines?",
+          answer:
+            "Delivery inside Dhaka takes 24 to 48 hours (৳60). Outside Dhaka takes 2 to 4 business days (৳120). Free delivery on orders over ৳2,500.",
+        },
+        {
+          question: "How can I apply a discount coupon?",
+          answer:
+            "Enter your coupon code in the cart summary or checkout coupon field and click 'Apply' for instant savings.",
+        },
+      ],
+    },
+    {
+      type: "newsletter",
+      id: "newsletter",
+      title: "Get 10% Off Your First Order",
+      description:
+        "Subscribe to our newsletter for exclusive vouchers, weekly sales, and member-only specials.",
+      buttonLabel: "Subscribe Now",
+      consentText:
+        "I agree to receive discount updates and promotional emails from DS Mart.",
+    },
   ],
 };
 function record(x: unknown): x is Record<string, unknown> {
