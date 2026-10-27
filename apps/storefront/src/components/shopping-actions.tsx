@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
-import { useCart } from "../lib/cart";
+import { useCart, openCartDrawer } from "../lib/cart";
 import type { Product } from "../lib/storefront";
 
 const iconProps = {
@@ -28,8 +28,20 @@ export function ShoppingLinks() {
           <path d="M12 20.5s-8-4.9-8-11A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8 2.5c0 6.1-8 11-8 11z" />
         </svg>
       </Link>
-      <Link href="/cart" aria-label={`Cart, ${cart.count} items`} title="Cart">
-        <svg {...iconProps}>
+      <Link
+        href="/cart"
+        onClick={(e) => {
+          e.preventDefault();
+          openCartDrawer();
+        }}
+        aria-label={`Cart, ${cart.count} items`}
+        title="Open Cart Drawer"
+        className="header-cart-anchor relative"
+        data-cart-target="true"
+        data-cart-icon="true"
+        id="header-cart-link"
+      >
+        <svg {...iconProps} className="cart-icon-svg">
           <path d="M5 8h14l-1 12H6L5 8z" />
           <path d="M9 8V7a3 3 0 0 1 6 0v1" />
         </svg>

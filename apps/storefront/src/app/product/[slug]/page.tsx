@@ -129,73 +129,104 @@ async function Content({ params }: Props) {
         </ol>
       </nav>
       <ProductOverview key={product.id} product={product} />
-      <div className="pdp-details-layout">
+      <div className="pdp-details-layout grid grid-cols-1 lg:grid-cols-[1.25fr_0.75fr] gap-8 mt-10">
+        {/* Left: About & Specifications */}
+        <div className="space-y-6">
+          <section
+            id="product-details"
+            className="shop-panel pdp-details p-6 sm:p-8 rounded-2xl bg-[var(--glass-solid)] border border-[var(--c-line)] shadow-xs"
+            aria-labelledby="details-title"
+          >
+            <p className="eyebrow text-xs font-bold uppercase tracking-wider text-[var(--c-muted)] mb-2">The details</p>
+            <h2 id="details-title" className="text-xl sm:text-2xl font-bold text-[var(--c-ink)] mb-4">About this product</h2>
+            <div className="pdp-description text-sm sm:text-base text-[var(--c-ink-2)] leading-relaxed whitespace-pre-line space-y-3">
+              {product.description ||
+                product.shortDescription ||
+                "Have a question about this product? Contact our team before ordering and we’ll help you choose."}
+            </div>
+
+            {specifications.length > 0 && (
+              <div className="mt-8 pt-6 border-t border-[var(--c-line)]">
+                <h3 className="text-base font-bold text-[var(--c-ink)] mb-3">Product specifications</h3>
+                <dl className="pdp-specifications divide-y divide-[var(--c-line)] border border-[var(--c-line)] rounded-xl overflow-hidden text-xs sm:text-sm">
+                  {specifications.map(([label, value]) => (
+                    <div key={label} className="flex justify-between py-3 px-4 odd:bg-black/[0.02] dark:odd:bg-white/[0.02]">
+                      <dt className="text-[var(--c-muted)] font-medium">{label}</dt>
+                      <dd className="font-semibold text-[var(--c-ink)] m-0 text-right">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+          </section>
+        </div>
+
+        {/* Right: Delivery & Support Accordions */}
         <section
-          id="product-details"
-          className="shop-panel pdp-details"
-          aria-labelledby="details-title"
-        >
-          <p className="eyebrow">The details</p>
-          <h2 id="details-title">About this product</h2>
-          <p className="pdp-description">
-            {product.description ||
-              product.shortDescription ||
-              "Have a question about this product? Contact our team before ordering and we’ll help you choose."}
-          </p>
-          {specifications.length > 0 && (
-            <>
-              <h3>Product information</h3>
-              <dl className="pdp-specifications">
-                {specifications.map(([label, value]) => (
-                  <div key={label}>
-                    <dt>{label}</dt>
-                    <dd>{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </>
-          )}
-        </section>
-        <section
-          className="shop-panel pdp-help"
+          className="shop-panel pdp-help p-6 sm:p-7 rounded-2xl bg-[var(--glass-solid)] border border-[var(--c-line)] shadow-xs h-fit space-y-4"
           aria-labelledby="delivery-title"
         >
-          <p className="eyebrow">Good to know</p>
-          <h2 id="delivery-title">Delivery & support</h2>
-          <details open>
-            <summary>Delivery and payment</summary>
-            <p>
-              Enter your delivery address at checkout to see the shipping
-              charge, available payment methods and final order total before
-              confirming.
-            </p>
-          </details>
-          <details>
-            <summary>Returns and product questions</summary>
-            <p>
-              Contact our team for return eligibility, product information or
-              help with an existing order. Include your order number if you have
-              one.
-            </p>
-            <Link href="/contact">Contact DS Mart</Link>
-          </details>
-          <details>
-            <summary>Tracking your order</summary>
-            <p>
-              Signed-in customers can view account orders. For a guest order,
-              use the browser you placed it from.
-            </p>
-            <Link href="/orders">View your orders</Link>
-          </details>
-          <Link className="pdp-help-link" href="/help">
-            More shopping help ↗
-          </Link>
+          <div>
+            <p className="eyebrow text-xs font-bold uppercase tracking-wider text-[var(--c-muted)] mb-1">Good to know</p>
+            <h2 id="delivery-title" className="text-xl font-bold text-[var(--c-ink)] m-0">Delivery & support</h2>
+          </div>
+
+          <div className="space-y-3 pt-2">
+            <details open className="group border border-[var(--c-line)] rounded-xl p-3.5 bg-[var(--glass)] transition-all">
+              <summary className="cursor-pointer font-bold text-xs sm:text-sm text-[var(--c-ink)] flex items-center justify-between select-none list-none">
+                <span className="flex items-center gap-2">🚚 Delivery and payment</span>
+                <span className="text-xs transition-transform group-open:rotate-180">▼</span>
+              </summary>
+              <p className="text-xs text-[var(--c-ink-2)] mt-2.5 mb-0 leading-relaxed">
+                Enter your delivery address at checkout to see shipping charges. Nationwide Cash on Delivery (COD) available with parcel inspection before payment.
+              </p>
+            </details>
+
+            <details className="group border border-[var(--c-line)] rounded-xl p-3.5 bg-[var(--glass)] transition-all">
+              <summary className="cursor-pointer font-bold text-xs sm:text-sm text-[var(--c-ink)] flex items-center justify-between select-none list-none">
+                <span className="flex items-center gap-2">🔄 Returns and product questions</span>
+                <span className="text-xs transition-transform group-open:rotate-180">▼</span>
+              </summary>
+              <div className="text-xs text-[var(--c-ink-2)] mt-2.5 space-y-2 leading-relaxed">
+                <p className="m-0">
+                  Easy 7-day hassle-free replacements and returns on eligible items. Include your order number when requesting support.
+                </p>
+                <Link href="/contact" className="inline-block text-xs font-bold underline hover:text-emerald-600">
+                  Contact DS Mart support →
+                </Link>
+              </div>
+            </details>
+
+            <details className="group border border-[var(--c-line)] rounded-xl p-3.5 bg-[var(--glass)] transition-all">
+              <summary className="cursor-pointer font-bold text-xs sm:text-sm text-[var(--c-ink)] flex items-center justify-between select-none list-none">
+                <span className="flex items-center gap-2">📦 Tracking your order</span>
+                <span className="text-xs transition-transform group-open:rotate-180">▼</span>
+              </summary>
+              <div className="text-xs text-[var(--c-ink-2)] mt-2.5 space-y-2 leading-relaxed">
+                <p className="m-0">
+                  Track live status of your order anytime with your order ID or phone number.
+                </p>
+                <Link href="/orders" className="inline-block text-xs font-bold underline hover:text-emerald-600">
+                  Track order status →
+                </Link>
+              </div>
+            </details>
+          </div>
+
+          <div className="pt-2">
+            <Link className="pdp-help-link text-xs font-bold text-[var(--c-ink)] hover:underline inline-flex items-center gap-1" href="/help">
+              More shopping help & FAQs ↗
+            </Link>
+          </div>
         </section>
       </div>
-      <ProductReviewsSection
-        productId={product.id}
-        productName={product.name}
-      />
+
+      <div id="customer-reviews" className="scroll-mt-24 pt-6">
+        <ProductReviewsSection
+          productId={product.id}
+          productName={product.name}
+        />
+      </div>
       <Suspense fallback={null}>
         <RelatedProducts product={product} />
       </Suspense>
