@@ -260,12 +260,13 @@ function asDecimal(v: unknown): number | null {
 }
 export function imageUrl(v: unknown): string | null {
   if (typeof v !== "string" || !v) return null;
-  if (/^https:\/\//.test(v)) return v;
-  if (v.startsWith("/uploads/")) {
+  if (/^https?:\/\//.test(v)) return v;
+  if (v.startsWith("data:")) return v;
+  if (v.startsWith("/uploads/") || v.startsWith("/")) {
     try {
       return new URL(v, new URL(apiBase).origin).toString();
     } catch {
-      return null;
+      return v;
     }
   }
   return null;

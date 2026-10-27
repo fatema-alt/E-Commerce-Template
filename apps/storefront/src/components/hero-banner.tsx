@@ -51,10 +51,11 @@ export function HeroBanner({ config, assets = [], block }: HeroBannerProps) {
   const cmsImageSrc = assetSource(assets, cmsImage?.assetId);
 
   // 1. Determine slides:
-  // If merchant configured multi-slides array, use those.
-  // Else if merchant configured a banner (has image or customized title/button), keep it as a dedicated SINGLE BANNER (do not slide away to dummy slides!).
-  // Else (unconfigured demo state), show the 3 demo slides.
-  const customSlides = Array.isArray(config?.slides) && config.slides.length > 0 ? (config.slides as Record<string, unknown>[]) : null;
+  // If merchant configured multi-slides array with 2+ slides, use those.
+  // Otherwise, provide a full 3-slide carousel where Slide 1 contains the merchant's configured banner
+  // (with custom image, custom title, subtitle, CTA button, bannerType and link),
+  // and Slides 2 & 3 provide engaging secondary campaign slides.
+  const customSlides = Array.isArray(config?.slides) && config.slides.length > 1 ? (config.slides as Record<string, unknown>[]) : null;
 
   let slides: SlideItem[] = [];
 
@@ -78,8 +79,11 @@ export function HeroBanner({ config, assets = [], block }: HeroBannerProps) {
         themeGradient: "linear-gradient(135deg, rgba(216,244,90,0.18), rgba(255,255,255,0.02))",
       };
     });
-  } else if (cmsImageSrc || cmsTitle) {
-    // Single merchant banner: DO NOT slide away to dummy slides!
+  } else {
+    // Standard 3-Slide Carousel:
+    // Slide 1: Primary Merchant-Configured Banner (always retains uploaded image and settings)
+    // Slide 2: Next-Gen Electronics Deals
+    // Slide 3: Savings & Special Promo Vouchers
     slides = [
       {
         id: "slide-merchant-primary",
@@ -109,32 +113,9 @@ export function HeroBanner({ config, assets = [], block }: HeroBannerProps) {
         ],
         themeGradient: "linear-gradient(135deg, rgba(216,244,90,0.18), rgba(255,255,255,0.02))",
       },
-    ];
-  } else {
-    // Initial demo fallback
-    slides = [
-      {
-        id: "slide-demo-main",
-        bannerType,
-        badge: "🔥 MEGA SHOPPING FESTIVAL • UP TO 60% OFF",
-        badgeColor: "amber",
-        title: "Shop Smart. Live Smart.",
-        subtitle:
-          "Discover top-tier electronics, fashion, lifestyle, and daily essentials with lightning-fast delivery and Cash on Delivery across Bangladesh.",
-        bannerLink: "/shop",
-        primaryCta: { label: "Start Shopping ↗", href: "/shop" },
-        secondaryCta: { label: "Explore Top Deals", href: "/shop" },
-        hasCustomImage: false,
-        floatingBadges: [
-          { icon: "🏷️", text: "Flat 20% Extra OFF" },
-          { icon: "⚡", text: "Fast 24-48h Delivery" },
-          { icon: "★", text: "4.9 (1.2k+ Reviews)" },
-        ],
-        themeGradient: "linear-gradient(135deg, rgba(216,244,90,0.18), rgba(255,255,255,0.02))",
-      },
       {
         id: "slide-demo-tech",
-        bannerType,
+        bannerType: "with_button",
         badge: "⚡ 100% GENUINE & AUTHORIZED DISTRIBUTOR",
         badgeColor: "emerald",
         title: "Next-Gen Electronics & Smart Gadgets",
@@ -153,7 +134,7 @@ export function HeroBanner({ config, assets = [], block }: HeroBannerProps) {
       },
       {
         id: "slide-demo-savings",
-        bannerType,
+        bannerType: "with_button",
         badge: "🎉 EXCLUSIVE VOUCHER DISCOUNT",
         badgeColor: "purple",
         title: "Save More on Every Single Order",
