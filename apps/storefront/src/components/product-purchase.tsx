@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useCart, openCartDrawer } from "../lib/cart";
+import { useCart } from "../lib/cart";
 import type { Product } from "../lib/storefront";
 import { money } from "../lib/shop-client";
 import { WishlistButton } from "./shopping-actions";
@@ -76,12 +76,12 @@ export function ProductPurchase({
   }
 
   // Fly-to-Cart Animation Implementation
-  function triggerFlyToCart(onComplete: () => void) {
+  function triggerFlyToCart(onComplete?: () => void) {
     if (
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches
     ) {
-      onComplete();
+      onComplete?.();
       return;
     }
 
@@ -94,7 +94,7 @@ export function ProductPurchase({
       document.querySelector<HTMLElement>('.shopping-links a[href="/cart"]');
 
     if (!sourceEl || !targetEl) {
-      onComplete();
+      onComplete?.();
       return;
     }
 
@@ -102,7 +102,7 @@ export function ProductPurchase({
     const tRect = targetEl.getBoundingClientRect();
 
     if (sRect.width === 0 || sRect.height === 0 || tRect.width === 0) {
-      onComplete();
+      onComplete?.();
       return;
     }
 
@@ -163,7 +163,7 @@ export function ProductPurchase({
         targetEl.classList.remove("cart-icon-bounce");
       }, 600);
 
-      onComplete();
+      onComplete?.();
     };
 
     animation.onfinish = finalize;
@@ -205,10 +205,8 @@ export function ProductPurchase({
         router.push("/checkout");
         navigating = true;
       } else {
-        // Trigger smooth Fly-to-Cart animation and then open the Slide-in Cart Drawer!
-        triggerFlyToCart(() => {
-          openCartDrawer();
-        });
+        // Trigger smooth Fly-to-Cart animation to header cart target
+        triggerFlyToCart();
       }
     } catch (cause) {
       setError(
@@ -474,13 +472,12 @@ export function ProductPurchase({
         {message && (
           <p className="pdp-cart-success p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex items-center justify-between m-0">
             <span>✓ {message}</span>
-            <button
-              type="button"
-              onClick={() => openCartDrawer()}
+            <Link
+              href="/cart"
               className="underline font-bold hover:text-emerald-600 ml-2"
             >
               View cart →
-            </button>
+            </Link>
           </p>
         )}
       </div>

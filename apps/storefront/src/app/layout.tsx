@@ -10,7 +10,6 @@ import { themeScript } from "../lib/theme-init";
 import { connection } from "next/server";
 import { FloatingContact } from "../components/store-engagement";
 import { StoreAnalytics } from "../components/store-analytics";
-import { CartDrawer } from "../components/cart-drawer";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -70,7 +69,6 @@ async function StoreFrame({ children }: { children: ReactNode }) {
       <StoreBenefits />
       <Footer config={config} />
       <FloatingContact initial={config.settings} />
-      <CartDrawer />
     </div>
   );
 }

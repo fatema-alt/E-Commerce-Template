@@ -148,25 +148,3 @@ export function useCart() {
     },
   };
 }
-
-export const CART_DRAWER_EVENT_OPEN = "commerce-cart-drawer-open";
-export const CART_DRAWER_EVENT_CLOSE = "commerce-cart-drawer-close";
-export const CART_DRAWER_EVENT_TOGGLE = "commerce-cart-drawer-toggle";
-
-export function openCartDrawer() {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(CART_DRAWER_EVENT_OPEN));
-  }
-}
-
-export function closeCartDrawer() {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(CART_DRAWER_EVENT_CLOSE));
-  }
-}
-
-export function toggleCartDrawer() {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(CART_DRAWER_EVENT_TOGGLE));
-  }
-}

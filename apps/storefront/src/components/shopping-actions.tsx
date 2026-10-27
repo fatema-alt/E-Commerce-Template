@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
-import { useCart, openCartDrawer } from "../lib/cart";
+import { useCart } from "../lib/cart";
 import type { Product } from "../lib/storefront";
 
 const iconProps = {
@@ -30,13 +30,9 @@ export function ShoppingLinks() {
       </Link>
       <Link
         href="/cart"
-        onClick={(e) => {
-          e.preventDefault();
-          openCartDrawer();
-        }}
         aria-label={`Cart, ${cart.count} items`}
-        title="Open Cart Drawer"
-        className="header-cart-anchor relative"
+        title="Cart"
+        className="header-cart-anchor"
         data-cart-target="true"
         data-cart-icon="true"
         id="header-cart-link"
