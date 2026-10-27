@@ -9,5 +9,6 @@ import { PromotionsModule } from '../promotions/promotions.module.js';
   imports: [PaymentsModule, PromotionsModule],
   controllers: [ShopController],
   providers: [ShopService, OrdersService],
+  exports: [ShopService],
 })
 export class ShopModule {}

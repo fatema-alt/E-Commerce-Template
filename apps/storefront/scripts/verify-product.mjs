@@ -84,10 +84,34 @@ const product = {
   ],
 };
 let productUnavailable = true;
+let reviewAttempts = 0;
+let newsletterAttempts = 0;
+const reviewFixtures = Array.from({ length: 7 }, (_, index) => ({ id: 'review-' + index, authorName: 'Test shopper ' + index, rating: index % 2 ? 4 : 5, content: 'Isolated browser-test review.', title: 'Test feedback', photos: [], helpfulCount: 0, isVerifiedPurchase: index < 2, createdAt: '2026-10-01T00:00:00Z' }));
 const simpleId = "00000000-0000-4000-8000-000000000003";
 const api = http.createServer(async (req, res) => {
   const path = new URL(req.url, "http://localhost").pathname;
   res.setHeader("Content-Type", "application/json");
+  if (/\/shop\/products\/[^/]+\/reviews$/.test(path)) {
+    if (req.method === 'POST') {
+      let body = ''; for await (const chunk of req) body += chunk;
+      const fields = JSON.parse(body); reviewAttempts++;
+      assert.equal(fields.productId, product.id); assert.equal(fields.rating, 4);
+      res.statusCode = reviewAttempts === 1 ? 503 : 201;
+      res.end(JSON.stringify(reviewAttempts === 1 ? { message: 'Temporary review failure' } : { status: 'PENDING' })); return;
+    }
+    const query = new URL(req.url, 'http://localhost').searchParams;
+    const rating = Number(query.get('rating')); const page = Number(query.get('page') || 1);
+    const rows = rating ? reviewFixtures.filter((review) => review.rating === rating) : reviewFixtures;
+    res.end(JSON.stringify({ items: rows.slice((page - 1) * 5, page * 5), totalPages: Math.ceil(rows.length / 5), summary: { total: 7, averageRating: 4.6, verifiedTotal: 2, ratingBreakdown: { 5: 4, 4: 3, 3: 0, 2: 0, 1: 0 } } })); return;
+  }
+  if (/\/shop\/products\/[^/]+\/qa$/.test(path)) { res.end(JSON.stringify([])); return; }
+  if (path.endsWith('/shop/newsletter') && req.method === 'POST') {
+    let body = ''; for await (const chunk of req) body += chunk;
+    const fields = JSON.parse(body); newsletterAttempts++;
+    assert.equal(fields.consent, true); assert.equal(fields.email, 'test@example.com');
+    res.statusCode = newsletterAttempts === 1 ? 503 : 200;
+    res.end(JSON.stringify({ message: newsletterAttempts === 1 ? 'Temporary subscription failure' : 'Your newsletter request has been recorded.' })); return;
+  }
   if (path.endsWith("/shop/me")) {
     res.end(JSON.stringify({ user: null }));
     return;
@@ -694,6 +718,68 @@ try {
     "retry after API recovery",
   );
   pass("retry fetches fresh product data after API recovery");
+  await navigate('/product/cotton-t-shirt');
+  await until('document.querySelectorAll(".review-card").length === 5', 'paginated real review response');
+  assert.equal(await evaluate('[...document.querySelectorAll(".review-star")].every(icon=>{const box=icon.getBoundingClientRect();return box.width===22&&box.height===22})'), true);
+  assert.ok(await evaluate('document.querySelector(".review-average").textContent.includes("4.6") && document.querySelector(".review-average").textContent.includes("2 verified")'));
+  await evaluate('document.querySelector(".review-pagination button:last-child").click()');
+  await until('document.querySelectorAll(".review-card").length === 2', 'review page two');
+  pass('compact 22px stars, actual rating summary, verified count and review pagination');
+  async function fill(selector, value) {
+    await evaluate(`(()=>{const input=document.querySelector(${JSON.stringify(selector)});const proto=input instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(input,${JSON.stringify(value)});input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await pause(60);
+  }
+  await evaluate('document.querySelector(".feedback-form input[type=radio][value=\\"4\\"]").click()');
+  await fill('.feedback-form input[name=authorName]', 'Test shopper');
+  await fill('.feedback-form input[name=authorEmail]', 'test@example.com');
+  await fill('.feedback-form textarea', 'A genuine test experience.');
+  await evaluate('document.querySelector(".feedback-form").requestSubmit()');
+  await until('document.querySelector(".feedback-form .shop-error")?.textContent.includes("Temporary review")', 'review error');
+  assert.equal(await evaluate('document.querySelector(".feedback-form textarea").value'), 'A genuine test experience.');
+  await evaluate('document.querySelector(".feedback-form").requestSubmit()');
+  await until('document.querySelector(".feedback-form .shop-success")?.textContent.includes("moderation")', 'review submitted');
+  assert.equal(reviewAttempts, 2);
+  pass('review rating interaction, required payload, error retention and moderated success');
+  await navigate('/');
+  await until('!!document.querySelector(".newsletter-form")', 'newsletter form');
+  assert.ok(!(await evaluate('document.querySelector(".newsletter-panel h2").textContent')).includes('10%'));
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".newsletter-form fieldset")).borderTopWidth'), '0px');
+  await fill('.newsletter-form input[name=email]', 'invalid');
+  await evaluate('document.querySelector(".newsletter-form").requestSubmit()');
+  assert.equal(newsletterAttempts, 0);
+  await fill('.newsletter-form input[name=email]', 'test@example.com');
+  await evaluate('document.querySelector(".newsletter-form").requestSubmit()');
+  assert.equal(newsletterAttempts, 0);
+  await evaluate('document.querySelector(".newsletter-form input[type=checkbox]").click();document.querySelector(".newsletter-form").requestSubmit()');
+  await until('document.querySelector(".newsletter-error")?.textContent.includes("Temporary")', 'subscription error');
+  assert.equal(await evaluate('document.querySelector(".newsletter-form input[name=email]").value'), 'test@example.com');
+  await evaluate('document.querySelector(".newsletter-form").requestSubmit();document.querySelector(".newsletter-form").dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}))');
+  await until('document.querySelector(".newsletter-success")?.textContent.includes("recorded")', 'subscription success');
+  assert.equal(newsletterAttempts, 2);
+  pass('newsletter email/consent validation, border reset, error retention and duplicate-submit protection');
+  for (const width of [390, 768, 1366]) {
+    await command('Emulation.setDeviceMetricsOverride', { width, height: 1000, deviceScaleFactor: 1, mobile: width < 600 });
+    await pause(150);
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), true);
+    for (const theme of ['light', 'dark']) {
+      await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)}`);
+      await evaluate('document.querySelector(".newsletter-panel").scrollIntoView({block:"center",behavior:"instant"})');
+      const shot = await command('Page.captureScreenshot', { format: 'png' });
+      writeFileSync(join(artifacts, `newsletter-${theme}-${width}.png`), Buffer.from(shot.data, 'base64'));
+    }
+    await navigate('/product/cotton-t-shirt');
+    await until('document.querySelectorAll(".review-card").length === 5', 'responsive review list');
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), true);
+    assert.equal(await evaluate('[...document.querySelectorAll(".review-star")].every(icon=>icon.getBoundingClientRect().width===22)'), true);
+    for (const theme of ['light', 'dark']) {
+      await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)};document.querySelector("#reviews-section").scrollIntoView({block:"start",behavior:"instant"})`);
+      const shot = await command('Page.captureScreenshot', {format:'png'});
+      writeFileSync(join(artifacts, `reviews-${theme}-${width}.png`), Buffer.from(shot.data, 'base64'));
+    }
+    await navigate('/');
+    await until('!!document.querySelector(".newsletter-form")', 'newsletter after review checks');
+  }
+  pass('newsletter responsive layout and light/dark screenshots at mobile, tablet and desktop widths');
   assert.ok(!logs.includes("blocking-prerender-metadata-dynamic"), logs);
   pass("no metadata prerender errors");
   console.log("Screenshots: " + artifacts);

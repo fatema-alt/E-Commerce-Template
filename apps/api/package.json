@@ -28,6 +28,7 @@
     "test:cms:storefront": "node scripts/smoke-cms-storefront.mjs",
     "test:shop:http": "node scripts/smoke-shop.mjs",
     "test:shop:browser": "node scripts/smoke-shop-browser.mjs",
+    "test:editor": "node scripts/verify-editor-backend.mjs",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",

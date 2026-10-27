@@ -84,12 +84,24 @@ export function ProductFields({
   value,
   onChange,
   regularPrice,
+  only,
+  exclude = [],
 }: {
   tab: string;
   value: ExtraFields;
   onChange: (value: ExtraFields) => void;
   regularPrice: string;
+  only?: Key[];
+  exclude?: Key[];
 }) {
+  const visible = (key: Key) =>
+    (!only || only.includes(key)) &&
+    !exclude.includes(key) &&
+    !(
+      tab === "shipping" &&
+      !value.requiresShipping &&
+      key !== "requiresShipping"
+    );
   let margin = "";
   if (
     /^\d+(\.\d{1,2})?$/.test(regularPrice) &&
@@ -106,50 +118,53 @@ export function ProductFields({
       margin = (Number(percent) / 100).toFixed(2) + "%";
     }
   }
-  const text = (key: Key, label: string, type = "text", maxLength = 200) => (
-    <label key={key} className="space-y-2 text-sm font-medium">
-      {label}
-      <input
-        className={control}
-        type={type}
-        min={type === "number" ? "0" : undefined}
-        step={
-          type === "number"
-            ? ["costPrice", "compareAtPrice"].includes(key)
-              ? ".01"
-              : ".001"
-            : undefined
-        }
-        maxLength={maxLength}
-        value={String(value[key])}
-        onChange={(e) => onChange({ ...value, [key]: e.target.value })}
-      />
-    </label>
-  );
-  const check = (key: Key, label: string) => (
-    <label key={key} className="flex items-center gap-3 text-sm">
-      <input
-        type="checkbox"
-        checked={Boolean(value[key])}
-        onChange={(e) => onChange({ ...value, [key]: e.target.checked })}
-      />
-      {label}
-    </label>
-  );
-  const select = (key: Key, label: string, options: string[]) => (
-    <label className="space-y-2 text-sm font-medium">
-      {label}
-      <select
-        className={control}
-        value={String(value[key])}
-        onChange={(e) => onChange({ ...value, [key]: e.target.value })}
-      >
-        {options.map((option) => (
-          <option key={option}>{option}</option>
-        ))}
-      </select>
-    </label>
-  );
+  const text = (key: Key, label: string, type = "text", maxLength = 200) =>
+    visible(key) ? (
+      <label key={key} className="space-y-2 text-sm font-medium">
+        {label}
+        <input
+          className={control}
+          type={type}
+          min={type === "number" ? "0" : undefined}
+          step={
+            type === "number"
+              ? ["costPrice", "compareAtPrice"].includes(key)
+                ? ".01"
+                : ".001"
+              : undefined
+          }
+          maxLength={maxLength}
+          value={String(value[key])}
+          onChange={(e) => onChange({ ...value, [key]: e.target.value })}
+        />
+      </label>
+    ) : null;
+  const check = (key: Key, label: string) =>
+    visible(key) ? (
+      <label key={key} className="flex items-center gap-3 text-sm">
+        <input
+          type="checkbox"
+          checked={Boolean(value[key])}
+          onChange={(e) => onChange({ ...value, [key]: e.target.checked })}
+        />
+        {label}
+      </label>
+    ) : null;
+  const select = (key: Key, label: string, options: string[]) =>
+    visible(key) ? (
+      <label className="space-y-2 text-sm font-medium">
+        {label}
+        <select
+          className={control}
+          value={String(value[key])}
+          onChange={(e) => onChange({ ...value, [key]: e.target.value })}
+        >
+          {options.map((option) => (
+            <option key={option}>{option}</option>
+          ))}
+        </select>
+      </label>
+    ) : null;
   return (
     <>
       {tab === "general" && (
@@ -159,25 +174,27 @@ export function ProductFields({
           {text("manufacturer", "Manufacturer", "text", 150)}
           {text("tags", "Tags (comma separated)", "text", 5000)}
           {text("collections", "Collections (comma separated)", "text", 5000)}
-          <label className="space-y-2 text-sm font-medium md:col-span-2">
-            Internal notes
-            <textarea
-              className={control}
-              rows={3}
-              maxLength={5000}
-              value={value.internalNotes}
-              onChange={(e) =>
-                onChange({ ...value, internalNotes: e.target.value })
-              }
-            />
-          </label>
+          {visible("internalNotes") && (
+            <label className="space-y-2 text-sm font-medium md:col-span-2">
+              Internal notes
+              <textarea
+                className={control}
+                rows={3}
+                maxLength={5000}
+                value={value.internalNotes}
+                onChange={(e) =>
+                  onChange({ ...value, internalNotes: e.target.value })
+                }
+              />
+            </label>
+          )}
         </>
       )}
       {tab === "pricing" && (
         <>
           {text("costPrice", "Cost price (administrators only)", "number")}
           {text("compareAtPrice", "Compare-at price", "number")}
-          {margin && (
+          {margin && visible("costPrice") && (
             <p className="text-sm text-indigo-600 md:col-span-2">
               Gross margin at regular price: {margin}
             </p>
@@ -192,11 +209,12 @@ export function ProductFields({
       {tab === "inventory" && (
         <>
           {check("trackInventory", "Track inventory")}
-          {select("backorderPolicy", "Backorder policy", [
-            "DENY",
-            "ALLOW",
-            "NOTIFY",
-          ])}
+          {value.trackInventory &&
+            select("backorderPolicy", "Backorder policy", [
+              "DENY",
+              "ALLOW",
+              "NOTIFY",
+            ])}
         </>
       )}
       {tab === "shipping" && (

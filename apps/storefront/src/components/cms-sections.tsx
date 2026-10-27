@@ -207,18 +207,7 @@ async function Block({
     );
   if (section.type === "newsletter")
     return (
-      <div className="cms-promo">
-        {title}
-        <p>{String(c.description || "")}</p>
-          <Newsletter buttonLabel={String(c.buttonLabel)} consentText={String(c.consentText || '')} />
-        {safeHref(String(c.privacyHref)) && (
-          <Link
-            href={safeHref(String(c.privacyHref))!}
-          >
-              Privacy information
-          </Link>
-        )}
-      </div>
+      <Newsletter title={typeof c.title === "string" ? c.title : undefined} description={String(c.description || "")} buttonLabel={String(c.buttonLabel || "Subscribe")} consentText={String(c.consentText || "")} privacyHref={String(c.privacyHref || "/help")} />
     );
   if (section.type === "trustFeatures") {
     const icons: Record<string, string> = {

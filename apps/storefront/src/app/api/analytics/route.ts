@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
+import { isStorefrontRequest } from "../../../lib/request-origin";
 
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export async function POST(req: NextRequest) {
-  const origin = process.env.STOREFRONT_ORIGIN || req.nextUrl.origin;
-  if (
-    req.headers.get("origin") !== origin ||
-    req.headers.get("x-storefront-request") !== "1" ||
-    req.headers.get("sec-fetch-site") === "cross-site"
-  )
+  if (!isStorefrontRequest(req, process.env.STOREFRONT_ORIGIN))
     return NextResponse.json({ ok: false }, { status: 403 });
   if (
     !req.headers.get("content-type")?.startsWith("application/json") ||

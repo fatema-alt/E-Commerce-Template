@@ -23,10 +23,12 @@ export function PendingProductImages({
   files,
   onChange,
   disabled,
+  progress,
 }: {
   files: File[];
   onChange: (files: File[]) => void;
   disabled: boolean;
+  progress?: { done: number; total: number } | null;
 }) {
   const [, setError] = useToastState("error");
   function choose(selected: File[]) {
@@ -77,7 +79,35 @@ export function PendingProductImages({
       {files.map((file, index) => (
         <div key={index} className="flex items-center gap-3">
           <Preview file={file} />
-          <span className="min-w-0 flex-1 truncate text-sm">{file.name}</span>
+          <span className="min-w-0 flex-1 truncate text-sm">
+            {file.name}
+            {index === 0 && (
+              <span className="block text-xs text-indigo-600">
+                Primary image if this is the first upload
+              </span>
+            )}
+          </span>
+          {[-1, 1].map((delta) => (
+            <button
+              key={delta}
+              type="button"
+              disabled={
+                disabled || index + delta < 0 || index + delta >= files.length
+              }
+              aria-label={`${delta < 0 ? "Move up" : "Move down"} ${file.name}`}
+              className="rounded border px-2 py-1 text-sm disabled:opacity-30"
+              onClick={() => {
+                const next = [...files];
+                [next[index], next[index + delta]] = [
+                  next[index + delta],
+                  next[index],
+                ];
+                onChange(next);
+              }}
+            >
+              {delta < 0 ? "↑" : "↓"}
+            </button>
+          ))}
           <button
             type="button"
             disabled={disabled}
@@ -90,9 +120,19 @@ export function PendingProductImages({
         </div>
       ))}
       {disabled && files.length > 0 && (
-        <p role="status" className="text-sm">
-          Saving product and uploading images…
-        </p>
+        <div role="status" className="text-sm">
+          {progress
+            ? `Uploaded ${progress.done} of ${progress.total} images`
+            : "Saving product and uploading images…"}
+          {progress && (
+            <progress
+              className="mt-2 w-full accent-indigo-600"
+              aria-label="Product image upload progress"
+              value={progress.done}
+              max={progress.total}
+            />
+          )}
+        </div>
       )}
     </div>
   );

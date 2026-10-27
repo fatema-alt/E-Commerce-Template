@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isStorefrontRequest } from "../../../../lib/request-origin";
 const api = (
   process.env.STOREFRONT_API_BASE_URL || "http://localhost:4000/api/v1"
 ).replace(/\/$/, "");
@@ -15,13 +16,7 @@ async function proxy(
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   let body: string | undefined;
   if (req.method === "POST") {
-    const origin = req.headers.get("origin");
-    const expected = process.env.STOREFRONT_ORIGIN || req.nextUrl.origin;
-    if (
-      req.headers.get("x-storefront-request") !== "1" ||
-      req.headers.get("sec-fetch-site") === "cross-site" ||
-      (origin && origin !== expected)
-    )
+    if (!isStorefrontRequest(req, process.env.STOREFRONT_ORIGIN, true))
       return NextResponse.json(
         { message: "Request origin rejected" },
         { status: 403 },

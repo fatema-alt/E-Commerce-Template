@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:editor": "node scripts/verify-product-editor.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.56.0",

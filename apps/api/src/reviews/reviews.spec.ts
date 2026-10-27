@@ -43,7 +43,7 @@ describe('ReviewsService', () => {
         name: 'Cotton T-Shirt',
       });
       mockDb.order.findFirst.mockResolvedValue(null);
-      mockDb.productReview.create.mockImplementation((args) =>
+      mockDb.productReview.create.mockImplementation((args: { data: Record<string, unknown> }) =>
         Promise.resolve({ id: 'rev-1', ...args.data }),
       );
 
@@ -67,7 +67,7 @@ describe('ReviewsService', () => {
         name: 'Cotton T-Shirt',
       });
       mockDb.order.findFirst.mockResolvedValue({ id: 'ord-123' });
-      mockDb.productReview.create.mockImplementation((args) =>
+      mockDb.productReview.create.mockImplementation((args: { data: Record<string, unknown> }) =>
         Promise.resolve({ id: 'rev-2', ...args.data }),
       );
 
@@ -87,7 +87,7 @@ describe('ReviewsService', () => {
   describe('getProductReviewsSummary', () => {
     it('calculates average rating and rating breakdown correctly', async () => {
       mockDb.productReview.findMany.mockResolvedValue([
-        { rating: 5 },
+        { rating: 5, isVerifiedPurchase: true },
         { rating: 5 },
         { rating: 4 },
         { rating: 2 },
@@ -96,6 +96,7 @@ describe('ReviewsService', () => {
       const summary = await service.getProductReviewsSummary('prod-1');
 
       expect(summary.total).toBe(4);
+      expect(summary.verifiedTotal).toBe(1);
       expect(summary.averageRating).toBe(4.0); // (5+5+4+2)/4 = 4.0
       expect(summary.ratingBreakdown[5]).toBe(2);
       expect(summary.ratingBreakdown[4]).toBe(1);
@@ -157,7 +158,7 @@ describe('ReviewsService', () => {
   describe('product questions & answers (Q&A)', () => {
     it('submits a question in PENDING state', async () => {
       mockDb.product.findUnique.mockResolvedValue({ id: 'prod-1' });
-      mockDb.productQuestion.create.mockImplementation((args) =>
+      mockDb.productQuestion.create.mockImplementation((args: { data: Record<string, unknown> }) =>
         Promise.resolve({ id: 'q-1', ...args.data }),
       );
 

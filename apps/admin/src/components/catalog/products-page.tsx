@@ -7,6 +7,8 @@ import {
   api as catalogApi,
   json as catalogJson,
 } from "@/components/catalog/catalog-ui";
+import { ProductEditorSection } from "./product-editor-section";
+import { ProductOptionsEditor } from "./product-options-editor";
 import { ProductList } from "@/components/catalog/product-list";
 import { CatalogAudit } from "@/components/catalog/catalog-audit";
 import {
@@ -22,20 +24,9 @@ import {
   useUnsavedChanges,
 } from "@/components/catalog/catalog-ui";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Package,
-  Pencil,
-  Trash2,
-  History,
-  Plus,
-  ArrowLeftRight,
-  Image as ImageIcon,
-  Layers,
-  SearchCheck,
-  Tag,
-} from "lucide-react";
+import { Pencil, Trash2, Plus } from "lucide-react";
 
 type Category = {
   id: string;
@@ -239,18 +230,13 @@ export default function ProductsPage({
     initialProduct?.updatedAt ?? null,
   );
   const [showForm, setShowForm] = useState(createMode);
-  const [editorTab, setEditorTab] = useState<
-    | "general"
-    | "pricing"
-    | "inventory"
-    | "seo"
-    | "media"
-    | "variants"
-    | "shipping"
-    | "publishing"
-    | "activity"
-  >("general");
+  const [categorySearch, setCategorySearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const savePending = useRef(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [, setError] = useToastState("error");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -293,7 +279,11 @@ export default function ProductsPage({
   const loadProducts = useCallback(async () => {
     setRevision((value) => value + 1);
   }, []);
-  useUnsavedChanges(showForm && (pendingImages.length > 0 || JSON.stringify({ form, extra }) !== baseline));
+  useUnsavedChanges(
+    showForm &&
+      (pendingImages.length > 0 ||
+        JSON.stringify({ form, extra }) !== baseline),
+  );
   useEffect(() => {
     async function loadCategories() {
       try {
@@ -323,45 +313,51 @@ export default function ProductsPage({
     void loadCategories();
   }, [setError]);
 
-  const loadImages = useCallback(async (productId: string) => {
-    setImagesLoading(true);
-    setImageError("");
-    try {
-      const response = await authenticatedFetch(
-        `${API}/products/${productId}/images`,
-        { cache: "no-store" },
-      );
-      if (!response.ok) throw new Error("Could not load product images");
-      const result: ProductImage[] = await response.json();
-      setImages(result);
-    } catch (err) {
-      setImageError(
-        err instanceof Error ? err.message : "Image loading failed",
-      );
-    } finally {
-      setImagesLoading(false);
-    }
-  }, [setImageError]);
+  const loadImages = useCallback(
+    async (productId: string) => {
+      setImagesLoading(true);
+      setImageError("");
+      try {
+        const response = await authenticatedFetch(
+          `${API}/products/${productId}/images`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) throw new Error("Could not load product images");
+        const result: ProductImage[] = await response.json();
+        setImages(result);
+      } catch (err) {
+        setImageError(
+          err instanceof Error ? err.message : "Image loading failed",
+        );
+      } finally {
+        setImagesLoading(false);
+      }
+    },
+    [setImageError],
+  );
 
-  const loadVariants = useCallback(async (productId: string) => {
-    setVariantLoading(true);
-    setVariantError("");
-    try {
-      const response = await authenticatedFetch(
-        `${API}/products/${productId}/variants`,
-        { cache: "no-store" },
-      );
-      if (!response.ok) throw new Error("Could not load variants");
-      setVariants(await response.json());
-    } catch (err) {
-      setVariants([]);
-      setVariantError(
-        err instanceof Error ? err.message : "Variant loading failed",
-      );
-    } finally {
-      setVariantLoading(false);
-    }
-  }, [setVariantError]);
+  const loadVariants = useCallback(
+    async (productId: string) => {
+      setVariantLoading(true);
+      setVariantError("");
+      try {
+        const response = await authenticatedFetch(
+          `${API}/products/${productId}/variants`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) throw new Error("Could not load variants");
+        setVariants(await response.json());
+      } catch (err) {
+        setVariants([]);
+        setVariantError(
+          err instanceof Error ? err.message : "Variant loading failed",
+        );
+      } finally {
+        setVariantLoading(false);
+      }
+    },
+    [setVariantError],
+  );
 
   async function readApiError(response: Response, fallback: string) {
     const data = await response.json().catch(() => ({}));
@@ -718,7 +714,7 @@ export default function ProductsPage({
     setForm(initialForm);
     setEditingId(null);
     setShowForm(false);
-    setEditorTab("general");
+
     setVariants([]);
     setVariantModal(false);
     setEditingVariantId(null);
@@ -728,7 +724,11 @@ export default function ProductsPage({
 
   async function saveProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving) return;
+    if (saving || savePending.current) return;
+    const submitter = (event.nativeEvent as SubmitEvent)
+      .submitter as HTMLButtonElement | null;
+    const requestedStatus =
+      submitter?.name === "intent" ? submitter.value : extra.status;
     const errors: Record<string, string> = {};
     if (form.name.trim().length < 2 || form.name.length > 200)
       errors.name = "Use a product name of 2?200 characters.";
@@ -750,6 +750,8 @@ export default function ProductsPage({
         "Sale price must be a valid amount no greater than regular price.";
     if (
       !editingId &&
+      extra.trackInventory &&
+      extra.type === "SIMPLE" &&
       (!form.stock.trim() ||
         !Number.isSafeInteger(Number(form.stock)) ||
         Number(form.stock) < 0 ||
@@ -759,15 +761,18 @@ export default function ProductsPage({
     setFieldErrors(errors);
     if (Object.keys(errors).length) {
       setError("Correct the highlighted product fields.");
-      setEditorTab(
-        errors.name || errors.slug || errors.sku || errors.categoryId
-          ? "general"
-          : errors.stock
-            ? "inventory"
-            : "pricing",
-      );
+      requestAnimationFrame(() => {
+        const field = document.querySelector<HTMLElement>(
+          '#product-editor [aria-invalid="true"]',
+        );
+        const details = field?.closest("details");
+        if (details) details.open = true;
+        field?.focus();
+        field?.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
       return;
     }
+    savePending.current = true;
     setSaving(true);
     setError("");
     setSuccess("");
@@ -784,10 +789,15 @@ export default function ProductsPage({
         price: form.price,
         salePrice: form.salePrice || null,
         ...(!editingId
-          ? { stock: Number(form.stock) }
+          ? {
+              stock:
+                extra.trackInventory && extra.type === "SIMPLE"
+                  ? Number(form.stock)
+                  : 0,
+            }
           : { expectedUpdatedAt: editingVersion }),
         categoryId: form.categoryId,
-        ...extraPayload(extra),
+        ...extraPayload({ ...extra, status: requestedStatus }),
       };
       const response = await authenticatedFetch(
         editingId ? `${API}/products/${editingId}` : `${API}/products`,
@@ -804,29 +814,54 @@ export default function ProductsPage({
       setEditingId(saved.id);
       setEditingVersion(saved.updatedAt);
       const remaining = [...pendingImages];
+      if (remaining.length)
+        setUploadProgress({ done: 0, total: remaining.length });
       while (remaining.length) {
         const body = new FormData();
         body.append("file", remaining[0]);
         try {
-          const upload = await authenticatedFetch(API + "/products/" + saved.id + "/images", {
-            method: "POST", body, signal: AbortSignal.timeout(60000),
-          });
-          if (!upload.ok) throw new Error(await readApiError(upload, "Image upload failed"));
+          const upload = await authenticatedFetch(
+            API + "/products/" + saved.id + "/images",
+            {
+              method: "POST",
+              body,
+              signal: AbortSignal.timeout(60000),
+            },
+          );
+          if (!upload.ok)
+            throw new Error(await readApiError(upload, "Image upload failed"));
         } catch (error) {
           setPendingImages([...remaining]);
-          setEditorTab("media");
+
           void loadImages(saved.id);
-          throw new Error("Product saved. " + remaining.length + " image(s) still need uploading. Save again to retry. " + (error instanceof Error ? error.message : "Image upload failed"));
+          throw new Error(
+            "Product saved. " +
+              remaining.length +
+              " image(s) still need uploading. Save again to retry. " +
+              (error instanceof Error ? error.message : "Image upload failed"),
+          );
         }
         remaining.shift();
+        setUploadProgress({
+          done: pendingImages.length - remaining.length,
+          total: pendingImages.length,
+        });
         setPendingImages([...remaining]);
       }
-      setSuccess(editingId ? "Product updated successfully" : pendingImages.length ? "Product and images saved successfully" : "Product created successfully");
+      setSuccess(
+        editingId
+          ? "Product updated successfully"
+          : pendingImages.length
+            ? "Product and images saved successfully"
+            : "Product created successfully",
+      );
       resetForm();
       await loadProducts();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
     } finally {
+      savePending.current = false;
+      setUploadProgress(null);
       setSaving(false);
     }
   }
@@ -953,7 +988,8 @@ export default function ProductsPage({
             type="button"
             onClick={async () => {
               if (
-                (pendingImages.length === 0 && JSON.stringify({ form, extra }) === baseline) ||
+                (pendingImages.length === 0 &&
+                  JSON.stringify({ form, extra }) === baseline) ||
                 (await confirm("Discard unsaved product changes?"))
               )
                 resetForm();
@@ -975,7 +1011,6 @@ export default function ProductsPage({
         )}
       </div>
 
-
       {createMode && role === "STAFF" && (
         <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">
           You do not have permission to edit products.
@@ -983,765 +1018,968 @@ export default function ProductsPage({
       )}
       {showForm && canEdit && (
         <form
+          id="product-editor"
           onSubmit={saveProduct}
           noValidate
-          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+          className="product-editor"
         >
-          <h2 className="mb-6 text-xl font-bold">
-            {editingId ? "Edit Product" : "Create Product"}
-          </h2>
-          <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-4">
-            {(
-              [
-                ["general", "General", Tag],
-                ["pricing", "Pricing", Package],
-                ["inventory", "Inventory", ArrowLeftRight],
-                ["seo", "SEO", SearchCheck],
-                ["media", "Images", ImageIcon],
-                ["variants", "Variants", Layers],
-                ["shipping", "Shipping", Package],
-                ["publishing", "Publishing", Tag],
-                ["activity", "Activity", History],
-              ] as const
-            ).map(([tab, label, Icon]) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setEditorTab(tab)}
-                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold ${editorTab === tab ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
-              >
-                <Icon size={16} /> {label}
-              </button>
-            ))}
-          </div>
-          <div className="mb-4 rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
-            {editorTab === "general" &&
-              "Basic product information and category."}
-            {editorTab === "pricing" &&
-              "Regular price and optional discounted price."}
-            {editorTab === "inventory" &&
-              "Opening quantity for new products; use stock adjustments for existing products."}
-            {editorTab === "seo" &&
-              "Search-engine title and description are saved to the product database."}
-            {editorTab === "media" &&
-              "Choose JPG, PNG or WebP images (up to 5 MB). Images upload when you save a new product."}
-            {editorTab === "variants" &&
-              "Manage size/color variants with their own SKU, price and attributes. Save the product first to add variants."}
-          </div>
-          <div className="grid gap-5 md:grid-cols-2">
-            <ProductFields
-              tab={editorTab}
-              value={extra}
-              onChange={setExtra}
-              regularPrice={form.price}
-            />
-            {editorTab === "activity" && (
-              <div className="md:col-span-2">
-                {editingId ? (
-                  <CatalogAudit entity="product" id={editingId} />
-                ) : (
-                  <p className="text-sm text-slate-500">
-                    Save the product to start its audit history.
-                  </p>
-                )}
-              </div>
-            )}
-            <div className={editorTab === "general" ? "contents" : "hidden"}>
-              <label className="space-y-2 text-sm font-medium">
-                Product Name
-                <input
-                  className={inputClass}
-                  required
-                  minLength={2}
-                  aria-invalid={!!fieldErrors.name}
-                  aria-describedby={
-                    fieldErrors.name ? "product-error-name" : undefined
-                  }
-                  value={form.name}
-                  onChange={(e) => {
-                    const name = e.target.value;
-                    setForm((prev) => ({
-                      ...prev,
-                      name,
-                      slug: editingId
-                        ? prev.slug
-                        : name
-                            .toLowerCase()
-                            .trim()
-                            .replace(/[^a-z0-9]+/g, "-")
-                            .replace(/^-|-$/g, ""),
-                    }));
-                  }}
-                />
-                {fieldErrors.name && (
-                  <span
-                    id="product-error-name"
-                    className="block text-xs text-red-700"
-                  >
-                    {fieldErrors.name}
-                  </span>
-                )}
-              </label>
-              <label className="space-y-2 text-sm font-medium">
-                Slug
-                <input
-                  className={inputClass}
-                  required
-                  pattern="[a-z0-9]+(-[a-z0-9]+)*"
-                  aria-invalid={!!fieldErrors.slug}
-                  aria-describedby={
-                    fieldErrors.slug ? "product-error-slug" : undefined
-                  }
-                  value={form.slug}
-                  onChange={(e) => setForm({ ...form, slug: e.target.value })}
-                />
-                {fieldErrors.slug && (
-                  <span
-                    id="product-error-slug"
-                    className="block text-xs text-red-700"
-                  >
-                    {fieldErrors.slug}
-                  </span>
-                )}
-              </label>
-              <label className="space-y-2 text-sm font-medium">
-                SKU
-                <input
-                  className={inputClass}
-                  required
-                  aria-invalid={!!fieldErrors.sku}
-                  aria-describedby={
-                    fieldErrors.sku ? "product-error-sku" : undefined
-                  }
-                  value={form.sku}
-                  onChange={(e) => setForm({ ...form, sku: e.target.value })}
-                />
-                {fieldErrors.sku && (
-                  <span
-                    id="product-error-sku"
-                    className="block text-xs text-red-700"
-                  >
-                    {fieldErrors.sku}
-                  </span>
-                )}
-              </label>
-              <label className="space-y-2 text-sm font-medium">
-                Category
-                <select
-                  className={inputClass}
-                  required
-                  aria-invalid={!!fieldErrors.categoryId}
-                  aria-describedby={
-                    fieldErrors.categoryId
-                      ? "product-error-categoryId"
-                      : undefined
-                  }
-                  value={form.categoryId}
-                  onChange={(e) =>
-                    setForm({ ...form, categoryId: e.target.value })
-                  }
+          {Object.keys(fieldErrors).length > 0 && (
+            <div
+              role="alert"
+              className="rounded-xl bg-red-50 p-4 text-sm text-red-700"
+            >
+              Correct the highlighted fields:{" "}
+              {Object.keys(fieldErrors).join(", ")}. Your changes have been
+              kept.
+            </div>
+          )}
+          <fieldset disabled={saving}>
+            <div className="product-editor-layout">
+              <div className="product-editor-main">
+                <ProductEditorSection
+                  title="Basic information"
+                  description="Start with a clear name and helpful product details."
                 >
-                  <option value="">Select category</option>
-                  {categories
-                    .filter((c) => c.isActive || c.id === form.categoryId)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                </select>
-                {fieldErrors.categoryId && (
-                  <span
-                    id="product-error-categoryId"
-                    className="block text-xs text-red-700"
-                  >
-                    {fieldErrors.categoryId}
-                  </span>
-                )}
-              </label>
-              <label className="space-y-2 text-sm font-medium">
-                Brand
-                <input
-                  className={inputClass}
-                  maxLength={150}
-                  value={form.brand}
-                  onChange={(e) => setForm({ ...form, brand: e.target.value })}
-                  placeholder="Optional brand"
-                />
-              </label>
-              <label className="space-y-2 text-sm font-medium md:col-span-2">
-                Short Description
-                <textarea
-                  className={inputClass}
-                  rows={2}
-                  maxLength={500}
-                  value={form.shortDescription}
-                  onChange={(e) =>
-                    setForm({ ...form, shortDescription: e.target.value })
-                  }
-                />
-              </label>
-              <label className="space-y-2 text-sm font-medium md:col-span-2">
-                Full Description
-                <textarea
-                  className={inputClass}
-                  rows={5}
-                  value={form.description}
-                  onChange={(e) =>
-                    setForm({ ...form, description: e.target.value })
-                  }
-                />
-              </label>
-            </div>
-            <div className={editorTab === "pricing" ? "contents" : "hidden"}>
-              <label className="space-y-2 text-sm font-medium">
-                Regular Price (BDT)
-                <input
-                  className={inputClass}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  required
-                  aria-invalid={!!fieldErrors.price}
-                  aria-describedby={
-                    fieldErrors.price ? "product-error-price" : undefined
-                  }
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: e.target.value })}
-                />
-                {fieldErrors.price && (
-                  <span
-                    id="product-error-price"
-                    className="block text-xs text-red-700"
-                  >
-                    {fieldErrors.price}
-                  </span>
-                )}
-              </label>
-              <label className="space-y-2 text-sm font-medium">
-                Sale Price (BDT)
-                <input
-                  className={inputClass}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  aria-invalid={!!fieldErrors.salePrice}
-                  aria-describedby={
-                    fieldErrors.salePrice
-                      ? "product-error-salePrice"
-                      : undefined
-                  }
-                  value={form.salePrice}
-                  onChange={(e) =>
-                    setForm({ ...form, salePrice: e.target.value })
-                  }
-                />
-                {fieldErrors.salePrice && (
-                  <span
-                    id="product-error-salePrice"
-                    className="block text-xs text-red-700"
-                  >
-                    {fieldErrors.salePrice}
-                  </span>
-                )}
-              </label>
-              {form.price &&
-                form.salePrice &&
-                Number(form.price) > Number(form.salePrice) && (
-                  <p className="text-sm font-medium text-green-700 md:col-span-2">
-                    Discount:{" "}
-                    {Math.round(
-                      (1 - Number(form.salePrice) / Number(form.price)) * 100,
-                    )}
-                    %
-                  </p>
-                )}
-            </div>
-            <div className={editorTab === "inventory" ? "contents" : "hidden"}>
-              <label className="space-y-2 text-sm font-medium">
-                Stock Quantity
-                <input
-                  className={inputClass}
-                  type="number"
-                  min="0"
-                  step="1"
-                  required
-                  disabled={!!editingId || extra.type === "VARIABLE"}
-                  aria-invalid={!!fieldErrors.stock}
-                  aria-describedby={
-                    fieldErrors.stock ? "product-error-stock" : undefined
-                  }
-                  value={form.stock}
-                  onChange={(e) => setForm({ ...form, stock: e.target.value })}
-                />
-                {fieldErrors.stock && (
-                  <span
-                    id="product-error-stock"
-                    className="block text-xs text-red-700"
-                  >
-                    {fieldErrors.stock}
-                  </span>
-                )}
-              </label>
-              <div className="rounded-xl border border-slate-200 p-4 text-sm text-slate-600">
-                {editingId
-                  ? "To record a reason for a stock change, use the IN/OUT actions in the product table."
-                  : "This quantity will create an opening inventory movement when the product is saved."}
-              </div>
-            </div>
-            <div className={editorTab === "seo" ? "contents" : "hidden"}>
-              <label className="space-y-2 text-sm font-medium md:col-span-2">
-                Meta Title
-                <input
-                  className={inputClass}
-                  maxLength={200}
-                  value={form.metaTitle}
-                  onChange={(e) =>
-                    setForm({ ...form, metaTitle: e.target.value })
-                  }
-                  placeholder={form.name || "Search result title"}
-                />
-                <span className="block text-xs text-slate-400">
-                  {form.metaTitle.length}/200 characters
-                </span>
-              </label>
-              <label className="space-y-2 text-sm font-medium md:col-span-2">
-                Meta Description
-                <textarea
-                  className={inputClass}
-                  rows={4}
-                  maxLength={500}
-                  value={form.metaDescription}
-                  onChange={(e) =>
-                    setForm({ ...form, metaDescription: e.target.value })
-                  }
-                  placeholder="Short search result description"
-                />
-                <span className="block text-xs text-slate-400">
-                  {form.metaDescription.length}/500 characters
-                </span>
-              </label>
-              <div className="md:col-span-2 rounded-xl border border-slate-200 p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-400">
-                  Search preview
-                </p>
-                <p className="mt-2 text-lg font-medium text-blue-700">
-                  {form.metaTitle || form.name || "Product title"}
-                </p>
-                <p className="text-sm text-green-700">
-                  /products/{form.slug || "product-slug"}
-                </p>
-                <p className="mt-1 text-sm text-slate-600">
-                  {form.metaDescription ||
-                    form.shortDescription ||
-                    "Product description"}
-                </p>
-              </div>
-            </div>
-            {editorTab === "media" && (
-              <div className="md:col-span-2 space-y-5">
-                {(!editingId || pendingImages.length > 0) && (
-                  <PendingProductImages files={pendingImages} onChange={setPendingImages} disabled={saving} />
-                )}
-                {editingId && (
-                  <>
-                    <MediaUpload
-                      productId={editingId}
-                      onUploaded={() => {
-                        void loadImages(editingId);
-                        void loadProducts();
+                  <label className="space-y-2 text-sm font-medium">
+                    Product Name
+                    <input
+                      className={inputClass}
+                      required
+                      minLength={2}
+                      aria-invalid={!!fieldErrors.name}
+                      aria-describedby={
+                        fieldErrors.name ? "product-error-name" : undefined
+                      }
+                      value={form.name}
+                      onChange={(e) => {
+                        const name = e.target.value;
+                        const suggestedSku =
+                          form.sku ||
+                          "DS-" + crypto.randomUUID().slice(0, 8).toUpperCase();
+                        setForm((prev) => ({
+                          ...prev,
+                          name,
+                          sku: suggestedSku,
+                          slug:
+                            editingId ||
+                            (prev.slug &&
+                              prev.slug !==
+                                prev.name
+                                  .toLowerCase()
+                                  .trim()
+                                  .replace(/[^a-z0-9]+/g, "-")
+                                  .replace(/^-|-$/g, ""))
+                              ? prev.slug
+                              : name
+                                  .toLowerCase()
+                                  .trim()
+                                  .replace(/[^a-z0-9]+/g, "-")
+                                  .replace(/^-|-$/g, ""),
+                        }));
                       }}
                     />
-
-
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold">
-                        Image gallery ({images.length})
-                      </h3>
-                      <button
-                        type="button"
-                        onClick={() => void loadImages(editingId)}
-                        className="text-sm text-indigo-600"
+                    {fieldErrors.name && (
+                      <span
+                        id="product-error-name"
+                        className="block text-xs text-red-700"
                       >
-                        Refresh gallery
-                      </button>
-                    </div>
-                    {imagesLoading ? (
-                      <p className="text-sm text-slate-500">
-                        Loading images...
-                      </p>
-                    ) : images.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-                        No images uploaded yet.
-                      </div>
-                    ) : (
-                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {images.map((image) => (
-                          <div
-                            key={image.id}
-                            className="overflow-hidden rounded-xl border border-slate-200"
+                        {fieldErrors.name}
+                      </span>
+                    )}
+                  </label>
+                  <label className="space-y-2 text-sm font-medium md:col-span-2">
+                    Short Description
+                    <textarea
+                      className={inputClass}
+                      rows={2}
+                      maxLength={500}
+                      value={form.shortDescription}
+                      onChange={(e) =>
+                        setForm({ ...form, shortDescription: e.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm font-medium md:col-span-2">
+                    Full Description
+                    <textarea
+                      className={inputClass}
+                      rows={5}
+                      value={form.description}
+                      onChange={(e) =>
+                        setForm({ ...form, description: e.target.value })
+                      }
+                    />
+                  </label>
+                </ProductEditorSection>
+                <ProductEditorSection
+                  title="Media"
+                  description="Upload JPG, PNG or WebP images up to 5 MB. Manage primary image and order in the gallery."
+                >
+                  <div className="md:col-span-2 space-y-5">
+                    {(!editingId || pendingImages.length > 0) && (
+                      <PendingProductImages
+                        files={pendingImages}
+                        progress={uploadProgress}
+                        onChange={setPendingImages}
+                        disabled={saving}
+                      />
+                    )}
+                    {editingId && (
+                      <>
+                        <MediaUpload
+                          productId={editingId}
+                          onUploaded={() => {
+                            void loadImages(editingId);
+                            void loadProducts();
+                          }}
+                        />
+
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold">
+                            Image gallery ({images.length})
+                          </h3>
+                          <button
+                            type="button"
+                            onClick={() => void loadImages(editingId)}
+                            className="text-sm text-indigo-600"
                           >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={imageSrc(image.url)}
-                              alt={image.altText || "Product image"}
-                              className="h-44 w-full bg-slate-100 object-contain"
-                            />
-                            <div className="space-y-3 p-3">
-                              <label className="block text-xs text-slate-500">
-                                Alt text
-                                <input
-                                  className={inputClass}
-                                  aria-label={
-                                    "Alt text for image " +
-                                    (image.sortOrder + 1)
-                                  }
-                                  maxLength={200}
-                                  value={image.altText ?? ""}
-                                  onChange={(e) =>
-                                    setImages((prev) =>
-                                      prev.map((item) =>
-                                        item.id === image.id
-                                          ? { ...item, altText: e.target.value }
-                                          : item,
-                                      ),
-                                    )
-                                  }
-                                  onBlur={() =>
-                                    void updateImage(image.id, {
-                                      altText: image.altText ?? "",
-                                    })
-                                  }
+                            Refresh gallery
+                          </button>
+                        </div>
+                        {imagesLoading ? (
+                          <p className="text-sm text-slate-500">
+                            Loading images...
+                          </p>
+                        ) : images.length === 0 ? (
+                          <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+                            No images uploaded yet.
+                          </div>
+                        ) : (
+                          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            {images.map((image) => (
+                              <div
+                                key={image.id}
+                                className="overflow-hidden rounded-xl border border-slate-200"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={imageSrc(image.url)}
+                                  alt={image.altText || "Product image"}
+                                  className="h-44 w-full bg-slate-100 object-contain"
                                 />
-                              </label>
-                              <label className="block text-xs text-slate-500">
-                                Display order
-                                <input
-                                  className={inputClass}
-                                  type="number"
-                                  min="0"
-                                  max="1000"
-                                  value={image.sortOrder}
-                                  onChange={(e) =>
-                                    setImages((prev) =>
-                                      prev.map((item) =>
-                                        item.id === image.id
-                                          ? {
-                                              ...item,
-                                              sortOrder: Number(e.target.value),
-                                            }
-                                          : item,
-                                      ),
-                                    )
-                                  }
-                                  onBlur={() =>
-                                    void updateImage(image.id, {
-                                      sortOrder: image.sortOrder,
-                                    })
-                                  }
-                                />
-                              </label>
-                              <label className="block text-xs text-slate-500">
-                                Variant
-                                <select
-                                  className={inputClass}
-                                  value={image.variantId ?? ""}
-                                  onChange={(e) =>
-                                    void updateImage(image.id, {
-                                      variantId: e.target.value || null,
-                                    })
-                                  }
-                                >
-                                  <option value="">
-                                    All variants / product
-                                  </option>
-                                  {variants.map((variant) => (
-                                    <option key={variant.id} value={variant.id}>
-                                      {variant.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-                              <label className="block text-xs text-slate-500">
-                                Replace image
-                                <input
-                                  type="file"
-                                  disabled={imageBusy}
-                                  accept="image/jpeg,image/png,image/webp"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) void replaceImage(image.id, file);
-                                    e.target.value = "";
-                                  }}
-                                />
-                              </label>
-                              {image.isPrimary && (
-                                <span className="text-xs font-semibold text-green-700">
-                                  Primary image
-                                </span>
-                              )}
-                              <div className="flex flex-wrap gap-2">
-                                {!image.isPrimary && (
-                                  <button
-                                    type="button"
-                                    disabled={imageBusy}
-                                    onClick={() =>
-                                      void setPrimaryImage(image.id)
-                                    }
-                                    className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50"
-                                  >
-                                    Set Primary
-                                  </button>
-                                )}
+                                <div className="space-y-3 p-3">
+                                  <label className="block text-xs text-slate-500">
+                                    Alt text
+                                    <input
+                                      className={inputClass}
+                                      aria-label={
+                                        "Alt text for image " +
+                                        (image.sortOrder + 1)
+                                      }
+                                      maxLength={200}
+                                      value={image.altText ?? ""}
+                                      onChange={(e) =>
+                                        setImages((prev) =>
+                                          prev.map((item) =>
+                                            item.id === image.id
+                                              ? {
+                                                  ...item,
+                                                  altText: e.target.value,
+                                                }
+                                              : item,
+                                          ),
+                                        )
+                                      }
+                                      onBlur={() =>
+                                        void updateImage(image.id, {
+                                          altText: image.altText ?? "",
+                                        })
+                                      }
+                                    />
+                                  </label>
+                                  <label className="block text-xs text-slate-500">
+                                    Display order
+                                    <input
+                                      className={inputClass}
+                                      type="number"
+                                      min="0"
+                                      max="1000"
+                                      value={image.sortOrder}
+                                      onChange={(e) =>
+                                        setImages((prev) =>
+                                          prev.map((item) =>
+                                            item.id === image.id
+                                              ? {
+                                                  ...item,
+                                                  sortOrder: Number(
+                                                    e.target.value,
+                                                  ),
+                                                }
+                                              : item,
+                                          ),
+                                        )
+                                      }
+                                      onBlur={() =>
+                                        void updateImage(image.id, {
+                                          sortOrder: image.sortOrder,
+                                        })
+                                      }
+                                    />
+                                  </label>
+                                  <label className="block text-xs text-slate-500">
+                                    Variant
+                                    <select
+                                      className={inputClass}
+                                      value={image.variantId ?? ""}
+                                      onChange={(e) =>
+                                        void updateImage(image.id, {
+                                          variantId: e.target.value || null,
+                                        })
+                                      }
+                                    >
+                                      <option value="">
+                                        All variants / product
+                                      </option>
+                                      {variants.map((variant) => (
+                                        <option
+                                          key={variant.id}
+                                          value={variant.id}
+                                        >
+                                          {variant.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <label className="block text-xs text-slate-500">
+                                    Replace image
+                                    <input
+                                      type="file"
+                                      disabled={imageBusy}
+                                      accept="image/jpeg,image/png,image/webp"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file)
+                                          void replaceImage(image.id, file);
+                                        e.target.value = "";
+                                      }}
+                                    />
+                                  </label>
+                                  {image.isPrimary && (
+                                    <span className="text-xs font-semibold text-green-700">
+                                      Primary image
+                                    </span>
+                                  )}
+                                  <div className="flex flex-wrap gap-2">
+                                    {!image.isPrimary && (
+                                      <button
+                                        type="button"
+                                        disabled={imageBusy}
+                                        onClick={() =>
+                                          void setPrimaryImage(image.id)
+                                        }
+                                        className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50"
+                                      >
+                                        Set Primary
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      disabled={imageBusy}
+                                      onClick={() => void deleteImage(image.id)}
+                                      className="rounded-lg border border-red-200 px-3 py-2 text-xs text-red-700 disabled:opacity-50"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </ProductEditorSection>
+                <ProductEditorSection
+                  title="Pricing"
+                  description="Enter prices in BDT. Sale price cannot exceed the regular price."
+                >
+                  <label className="space-y-2 text-sm font-medium">
+                    Regular Price (BDT)
+                    <input
+                      className={inputClass}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      required
+                      aria-invalid={!!fieldErrors.price}
+                      aria-describedby={
+                        fieldErrors.price ? "product-error-price" : undefined
+                      }
+                      value={form.price}
+                      onChange={(e) =>
+                        setForm({ ...form, price: e.target.value })
+                      }
+                    />
+                    {fieldErrors.price && (
+                      <span
+                        id="product-error-price"
+                        className="block text-xs text-red-700"
+                      >
+                        {fieldErrors.price}
+                      </span>
+                    )}
+                  </label>
+
+                  <label className="space-y-2 text-sm font-medium">
+                    Sale Price (BDT)
+                    <input
+                      className={inputClass}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      aria-invalid={!!fieldErrors.salePrice}
+                      aria-describedby={
+                        fieldErrors.salePrice
+                          ? "product-error-salePrice"
+                          : undefined
+                      }
+                      value={form.salePrice}
+                      onChange={(e) =>
+                        setForm({ ...form, salePrice: e.target.value })
+                      }
+                    />
+                    {fieldErrors.salePrice && (
+                      <span
+                        id="product-error-salePrice"
+                        className="block text-xs text-red-700"
+                      >
+                        {fieldErrors.salePrice}
+                      </span>
+                    )}
+                  </label>
+
+                  {form.price &&
+                    form.salePrice &&
+                    Number(form.price) > Number(form.salePrice) && (
+                      <p className="text-sm font-medium text-green-700 md:col-span-2">
+                        Discount:{" "}
+                        {Math.round(
+                          (1 - Number(form.salePrice) / Number(form.price)) *
+                            100,
+                        )}
+                        %
+                      </p>
+                    )}
+                  <ProductFields
+                    tab="pricing"
+                    only={["costPrice"]}
+                    value={extra}
+                    onChange={setExtra}
+                    regularPrice={form.price}
+                  />
+                  <details className="md:col-span-2">
+                    <summary>Advanced pricing &amp; tax</summary>
+                    <div className="product-editor-fields">
+                      <ProductFields
+                        tab="pricing"
+                        exclude={["costPrice"]}
+                        value={extra}
+                        onChange={setExtra}
+                        regularPrice={form.price}
+                      />
+                    </div>
+                  </details>
+                </ProductEditorSection>
+                <ProductEditorSection
+                  title="Inventory"
+                  description="Every product needs a unique SKU. Opening stock applies to new simple products."
+                >
+                  <label className="space-y-2 text-sm font-medium">
+                    SKU
+                    <input
+                      className={inputClass}
+                      required
+                      aria-invalid={!!fieldErrors.sku}
+                      aria-describedby={
+                        fieldErrors.sku ? "product-error-sku" : undefined
+                      }
+                      value={form.sku}
+                      onChange={(e) =>
+                        setForm({ ...form, sku: e.target.value })
+                      }
+                    />
+                    {fieldErrors.sku && (
+                      <span
+                        id="product-error-sku"
+                        className="block text-xs text-red-700"
+                      >
+                        {fieldErrors.sku}
+                      </span>
+                    )}
+                  </label>
+                  <ProductFields
+                    tab="general"
+                    only={["barcode"]}
+                    value={extra}
+                    onChange={setExtra}
+                    regularPrice={form.price}
+                  />
+                  <ProductFields
+                    tab="inventory"
+                    value={extra}
+                    onChange={setExtra}
+                    regularPrice={form.price}
+                  />
+                  {extra.trackInventory && extra.type === "SIMPLE" && (
+                    <>
+                      <label className="space-y-2 text-sm font-medium">
+                        Stock Quantity
+                        <input
+                          className={inputClass}
+                          type="number"
+                          min="0"
+                          step="1"
+                          required
+                          disabled={!!editingId}
+                          aria-invalid={!!fieldErrors.stock}
+                          aria-describedby={
+                            fieldErrors.stock
+                              ? "product-error-stock"
+                              : undefined
+                          }
+                          value={form.stock}
+                          onChange={(e) =>
+                            setForm({ ...form, stock: e.target.value })
+                          }
+                        />
+                        {fieldErrors.stock && (
+                          <span
+                            id="product-error-stock"
+                            className="block text-xs text-red-700"
+                          >
+                            {fieldErrors.stock}
+                          </span>
+                        )}
+                      </label>
+
+                      <div className="rounded-xl border border-slate-200 p-4 text-sm text-slate-600">
+                        {editingId
+                          ? "To record a reason for a stock change, use the IN/OUT actions in the product table."
+                          : "This quantity will create an opening inventory movement when the product is saved."}
+                      </div>
+                    </>
+                  )}
+                  {editingId && extra.trackInventory && (
+                    <p className="text-sm text-slate-500 md:col-span-2">
+                      Low stock alert:{" "}
+                      {initialProduct?.inventory?.lowStockAt ?? 5} units. Use
+                      IN/OUT actions to retain stock history.
+                    </p>
+                  )}
+                </ProductEditorSection>
+                <ProductEditorSection
+                  title="Product variants"
+                  description="Simple products need no variants. Variable products support their own SKU, price and stock."
+                >
+                  <ProductFields
+                    tab="general"
+                    only={["type"]}
+                    value={extra}
+                    onChange={setExtra}
+                    regularPrice={form.price}
+                  />
+                  {extra.type === "VARIABLE" && (
+                    <>
+                      <ProductOptionsEditor
+                        value={extra.options}
+                        onChange={(options) => setExtra({ ...extra, options })}
+                      />
+                      <div className="md:col-span-2 space-y-5">
+                        {!editingId ? (
+                          <div className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50 p-6 text-sm text-indigo-800">
+                            First complete the required product fields and click
+                            Create Product. Then edit the saved product to add
+                            variants.
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <h3 className="font-semibold">
+                                Variants ({variants.length})
+                              </h3>
+                              <div className="flex gap-3">
                                 <button
                                   type="button"
-                                  disabled={imageBusy}
-                                  onClick={() => void deleteImage(image.id)}
-                                  className="rounded-lg border border-red-200 px-3 py-2 text-xs text-red-700 disabled:opacity-50"
+                                  onClick={() => void loadVariants(editingId)}
+                                  className="text-sm text-indigo-600"
                                 >
-                                  Delete
+                                  Refresh
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openVariantModal()}
+                                  className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                                >
+                                  <Plus size={15} /> Add Variant
                                 </button>
                               </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-            {editorTab === "variants" && (
-              <div className="md:col-span-2 space-y-5">
-                {!editingId ? (
-                  <div className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50 p-6 text-sm text-indigo-800">
-                    First complete the required product fields and click Create
-                    Product. Then edit the saved product to add variants.
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <h3 className="font-semibold">
-                        Variants ({variants.length})
-                      </h3>
-                      <div className="flex gap-3">
-                        <button
-                          type="button"
-                          onClick={() => void loadVariants(editingId)}
-                          className="text-sm text-indigo-600"
-                        >
-                          Refresh
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openVariantModal()}
-                          className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-                        >
-                          <Plus size={15} /> Add Variant
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-3">
-                      <input
-                        aria-label="Search variants"
-                        className={inputClass + " max-w-xs"}
-                        placeholder="Search variant name or SKU"
-                        value={variantSearch}
-                        onChange={(e) => setVariantSearch(e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        disabled={variantBusy || extra.type !== "VARIABLE"}
-                        className="rounded-lg border px-3 py-2 text-sm"
-                        onClick={() => void generateVariants()}
-                      >
-                        Generate combinations
-                      </button>
-                      <input
-                        aria-label="Bulk variant price"
-                        className={inputClass + " max-w-40"}
-                        type="number"
-                        min="0"
-                        step=".01"
-                        placeholder="New price"
-                        value={variantPrice}
-                        onChange={(e) => setVariantPrice(e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        disabled={
-                          variantBusy || !variantPrice || !variants.length
-                        }
-                        className="rounded-lg border px-3 py-2 text-sm"
-                        onClick={() => void bulkVariantPrice()}
-                      >
-                        Price all variants
-                      </button>
-                    </div>
+                            <div className="flex flex-wrap gap-3">
+                              <input
+                                aria-label="Search variants"
+                                className={inputClass + " max-w-xs"}
+                                placeholder="Search variant name or SKU"
+                                value={variantSearch}
+                                onChange={(e) =>
+                                  setVariantSearch(e.target.value)
+                                }
+                              />
+                              <button
+                                type="button"
+                                disabled={
+                                  variantBusy || extra.type !== "VARIABLE"
+                                }
+                                className="rounded-lg border px-3 py-2 text-sm"
+                                onClick={() => void generateVariants()}
+                              >
+                                Generate combinations
+                              </button>
+                              <input
+                                aria-label="Bulk variant price"
+                                className={inputClass + " max-w-40"}
+                                type="number"
+                                min="0"
+                                step=".01"
+                                placeholder="New price"
+                                value={variantPrice}
+                                onChange={(e) =>
+                                  setVariantPrice(e.target.value)
+                                }
+                              />
+                              <button
+                                type="button"
+                                disabled={
+                                  variantBusy ||
+                                  !variantPrice ||
+                                  !variants.length
+                                }
+                                className="rounded-lg border px-3 py-2 text-sm"
+                                onClick={() => void bulkVariantPrice()}
+                              >
+                                Price all variants
+                              </button>
+                            </div>
 
-
-                    {variantLoading ? (
-                      <p className="text-sm text-slate-500">
-                        Loading variants...
-                      </p>
-                    ) : variants.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-sm text-slate-500">
-                        No variants yet. Click “Add Variant” to create a
-                        size/color combination.
-                      </div>
-                    ) : (
-                      <div className="overflow-x-auto rounded-xl border border-slate-200">
-                        <table className="w-full min-w-[720px] text-left text-sm">
-                          <thead className="bg-slate-50 text-slate-500">
-                            <tr>
-                              <th className="p-3">Variant</th>
-                              <th className="p-3">SKU</th>
-                              <th className="p-3">Attributes</th>
-                              <th className="p-3">Price</th>
-                              <th className="p-3">Stock</th>
-                              <th className="p-3">Status</th>
-                              <th className="p-3">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {variants
-                              .filter((variant) =>
-                                (variant.name + " " + variant.sku)
-                                  .toLowerCase()
-                                  .includes(variantSearch.toLowerCase()),
-                              )
-                              .map((variant) => (
-                                <tr key={variant.id} className="border-t">
-                                  <td className="p-3 font-semibold text-slate-900">
-                                    {variant.name}
-                                    {variant.isDefault && (
-                                      <span className="ml-2 rounded bg-indigo-50 px-2 py-1 text-xs text-indigo-600">
-                                        Default
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="p-3 text-slate-500">
-                                    {variant.sku}
-                                  </td>
-                                  <td className="p-3">
-                                    <div className="flex flex-wrap gap-1">
-                                      {Object.entries(
-                                        variant.attributes ?? {},
-                                      ).map(([key, value]) => (
-                                        <span
-                                          key={key}
-                                          className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600"
+                            {variantLoading ? (
+                              <p className="text-sm text-slate-500">
+                                Loading variants...
+                              </p>
+                            ) : variants.length === 0 ? (
+                              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-sm text-slate-500">
+                                No variants yet. Click “Add Variant” to create a
+                                size/color combination.
+                              </div>
+                            ) : (
+                              <div className="overflow-x-auto rounded-xl border border-slate-200">
+                                <table className="w-full min-w-[720px] text-left text-sm">
+                                  <thead className="bg-slate-50 text-slate-500">
+                                    <tr>
+                                      <th className="p-3">Variant</th>
+                                      <th className="p-3">SKU</th>
+                                      <th className="p-3">Attributes</th>
+                                      <th className="p-3">Price</th>
+                                      <th className="p-3">Stock</th>
+                                      <th className="p-3">Status</th>
+                                      <th className="p-3">Actions</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {variants
+                                      .filter((variant) =>
+                                        (variant.name + " " + variant.sku)
+                                          .toLowerCase()
+                                          .includes(
+                                            variantSearch.toLowerCase(),
+                                          ),
+                                      )
+                                      .map((variant) => (
+                                        <tr
+                                          key={variant.id}
+                                          className="border-t"
                                         >
-                                          {key}: {value}
-                                        </span>
+                                          <td className="p-3 font-semibold text-slate-900">
+                                            {variant.name}
+                                            {variant.isDefault && (
+                                              <span className="ml-2 rounded bg-indigo-50 px-2 py-1 text-xs text-indigo-600">
+                                                Default
+                                              </span>
+                                            )}
+                                          </td>
+                                          <td className="p-3 text-slate-500">
+                                            {variant.sku}
+                                          </td>
+                                          <td className="p-3">
+                                            <div className="flex flex-wrap gap-1">
+                                              {Object.entries(
+                                                variant.attributes ?? {},
+                                              ).map(([key, value]) => (
+                                                <span
+                                                  key={key}
+                                                  className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600"
+                                                >
+                                                  {key}: {value}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          </td>
+                                          <td className="p-3">
+                                            {variant.salePrice ? (
+                                              <>
+                                                <span className="font-semibold">
+                                                  ৳
+                                                  {Number(
+                                                    variant.salePrice,
+                                                  ).toFixed(2)}
+                                                </span>{" "}
+                                                <span className="text-xs text-slate-400 line-through">
+                                                  ৳
+                                                  {Number(
+                                                    variant.price,
+                                                  ).toFixed(2)}
+                                                </span>
+                                              </>
+                                            ) : (
+                                              <span className="font-semibold">
+                                                ৳
+                                                {Number(variant.price).toFixed(
+                                                  2,
+                                                )}
+                                              </span>
+                                            )}
+                                          </td>
+                                          <td className="p-3">
+                                            {variant.inventory ? (
+                                              <>
+                                                <div className="font-semibold">
+                                                  {variant.inventory.quantity}
+                                                </div>
+                                                <div className="text-xs text-slate-500">
+                                                  {variant.inventory.reserved}{" "}
+                                                  reserved
+                                                </div>
+                                              </>
+                                            ) : (
+                                              <span className="text-slate-400">
+                                                —
+                                              </span>
+                                            )}
+                                          </td>
+                                          <td className="p-3">
+                                            <span
+                                              className={
+                                                variant.isActive
+                                                  ? "text-green-700"
+                                                  : "text-slate-500"
+                                              }
+                                            >
+                                              {variant.isActive
+                                                ? "ACTIVE"
+                                                : "INACTIVE"}
+                                            </span>
+                                          </td>
+                                          <td className="p-3">
+                                            <div className="flex gap-3">
+                                              <button
+                                                type="button"
+                                                disabled={variantBusy}
+                                                onClick={() =>
+                                                  openVariantModal(variant)
+                                                }
+                                                className="text-indigo-600 disabled:opacity-50"
+                                                aria-label={`Edit variant ${variant.name}`}
+                                              >
+                                                <Pencil size={16} />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                disabled={variantBusy}
+                                                onClick={() =>
+                                                  void deleteVariant(variant)
+                                                }
+                                                className="text-red-600 disabled:opacity-50"
+                                                aria-label={`Delete variant ${variant.name}`}
+                                              >
+                                                <Trash2 size={16} />
+                                              </button>
+                                            </div>
+                                          </td>
+                                        </tr>
                                       ))}
-                                    </div>
-                                  </td>
-                                  <td className="p-3">
-                                    {variant.salePrice ? (
-                                      <>
-                                        <span className="font-semibold">
-                                          ৳
-                                          {Number(variant.salePrice).toFixed(2)}
-                                        </span>{" "}
-                                        <span className="text-xs text-slate-400 line-through">
-                                          ৳{Number(variant.price).toFixed(2)}
-                                        </span>
-                                      </>
-                                    ) : (
-                                      <span className="font-semibold">
-                                        ৳{Number(variant.price).toFixed(2)}
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="p-3">
-                                    {variant.inventory ? (
-                                      <>
-                                        <div className="font-semibold">
-                                          {variant.inventory.quantity}
-                                        </div>
-                                        <div className="text-xs text-slate-500">
-                                          {variant.inventory.reserved} reserved
-                                        </div>
-                                      </>
-                                    ) : (
-                                      <span className="text-slate-400">—</span>
-                                    )}
-                                  </td>
-                                  <td className="p-3">
-                                    <span
-                                      className={
-                                        variant.isActive
-                                          ? "text-green-700"
-                                          : "text-slate-500"
-                                      }
-                                    >
-                                      {variant.isActive ? "ACTIVE" : "INACTIVE"}
-                                    </span>
-                                  </td>
-                                  <td className="p-3">
-                                    <div className="flex gap-3">
-                                      <button
-                                        type="button"
-                                        disabled={variantBusy}
-                                        onClick={() =>
-                                          openVariantModal(variant)
-                                        }
-                                        className="text-indigo-600 disabled:opacity-50"
-                                        aria-label={`Edit variant ${variant.name}`}
-                                      >
-                                        <Pencil size={16} />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        disabled={variantBusy}
-                                        onClick={() =>
-                                          void deleteVariant(variant)
-                                        }
-                                        className="text-red-600 disabled:opacity-50"
-                                        aria-label={`Delete variant ${variant.name}`}
-                                      >
-                                        <Trash2 size={16} />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
+                    </>
+                  )}
+                </ProductEditorSection>
+                <ProductEditorSection
+                  title="Shipping"
+                  description="Physical products can include weight, dimensions and shipping rules."
+                >
+                  <ProductFields
+                    tab="shipping"
+                    value={extra}
+                    onChange={setExtra}
+                    regularPrice={form.price}
+                  />
+                </ProductEditorSection>
+                <ProductEditorSection
+                  title="Advanced settings & activity"
+                  description="Internal fields and additional search settings."
+                  collapsed
+                >
+                  <ProductFields
+                    tab="general"
+                    only={["manufacturer", "internalNotes"]}
+                    value={extra}
+                    onChange={setExtra}
+                    regularPrice={form.price}
+                  />
+                  <ProductFields
+                    tab="seo"
+                    value={extra}
+                    onChange={setExtra}
+                    regularPrice={form.price}
+                  />
+                  <div className="md:col-span-2">
+                    {editingId ? (
+                      <CatalogAudit entity="product" id={editingId} />
+                    ) : (
+                      <p className="text-sm text-slate-500">
+                        Activity is available after the first save.
+                      </p>
                     )}
-                  </>
-                )}
+                  </div>
+                </ProductEditorSection>
               </div>
-            )}
-          </div>
-          <div className="mt-6 flex gap-3">
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-xl bg-indigo-600 px-6 py-3 font-semibold text-white disabled:opacity-50"
-            >
-              {saving
-                ? "Saving..."
-                : editingId
-                  ? "Update Product"
-                  : "Create Product"}
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                if (
-                  (pendingImages.length === 0 && JSON.stringify({ form, extra }) === baseline) ||
-                  (await confirm("Discard unsaved product changes?"))
-                )
-                  resetForm();
-              }}
-              className="rounded-xl border border-slate-200 px-6 py-3"
-            >
-              Cancel
-            </button>
-          </div>
+              <aside
+                className="product-editor-sidebar"
+                aria-label="Product settings"
+              >
+                <ProductEditorSection title="Product status" description="">
+                  <ProductFields
+                    tab="publishing"
+                    value={extra}
+                    onChange={setExtra}
+                    regularPrice={form.price}
+                  />
+                </ProductEditorSection>
+                <ProductEditorSection title="Organization" description="">
+                  <label className="text-sm font-medium">
+                    Search categories
+                    <input
+                      className={inputClass}
+                      type="search"
+                      value={categorySearch}
+                      onChange={(event) =>
+                        setCategorySearch(event.target.value)
+                      }
+                      placeholder="Search by category name"
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm font-medium">
+                    Category
+                    <select
+                      className={inputClass}
+                      required
+                      aria-invalid={!!fieldErrors.categoryId}
+                      aria-describedby={
+                        fieldErrors.categoryId
+                          ? "product-error-categoryId"
+                          : undefined
+                      }
+                      value={form.categoryId}
+                      onChange={(e) =>
+                        setForm({ ...form, categoryId: e.target.value })
+                      }
+                    >
+                      <option value="">Select category</option>
+                      {categories
+                        .filter(
+                          (c) =>
+                            (c.isActive || c.id === form.categoryId) &&
+                            (!categorySearch ||
+                              c.name
+                                .toLowerCase()
+                                .includes(categorySearch.toLowerCase()) ||
+                              c.id === form.categoryId),
+                        )
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                    </select>
+                    {fieldErrors.categoryId && (
+                      <span
+                        id="product-error-categoryId"
+                        className="block text-xs text-red-700"
+                      >
+                        {fieldErrors.categoryId}
+                      </span>
+                    )}
+                  </label>
+                  <label className="space-y-2 text-sm font-medium">
+                    Brand
+                    <input
+                      className={inputClass}
+                      maxLength={150}
+                      value={form.brand}
+                      onChange={(e) =>
+                        setForm({ ...form, brand: e.target.value })
+                      }
+                      placeholder="Optional brand"
+                    />
+                  </label>
+                  <ProductFields
+                    tab="general"
+                    only={["tags", "collections"]}
+                    value={extra}
+                    onChange={setExtra}
+                    regularPrice={form.price}
+                  />
+                </ProductEditorSection>
+                <ProductEditorSection
+                  title="Search engine listing"
+                  description="Preview uses product name and short description until custom SEO text is entered."
+                  collapsed
+                >
+                  <label className="space-y-2 text-sm font-medium">
+                    Slug
+                    <input
+                      className={inputClass}
+                      required
+                      pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                      aria-invalid={!!fieldErrors.slug}
+                      aria-describedby={
+                        fieldErrors.slug ? "product-error-slug" : undefined
+                      }
+                      value={form.slug}
+                      onChange={(e) =>
+                        setForm({ ...form, slug: e.target.value })
+                      }
+                    />
+                    {fieldErrors.slug && (
+                      <span
+                        id="product-error-slug"
+                        className="block text-xs text-red-700"
+                      >
+                        {fieldErrors.slug}
+                      </span>
+                    )}
+                  </label>
+                  <label className="space-y-2 text-sm font-medium md:col-span-2">
+                    Meta Title
+                    <input
+                      className={inputClass}
+                      maxLength={200}
+                      value={form.metaTitle}
+                      onChange={(e) =>
+                        setForm({ ...form, metaTitle: e.target.value })
+                      }
+                      placeholder={form.name || "Search result title"}
+                    />
+                    <span className="block text-xs text-slate-400">
+                      {form.metaTitle.length}/200 characters
+                    </span>
+                  </label>
+
+                  <label className="space-y-2 text-sm font-medium md:col-span-2">
+                    Meta Description
+                    <textarea
+                      className={inputClass}
+                      rows={4}
+                      maxLength={500}
+                      value={form.metaDescription}
+                      onChange={(e) =>
+                        setForm({ ...form, metaDescription: e.target.value })
+                      }
+                      placeholder="Short search result description"
+                    />
+                    <span className="block text-xs text-slate-400">
+                      {form.metaDescription.length}/500 characters
+                    </span>
+                  </label>
+
+                  <div className="md:col-span-2 rounded-xl border border-slate-200 p-4">
+                    <p className="text-xs uppercase tracking-wide text-slate-400">
+                      Search preview
+                    </p>
+                    <p className="mt-2 text-lg font-medium text-blue-700">
+                      {form.metaTitle || form.name || "Product title"}
+                    </p>
+                    <p className="text-sm text-green-700">
+                      /product/{form.slug || "product-slug"}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {form.metaDescription ||
+                        form.shortDescription ||
+                        "Product description"}
+                    </p>
+                  </div>
+                </ProductEditorSection>
+              </aside>
+            </div>
+            <div className="product-editor-actions">
+              <span className="text-sm text-slate-500">
+                {saving
+                  ? "Saving product and images?"
+                  : "Changes are saved when you choose an action."}
+              </span>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm"
+                  onClick={async () => {
+                    if (
+                      (pendingImages.length === 0 &&
+                        JSON.stringify({ form, extra }) === baseline) ||
+                      (await confirm("Discard unsaved product changes?"))
+                    )
+                      resetForm();
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  name="intent"
+                  value="DRAFT"
+                  disabled={saving}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold"
+                >
+                  Save Draft
+                </button>
+                <button
+                  type="submit"
+                  name="intent"
+                  value={extra.status === "DRAFT" ? "ACTIVE" : extra.status}
+                  disabled={saving}
+                  className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  {saving
+                    ? "Saving?"
+                    : extra.status === "DRAFT"
+                      ? "Publish Product"
+                      : "Update Product"}
+                </button>
+              </div>
+            </div>
+          </fieldset>
         </form>
       )}
       {!createMode && (

@@ -150,12 +150,11 @@ export function HomeSections({
           return (
             <section
               key={block.id}
-              className="cms-promo shop-panel"
-              aria-labelledby={`title-${block.id}`}
+              className="newsletter-home-section"
             >
-              <h2 id={`title-${block.id}`}>{block.title}</h2>
-              {block.description && <p>{block.description}</p>}
               <Newsletter
+                title={block.title}
+                description={block.description}
                 buttonLabel={block.buttonLabel || "Subscribe"}
                 consentText={
                   block.consentText ||

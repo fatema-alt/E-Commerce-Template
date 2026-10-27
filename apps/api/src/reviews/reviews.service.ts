@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -113,6 +112,7 @@ export class ReviewsService {
       },
       select: {
         rating: true,
+        isVerifiedPurchase: true,
       },
     });
 
@@ -130,6 +130,7 @@ export class ReviewsService {
     return {
       total,
       averageRating,
+      verifiedTotal: reviews.filter((review) => review.isVerifiedPurchase).length,
       ratingBreakdown,
     };
   }
