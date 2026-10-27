@@ -378,7 +378,33 @@ input[type=checkbox],input[type=radio]{width:auto;accent-color:var(--c-ink)}
 .pdp-primary-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
 .pdp-primary-actions button{height:48px;border-radius:var(--r-md);font-size:.95rem;font-weight:700}
 .pdp-secondary-actions{display:flex;align-items:center;gap:12px;margin-top:6px}
-.pdp-trust-guarantees{margin-top:10px}
+
+/* Trust Guarantees Cards */
+.pdp-trust-guarantees{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:16px}
+@media (max-width:540px){.pdp-trust-guarantees{grid-template-columns:1fr}}
+.pdp-trust-card{margin:0;padding:12px 14px;border-radius:var(--r-md);background:var(--glass);border:1px solid var(--c-line);display:flex;align-items:center;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,.03);transition:transform .15s,box-shadow .15s}
+.pdp-trust-card:hover{transform:translateY(-1px);box-shadow:0 4px 12px -2px rgba(0,0,0,.06)}
+.pdp-trust-card .trust-icon{font-size:1.35rem;line-height:1;flex-shrink:0}
+.pdp-trust-card .trust-content{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pdp-trust-card strong{font-size:.82rem;font-weight:700;color:var(--c-ink);line-height:1.25;display:block}
+.pdp-trust-card span{font-size:.72rem;color:var(--c-muted);line-height:1.2;display:block}
+
+/* Service notes cards */
+.pdp-service-notes{display:grid;gap:10px;margin-top:16px}
+.pdp-service-notes p{margin:0;padding:14px 18px;border-radius:var(--r-lg);background:var(--glass);border:1px solid var(--c-line);display:grid;gap:2px}
+.pdp-service-notes p strong{font-size:.88rem;color:var(--c-ink);font-weight:700}
+.pdp-service-notes span{color:var(--c-muted);font-size:.82rem}
+
+/* Mobile sticky bottom purchase bar */
+.pdp-mobile-sticky-bar{display:none !important}
+@media (max-width:1023px){
+  .pdp-mobile-sticky-bar{display:flex !important;position:fixed;bottom:0;left:0;right:0;z-index:45;background:var(--glass-solid);border-top:1px solid var(--c-line);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));align-items:center;justify-content:space-between;gap:12px;box-shadow:0 -4px 20px rgba(0,0,0,.12)}
+  .pdp-mobile-sticky-bar .mobile-price-group{min-width:0}
+  .pdp-mobile-sticky-bar .mobile-product-title{font-size:11px;color:var(--c-muted);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;display:block}
+  .pdp-mobile-sticky-bar .mobile-price{font-size:1rem;font-weight:800;color:var(--c-ink);display:block}
+  .pdp-mobile-sticky-bar .mobile-add-btn{height:42px;padding:0 20px;border-radius:var(--r-md);background:var(--lime);color:var(--lime-ink);font-weight:700;font-size:.82rem;border:0;display:flex;align-items:center;gap:6px;cursor:pointer}
+}
+
 .pdp-details-layout{display:grid;grid-template-columns:1.35fr .65fr;gap:clamp(20px,3vw,36px);margin-top:clamp(28px,4vw,48px)}
 .pdp-specifications{display:grid;gap:0}
 .pdp-specifications div{display:flex;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--c-line)}

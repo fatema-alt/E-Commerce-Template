@@ -497,58 +497,58 @@ export function ProductPurchase({
       </div>
 
       {/* 6. Delivery & Shopping Guarantees */}
-      <div className="pdp-trust-guarantees grid grid-cols-2 gap-2.5 p-3.5 rounded-2xl bg-[var(--glass)] border border-[var(--c-line)] text-xs text-[var(--c-ink)]">
-        <div className="flex items-center gap-2">
-          <span className="text-base">🛡️</span>
-          <div>
+      <div className="pdp-trust-guarantees">
+        <div className="pdp-trust-card">
+          <span className="trust-icon" aria-hidden="true">🛡️</span>
+          <div className="trust-content">
             <strong>100% Authentic</strong>
-            <span className="block text-[10px] text-[var(--c-muted)]">Verified genuine source</span>
+            <span>Verified genuine source</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-base">💵</span>
-          <div>
+        <div className="pdp-trust-card">
+          <span className="trust-icon" aria-hidden="true">💵</span>
+          <div className="trust-content">
             <strong>Cash on Delivery</strong>
-            <span className="block text-[10px] text-[var(--c-muted)]">Pay at your doorstep</span>
+            <span>Pay at your doorstep</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-base">🔄</span>
-          <div>
+        <div className="pdp-trust-card">
+          <span className="trust-icon" aria-hidden="true">🔄</span>
+          <div className="trust-content">
             <strong>7-Day Returns</strong>
-            <span className="block text-[10px] text-[var(--c-muted)]">Hassle-free guarantee</span>
+            <span>Hassle-free guarantee</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-base">⚡</span>
-          <div>
+        <div className="pdp-trust-card">
+          <span className="trust-icon" aria-hidden="true">⚡</span>
+          <div className="trust-content">
             <strong>Fast 24-48h Delivery</strong>
-            <span className="block text-[10px] text-[var(--c-muted)]">Across Bangladesh</span>
+            <span>Across Bangladesh</span>
           </div>
         </div>
       </div>
 
-      {/* 7. Mobile Sticky Bottom Purchase Bar */}
+      {/* 7. Mobile Sticky Bottom Purchase Bar (hidden on desktop via CSS) */}
       <div
         data-contact-avoid="true"
-        className="pdp-mobile-sticky-bar fixed bottom-0 left-0 right-0 z-40 bg-[var(--glass-solid)]/95 backdrop-blur-md border-t border-[var(--c-line)] p-3 px-4 shadow-xl flex items-center justify-between gap-3 lg:hidden pb-[calc(12px+env(safe-area-inset-bottom,0px))]"
+        className="pdp-mobile-sticky-bar"
       >
-        <div className="min-w-0">
-          <span className="block text-[11px] text-[var(--c-muted)] font-medium truncate max-w-[150px]">
+        <div className="mobile-price-group">
+          <span className="mobile-product-title">
             {product.name}
           </span>
-          <span className="text-base font-extrabold text-[var(--c-ink)]">
+          <span className="mobile-price">
             {money(price)}
           </span>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div>
           <button
             type="button"
-            className="h-11 px-5 rounded-xl bg-[#d8f45a] hover:bg-[#c9e847] text-slate-900 font-bold text-xs tracking-wide shadow-xs active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-40"
+            className="mobile-add-btn"
             disabled={busy || !valid || needsVariant || available < 1}
             onClick={() => add(false)}
           >

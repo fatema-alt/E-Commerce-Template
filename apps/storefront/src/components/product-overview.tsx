@@ -96,6 +96,21 @@ export function ProductOverview({ product }: { product: Product }) {
           variantId={variantId}
           onVariantChange={setVariant}
         />
+        <div className="pdp-service-notes">
+          <p>
+            <strong>Clear totals</strong>
+            <span>
+              Review delivery charges and your final total before ordering.
+            </span>
+          </p>
+          <p>
+            <strong>Order updates</strong>
+            <span>
+              Follow your order from your account or the browser used for guest
+              checkout.
+            </span>
+          </p>
+        </div>
       </section>
     </div>
   );
