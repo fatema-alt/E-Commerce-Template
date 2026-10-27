@@ -15,6 +15,7 @@ import { BannerSlider, SaleCountdown } from "./cms-interactive";
 import { Newsletter } from './newsletter';
 import { BrandArtwork } from "./brand-artwork";
 import { HeroBanner } from "./hero-banner";
+import { DepartmentGrid } from "./department-grid";
 import { RecentlyViewedSection } from "./recently-viewed";
 import { CustomerReviewsSection } from "./customer-reviews-section";
 function Picture({ image, assets }: { image?: Image; assets: Asset[] }) {
@@ -124,43 +125,17 @@ async function Block({
   }
   if (section.type === "categoryGrid") {
     const rawCategoryIds = Array.isArray(c.categoryIds) ? (c.categoryIds as string[]) : [];
-    const all = await getCategories(rawCategoryIds.length > 0 ? rawCategoryIds : undefined);
+    const [all, configured] = await Promise.all([
+      getCategories(),
+      rawCategoryIds.length ? getCategories(rawCategoryIds) : Promise.resolve([]),
+    ]);
     const selected =
       rawCategoryIds.length > 0
         ? rawCategoryIds
-            .map((id) => all.find((category) => category.id === id))
+            .map((id) => configured.find((category) => category.id === id))
             .filter((category): category is (typeof all)[number] => category !== undefined)
-        : all.slice(0, 12);
-    return (
-      <>
-        {title}
-        <div
-          className="categories-grid cms-grid"
-          style={{ "--columns": Number(c.columns || 4) } as CSSProperties}
-        >
-          {selected.map((category) => (
-            <Link
-              key={category.id}
-              href={`/category/${encodeURIComponent(category.slug)}`}
-              className="category-card"
-            >
-              {category.imageUrl && (
-                <img
-                  src={category.imageUrl}
-                  alt=""
-                  className="cms-image"
-                  loading="lazy"
-                />
-              )}
-              <span>{category.name}</span>
-            </Link>
-          ))}
-        </div>
-        {!selected.length && (
-          <p className="empty-content">No categories are available yet.</p>
-        )}
-      </>
-    );
+        : all;
+    return <DepartmentGrid categories={selected} hasMore={all.length > 6} title={typeof c.title === "string" && c.title.trim() ? c.title : undefined} />;
   }
   if (
     section.type === "featuredCollections" ||
@@ -322,7 +297,7 @@ export function CmsSections({
         .map((section) => (
           <section
             key={section.id}
-            className={`cms-section ${section.responsive?.width === "full" ? "cms-full" : "container"} ${section.responsive?.mobile === false ? "cms-hide-mobile" : ""} ${section.responsive?.tablet === false ? "cms-hide-tablet" : ""} ${section.responsive?.desktop === false ? "cms-hide-desktop" : ""}`}
+            className={`cms-section ${section.type === "categoryGrid" ? "department-home-section" : ""} ${section.responsive?.width === "full" ? "cms-full" : "container"} ${section.responsive?.mobile === false ? "cms-hide-mobile" : ""} ${section.responsive?.tablet === false ? "cms-hide-tablet" : ""} ${section.responsive?.desktop === false ? "cms-hide-desktop" : ""}`}
             style={
               {
                 "--section-padding": `${section.responsive?.padding ?? 4}rem`,

@@ -1,32 +1,8 @@
-import { BrandArtwork } from "./brand-artwork";
+import { DepartmentGrid } from "./department-grid";
 import Link from "next/link";
 import type { Category, ContentBlock, Product } from "../lib/storefront";
 import { Newsletter } from "./newsletter";
 import { HeroBanner } from "./hero-banner";
-
-const money = new Intl.NumberFormat("en-BD", {
-  style: "currency",
-  currency: "BDT",
-  maximumFractionDigits: 2,
-});
-
-const slug = (value: string) => encodeURIComponent(value);
-
-function SafeImage({
-  src,
-  alt,
-}: {
-  src?: string | null;
-  alt: string;
-}) {
-  return src && /^(https?:\/\/)/i.test(src) ? (
-    <img className="product-image" src={src} alt={alt} loading="lazy" />
-  ) : (
-    <div className="image-placeholder" aria-hidden="true">
-      ✳
-    </div>
-  );
-}
 
 import { ProductCard } from "./product-card";
 export { ProductCard };
@@ -51,31 +27,10 @@ export function HomeSections({
           return (
             <section
               key={block.id}
-              className="section"
-              aria-labelledby={`title-${block.id}`}
+              className="section department-home-section"
+              aria-label={block.title}
             >
-              <div className="section-head">
-                <h2 id={`title-${block.id}`}>{block.title}</h2>
-                <Link href="/categories">Explore all</Link>
-              </div>
-              {categories.length ? (
-                <div className="categories-grid">
-                  {categories.map((cat) => (
-                    <Link
-                      key={cat.id}
-                      className="category-card"
-                      href={`/category/${slug(cat.slug)}`}
-                    >
-                      <SafeImage src={cat.imageUrl} alt="" />
-                      <span>{cat.name}</span>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <div className="empty-content">
-                  Categories will appear here when your catalog is populated.
-                </div>
-              )}
+              <DepartmentGrid categories={categories} title={block.title} />
             </section>
           );
         }

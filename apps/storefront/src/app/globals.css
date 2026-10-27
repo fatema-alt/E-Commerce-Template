@@ -252,6 +252,40 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .category-card:hover{transform:translateY(-4px)}
 .category-card img,.category-card .image-placeholder{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .category-card span:last-child{position:relative;margin:12px;padding:10px 16px;border-radius:var(--r-pill);background:var(--glass-solid);font-weight:600;font-size:.95rem;width:fit-content}
+
+/* Compact department promotions; scoped to the homepage category grid. */
+.department-section{container-type:inline-size}
+.department-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}
+.department-heading h2{font-size:clamp(1.5rem,2.4vw,2rem);font-weight:700;letter-spacing:-.035em;line-height:1.15;margin:0 0 6px}
+.department-heading p{font-size:.9rem;line-height:1.5;color:var(--c-muted);margin:0}
+.department-view-all{display:inline-flex;align-items:center;justify-content:center;gap:10px;flex-shrink:0;min-height:44px;padding:10px 16px;border:1px solid var(--c-line);border-radius:var(--r-pill);background:var(--glass);font-size:.8rem;font-weight:650;transition:background .25s,color .25s}
+.department-view-all:hover{background:var(--lime);color:var(--lime-ink)}
+.department-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(12px,1.6vw,20px)}
+.department-card{--department-tint:#dff2fa;position:relative;display:grid;grid-template-rows:auto minmax(0,1fr);isolation:isolate;min-width:0;aspect-ratio:1.6;border-radius:20px;border:1px solid var(--c-line);overflow:hidden;padding:clamp(12px,2vw,24px);background:linear-gradient(135deg,var(--department-tint),var(--glass-solid));transition:transform .25s ease,box-shadow .25s ease,border-color .25s ease}
+.department-tone-1{--department-tint:#f9e5ec}.department-tone-2{--department-tint:#edf5d2}.department-tone-3{--department-tint:#e9e5fa}.department-tone-4{--department-tint:#fbead9}.department-tone-5{--department-tint:#dcf2eb}
+.department-card h3{position:relative;z-index:2;font-size:clamp(.9rem,1.8vw,1.35rem);font-weight:750;line-height:1.2;letter-spacing:-.025em;overflow-wrap:anywhere;margin:0;padding-right:24px;max-width:100%;color:var(--c-ink)}
+.department-card-arrow{position:absolute;right:clamp(10px,1.5vw,20px);top:clamp(10px,1.5vw,20px);z-index:2;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--glass-solid);border:1px solid var(--c-line);color:#0086bb;font-size:.9rem;transition:background .25s,transform .25s}
+.department-card-image{position:relative;min-height:0;min-width:0;margin-top:6px;z-index:1}
+.department-card-image .department-image{object-fit:contain;object-position:center;transition:transform .25s ease;filter:drop-shadow(0 10px 12px rgba(15,20,17,.08))}
+.department-card-text-only{display:flex;flex-direction:column;justify-content:space-between}
+.department-browse{font-size:.8rem;font-weight:600;color:var(--c-ink-2)}
+.department-card:hover{transform:translateY(-3px);box-shadow:0 14px 30px -18px rgba(15,20,17,.3);border-color:rgba(0,174,239,.3)}
+.department-card:hover .department-image{transform:scale(1.035)}
+.department-card:hover .department-card-arrow{background:var(--lime);color:var(--lime-ink);transform:translate(1px,-1px)}
+.department-card:focus-visible{outline:3px solid #00aeef;outline-offset:3px}
+:root[data-theme=dark] .department-card{background:linear-gradient(135deg,color-mix(in srgb,var(--department-tint) 13%,var(--glass-solid)),var(--glass-solid))}
+:root[data-theme=dark] .department-card-arrow{color:#67d4ff}
+.department-home-section+.cms-section,.department-home-section+.section{margin-top:clamp(24px,3vw,36px)}
+@container(min-width:760px){.department-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@container(max-width:480px){
+  .department-heading{align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+  .department-heading p{font-size:.8rem}
+  .department-view-all{font-size:.75rem;padding:8px 12px}
+  .department-card{border-radius:16px}
+  .department-card-arrow{width:22px;height:22px;font-size:.75rem}
+  .department-card h3{font-size:.85rem;padding-right:18px}
+  .department-browse{font-size:.7rem}
+}
 .image-placeholder{display:grid;place-items:center;font-size:2rem;color:var(--c-muted);background:var(--c-line);aspect-ratio:1}
 
 /* product cards */
