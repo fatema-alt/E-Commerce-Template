@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- Review attachments can use merchant-approved external URLs. */
 import { useEffect, useId, useRef, useState } from "react";
 import { shopRequest, type Shopper } from "../lib/shop-client";
+import { useProductFeedback } from "./product-feedback";
 
 type Summary = {
   total: number;
@@ -76,6 +77,7 @@ export function ProductReviewsSection({
   productName: string;
 }) {
   const id = useId();
+  const setSharedSummary = useProductFeedback()?.setSummary;
   const [tab, setTab] = useState<"reviews" | "questions">("reviews");
   const [data, setData] = useState<ReviewPage | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -140,7 +142,7 @@ export function ProductReviewsSection({
               : result.message || "Could not load customer feedback.",
           );
         if (controller.signal.aborted) return;
-        if (tab === "reviews") setData(result);
+        if (tab === "reviews") { setData(result); setSharedSummary?.(result.summary); }
         else setQuestions(result);
       })
       .catch((e: Error) => {
@@ -150,7 +152,7 @@ export function ProductReviewsSection({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [productId, page, rating, revision, tab]);
+  }, [productId, page, rating, revision, tab, setSharedSummary]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

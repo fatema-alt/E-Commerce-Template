@@ -7,7 +7,9 @@ import {
   api as catalogApi,
   json as catalogJson,
 } from "@/components/catalog/catalog-ui";
+import dynamic from "next/dynamic";
 import { ProductEditorSection } from "./product-editor-section";
+import { ProductGalleryManager } from "./product-gallery-manager";
 import { ProductOptionsEditor } from "./product-options-editor";
 import { ProductList } from "@/components/catalog/product-list";
 import { CatalogAudit } from "@/components/catalog/catalog-audit";
@@ -27,6 +29,13 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2, Plus } from "lucide-react";
+
+const ProductRichEditor = dynamic(() => import("./product-rich-editor"), {
+  ssr: false,
+  loading: () => (
+    <div className="product-rich-loading">Loading description editor...</div>
+  ),
+});
 
 type Category = {
   id: string;
@@ -366,6 +375,29 @@ export default function ProductsPage({
       : data.message || fallback;
   }
 
+  const imageMutation = useRef(false);
+  async function reorderImages(ids: string[]) {
+    if (!editingId || imageMutation.current || imageBusy) return;
+    imageMutation.current = true;
+    setImageBusy(true);
+    setImageError("");
+    try {
+      await catalogApi(
+        "/products/" + editingId + "/images/order",
+        catalogJson("PATCH", { imageIds: ids }),
+      );
+      await loadImages(editingId);
+      setImageSuccess("Image order saved. The first image is primary.");
+    } catch (error) {
+      setImageError(
+        error instanceof Error ? error.message : "Could not reorder images",
+      );
+    } finally {
+      imageMutation.current = false;
+      setImageBusy(false);
+    }
+  }
+
   async function setPrimaryImage(imageId: string) {
     if (!editingId || imageBusy) return;
     setImageBusy(true);
@@ -394,7 +426,7 @@ export default function ProductsPage({
       variantId?: string | null;
     },
   ) {
-    if (!editingId || imageBusy) return;
+    if (!editingId || imageBusy) return false;
     setImageBusy(true);
     setImageError("");
     try {
@@ -404,10 +436,12 @@ export default function ProductsPage({
       );
       setImageSuccess("Image details updated");
       await loadImages(editingId);
+      return true;
     } catch (error) {
       setImageError(
         error instanceof Error ? error.message : "Image update failed",
       );
+      return false;
     } finally {
       setImageBusy(false);
     }
@@ -737,6 +771,8 @@ export default function ProductsPage({
         "Use lowercase letters, numbers and single hyphens (up to 200 characters).";
     if (!form.sku.trim() || form.sku.length > 100)
       errors.sku = "Enter a unique SKU of up to 100 characters.";
+    if (form.description.length > 50000)
+      errors.description = "Description exceeds the 50,000 character limit.";
     if (!form.categoryId) errors.categoryId = "Select a category.";
     if (!/^\d{1,10}(\.\d{1,2})?$/.test(form.price))
       errors.price =
@@ -1040,7 +1076,7 @@ export default function ProductsPage({
                   title="Basic information"
                   description="Start with a clear name and helpful product details."
                 >
-                  <label className="space-y-2 text-sm font-medium">
+                  <label className="product-name-field full space-y-2 text-sm font-medium">
                     Product Name
                     <input
                       className={inputClass}
@@ -1091,7 +1127,7 @@ export default function ProductsPage({
                     Short Description
                     <textarea
                       className={inputClass}
-                      rows={2}
+                      rows={4}
                       maxLength={500}
                       value={form.shortDescription}
                       onChange={(e) =>
@@ -1099,17 +1135,19 @@ export default function ProductsPage({
                       }
                     />
                   </label>
-                  <label className="space-y-2 text-sm font-medium md:col-span-2">
-                    Full Description
-                    <textarea
-                      className={inputClass}
-                      rows={5}
-                      value={form.description}
-                      onChange={(e) =>
-                        setForm({ ...form, description: e.target.value })
-                      }
-                    />
-                  </label>
+                  <ProductRichEditor
+                    key={editingId || "new"}
+                    value={form.description}
+                    disabled={saving}
+                    onChange={(description) =>
+                      setForm((prev) => ({ ...prev, description }))
+                    }
+                  />
+                  {fieldErrors.description && (
+                    <p className="product-rich-error" role="alert">
+                      {fieldErrors.description}
+                    </p>
+                  )}
                 </ProductEditorSection>
                 <ProductEditorSection
                   title="Media"
@@ -1155,146 +1193,17 @@ export default function ProductsPage({
                             No images uploaded yet.
                           </div>
                         ) : (
-                          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            {images.map((image) => (
-                              <div
-                                key={image.id}
-                                className="overflow-hidden rounded-xl border border-slate-200"
-                              >
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={imageSrc(image.url)}
-                                  alt={image.altText || "Product image"}
-                                  className="h-44 w-full bg-slate-100 object-contain"
-                                />
-                                <div className="space-y-3 p-3">
-                                  <label className="block text-xs text-slate-500">
-                                    Alt text
-                                    <input
-                                      className={inputClass}
-                                      aria-label={
-                                        "Alt text for image " +
-                                        (image.sortOrder + 1)
-                                      }
-                                      maxLength={200}
-                                      value={image.altText ?? ""}
-                                      onChange={(e) =>
-                                        setImages((prev) =>
-                                          prev.map((item) =>
-                                            item.id === image.id
-                                              ? {
-                                                  ...item,
-                                                  altText: e.target.value,
-                                                }
-                                              : item,
-                                          ),
-                                        )
-                                      }
-                                      onBlur={() =>
-                                        void updateImage(image.id, {
-                                          altText: image.altText ?? "",
-                                        })
-                                      }
-                                    />
-                                  </label>
-                                  <label className="block text-xs text-slate-500">
-                                    Display order
-                                    <input
-                                      className={inputClass}
-                                      type="number"
-                                      min="0"
-                                      max="1000"
-                                      value={image.sortOrder}
-                                      onChange={(e) =>
-                                        setImages((prev) =>
-                                          prev.map((item) =>
-                                            item.id === image.id
-                                              ? {
-                                                  ...item,
-                                                  sortOrder: Number(
-                                                    e.target.value,
-                                                  ),
-                                                }
-                                              : item,
-                                          ),
-                                        )
-                                      }
-                                      onBlur={() =>
-                                        void updateImage(image.id, {
-                                          sortOrder: image.sortOrder,
-                                        })
-                                      }
-                                    />
-                                  </label>
-                                  <label className="block text-xs text-slate-500">
-                                    Variant
-                                    <select
-                                      className={inputClass}
-                                      value={image.variantId ?? ""}
-                                      onChange={(e) =>
-                                        void updateImage(image.id, {
-                                          variantId: e.target.value || null,
-                                        })
-                                      }
-                                    >
-                                      <option value="">
-                                        All variants / product
-                                      </option>
-                                      {variants.map((variant) => (
-                                        <option
-                                          key={variant.id}
-                                          value={variant.id}
-                                        >
-                                          {variant.name}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </label>
-                                  <label className="block text-xs text-slate-500">
-                                    Replace image
-                                    <input
-                                      type="file"
-                                      disabled={imageBusy}
-                                      accept="image/jpeg,image/png,image/webp"
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file)
-                                          void replaceImage(image.id, file);
-                                        e.target.value = "";
-                                      }}
-                                    />
-                                  </label>
-                                  {image.isPrimary && (
-                                    <span className="text-xs font-semibold text-green-700">
-                                      Primary image
-                                    </span>
-                                  )}
-                                  <div className="flex flex-wrap gap-2">
-                                    {!image.isPrimary && (
-                                      <button
-                                        type="button"
-                                        disabled={imageBusy}
-                                        onClick={() =>
-                                          void setPrimaryImage(image.id)
-                                        }
-                                        className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50"
-                                      >
-                                        Set Primary
-                                      </button>
-                                    )}
-                                    <button
-                                      type="button"
-                                      disabled={imageBusy}
-                                      onClick={() => void deleteImage(image.id)}
-                                      className="rounded-lg border border-red-200 px-3 py-2 text-xs text-red-700 disabled:opacity-50"
-                                    >
-                                      Delete
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                          <ProductGalleryManager
+                            images={images}
+                            variants={variants}
+                            disabled={imageBusy || saving}
+                            imageSrc={imageSrc}
+                            onReorder={reorderImages}
+                            onPrimary={setPrimaryImage}
+                            onUpdate={updateImage}
+                            onReplace={replaceImage}
+                            onRemove={deleteImage}
+                          />
                         )}
                       </>
                     )}

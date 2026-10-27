@@ -12,6 +12,7 @@
     "test:hero": "node scripts/verify-hero.mjs"
   },
   "dependencies": {
+    "@commerce/product-content": "workspace:*",
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0"

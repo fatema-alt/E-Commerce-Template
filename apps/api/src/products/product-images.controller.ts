@@ -1,6 +1,7 @@
 import {
   SetMetadata,
   BadRequestException,
+  ConflictException,
   Body,
   Controller,
   Delete,
@@ -19,6 +20,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import {
   IsBoolean,
+  IsArray,
+  ArrayMinSize,
+  ArrayMaxSize,
+  ArrayUnique,
   IsInt,
   IsOptional,
   IsString,
@@ -40,6 +45,9 @@ class ImageDto {
   @IsOptional() @IsUUID() variantId?: string | null;
   @IsOptional() @IsBoolean() isPrimary?: boolean;
 }
+export class ImageOrderDto {
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(20) @ArrayUnique() @IsUUID('all', { each: true }) imageIds!: string[];
+}
 
 @Controller('products/:productId/images')
 export class ProductImagesController {
@@ -56,6 +64,19 @@ export class ProductImagesController {
       }))
     )
       throw new NotFoundException('Product not found');
+  }
+
+  private async cleanupUnreferenced(key: string | null, url: string): Promise<boolean> {
+    if (!key) return false;
+    try {
+      const [images, assets, categories] = await Promise.all([
+        this.prisma.productImage.count({ where: { OR: [{ storageKey: key }, { url }] } }),
+        this.prisma.cmsMediaAsset.count({ where: { url } }),
+        this.prisma.category.count({ where: { imageUrl: url } }),
+      ]);
+      if (!images && !assets && !categories) await this.storage.remove('products', key);
+      return false;
+    } catch { return true; }
   }
 
   @Get()
@@ -114,6 +135,21 @@ export class ProductImagesController {
       await this.storage.remove('products', stored.key);
       catalogError(error);
     }
+  }
+
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @Patch('order')
+  async reorder(@Param('productId', ParseUUIDPipe) productId: string, @Body() dto: ImageOrderDto, @Req() req: AdminRequest) {
+    await this.product(productId);
+    return this.prisma.$transaction(async tx => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${productId}))`;
+      const images = await tx.productImage.findMany({ where: { productId }, select: { id: true } });
+      if (dto.imageIds.length !== images.length || images.some(image => !dto.imageIds.includes(image.id))) throw new ConflictException('The gallery changed. Reload before reordering.');
+      await tx.productImage.updateMany({ where: { productId }, data: { isPrimary: false } });
+      for (const [sortOrder, id] of dto.imageIds.entries()) await tx.productImage.update({ where: { id }, data: { sortOrder, isPrimary: sortOrder === 0 } });
+      await audit(tx, 'product', productId, 'IMAGE_REORDER', { imageIds: dto.imageIds }, req.admin?.id);
+      return { success: true };
+    });
   }
 
   @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
@@ -205,7 +241,7 @@ export class ProductImagesController {
     )
       throw new NotFoundException('Image not found');
     const stored = await this.storage.put('products', file);
-    let changed: { oldKey: string | null; image: unknown };
+    let changed: { oldKey: string | null; oldUrl: string; image: unknown };
     try {
       changed = await this.prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${productId}))`;
@@ -225,18 +261,13 @@ export class ProductImagesController {
           { imageId },
           req.admin?.id,
         );
-        return { oldKey: existing.storageKey, image };
+        return { oldKey: existing.storageKey, oldUrl: existing.url, image };
       });
     } catch (error) {
       await this.storage.remove('products', stored.key);
       catalogError(error);
     }
-    const cleanupPending = changed.oldKey
-      ? await this.storage.remove('products', changed.oldKey).then(
-          () => false,
-          () => true,
-        )
-      : false;
+    const cleanupPending = await this.cleanupUnreferenced(changed.oldKey, changed.oldUrl);
     return { image: changed.image, cleanupPending };
   }
 
@@ -276,12 +307,7 @@ export class ProductImagesController {
       );
       return existing;
     });
-    const cleanupPending = image.storageKey
-      ? await this.storage.remove('products', image.storageKey).then(
-          () => false,
-          () => true,
-        )
-      : false;
+    const cleanupPending = await this.cleanupUnreferenced(image.storageKey, image.url);
     return { success: true, cleanupPending };
   }
 }

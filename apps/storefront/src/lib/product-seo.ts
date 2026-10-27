@@ -1,3 +1,4 @@
+import { productDescriptionText } from "@commerce/product-content";
 import type { Product } from "./storefront";
 export function publicUrl(value?: string): string | undefined {
   if (!value) return undefined;
@@ -35,7 +36,7 @@ export function productStructuredData(product: Product) {
     name: product.name,
     ...(url ? { url } : {}),
     sku: product.sku,
-    description: product.shortDescription || product.description || undefined,
+    description: product.shortDescription || productDescriptionText(product.description) || undefined,
     image: product.images?.map((image) => image.url),
     ...(product.brand
       ? { brand: { "@type": "Brand", name: product.brand } }

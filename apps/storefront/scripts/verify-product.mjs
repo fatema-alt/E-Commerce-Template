@@ -7,6 +7,7 @@ import {
   mkdirSync,
   mkdtempSync,
   writeFileSync,
+  readFileSync,
   rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -100,6 +101,9 @@ let engagementSettings = { storeName: 'DS Mart', locale: 'en', currency: 'BDT', 
 const fixtureOrder = { id: '00000000-0000-4000-8000-000000000010', orderNumber: '00000000-0000-4000-8000-000000000010', status: 'PROCESSING', paymentStatus: 'UNPAID', paymentMethod: 'COD', createdAt: '2026-10-20T09:00:00Z', customerName: 'Test Shopper', customerPhone: '01712345678', subtotal: '500.00', shippingTotal: '60.00', taxTotal: '0.00', grandTotal: '560.00', items: [{ nameSnapshot: 'Historical cotton shirt', skuSnapshot: 'HISTORY-001', quantity: 1, unitPrice: '500.00', lineTotal: '500.00' }], addresses: [{ recipientName: 'Test Shopper', phone: '01712345678', line1: 'Test address', city: 'Dhaka' }], shipments: [] };
 const reviewFixtures = Array.from({ length: 7 }, (_, index) => ({ id: 'review-' + index, authorName: 'Test shopper ' + index, rating: index % 2 ? 4 : 5, content: 'Isolated browser-test review.', title: 'Test feedback', photos: [], helpfulCount: 0, isVerifiedPurchase: index < 2, createdAt: '2026-10-01T00:00:00Z' }));
 const simpleId = "00000000-0000-4000-8000-000000000003";
+const emptyReviewId = '00000000-0000-4000-8000-000000000004';
+const savedRichPath = resolve(app, '../admin/.editor-check/rich-product.json');
+const savedRichDescription = existsSync(savedRichPath) ? JSON.parse(readFileSync(savedRichPath,'utf8')).description : '<h2>বাংলা Product 😀</h2><p>English <strong>bold</strong></p><ul><li>বাংলা bullet</li></ul><ol><li>First step</li></ol>';
 const api = http.createServer(async (req, res) => {
   const path = new URL(req.url, "http://localhost").pathname;
   res.setHeader("Content-Type", "application/json");
@@ -136,8 +140,9 @@ const api = http.createServer(async (req, res) => {
     }
     const query = new URL(req.url, 'http://localhost').searchParams;
     const rating = Number(query.get('rating')); const page = Number(query.get('page') || 1);
-    const rows = rating ? reviewFixtures.filter((review) => review.rating === rating) : reviewFixtures;
-    res.end(JSON.stringify({ items: rows.slice((page - 1) * 5, page * 5), totalPages: Math.ceil(rows.length / 5), summary: { total: 7, averageRating: 4.6, verifiedTotal: 2, ratingBreakdown: { 5: 4, 4: 3, 3: 0, 2: 0, 1: 0 } } })); return;
+    const empty = path.includes(emptyReviewId);
+    const rows = empty ? [] : rating ? reviewFixtures.filter((review) => review.rating === rating) : reviewFixtures;
+    res.end(JSON.stringify({ items: rows.slice((page - 1) * 5, page * 5), totalPages: Math.ceil(rows.length / 5), summary: { total: empty ? 0 : 7, averageRating: empty ? 0 : 4.6, verifiedTotal: empty ? 0 : 2, ratingBreakdown: { 5: empty ? 0 : 4, 4: empty ? 0 : 3, 3: 0, 2: 0, 1: 0 } } })); return;
   }
   if (/\/shop\/products\/[^/]+\/qa$/.test(path)) { res.end(JSON.stringify([])); return; }
   if (path.endsWith('/shop/newsletter') && req.method === 'POST') {
@@ -279,6 +284,8 @@ const api = http.createServer(async (req, res) => {
     return;
   }
   if (path.includes("/products/")) {
+    if (path.endsWith('/formatted')) { res.end(JSON.stringify({...product,slug:'formatted',description:savedRichDescription+'<img src=x onerror="window.richInjected=true"><script>window.richInjected=true</script>'})); return; }
+    if (path.endsWith('/empty-reviews')) { res.end(JSON.stringify({...product,id:emptyReviewId,slug:'empty-reviews'})); return; }
     res.end(JSON.stringify(product));
     return;
   }
@@ -778,6 +785,7 @@ try {
   await until('document.querySelectorAll(".review-card").length === 5', 'paginated real review response');
   assert.equal(await evaluate('[...document.querySelectorAll(".review-star")].every(icon=>{const box=icon.getBoundingClientRect();return box.width===22&&box.height===22})'), true);
   assert.ok(await evaluate('document.querySelector(".review-average").textContent.includes("4.6") && document.querySelector(".review-average").textContent.includes("2 verified")'));
+  assert.ok(await evaluate('document.querySelector(".pdp-feedback-link").textContent.includes("4.6") && document.querySelector(".pdp-feedback-link").textContent.includes("7 reviews")'));
   await evaluate('document.querySelector(".review-pagination button:last-child").click()');
   await until('document.querySelectorAll(".review-card").length === 2', 'review page two');
   pass('compact 22px stars, actual rating summary, verified count and review pagination');
@@ -1006,6 +1014,18 @@ try {
   }
   pass('account ribbon and contact responsive light/dark layouts at 320/375/768/1440');
   assert.deepEqual(browserErrors, [], 'no uncaught browser exceptions or hydration errors');
+  await navigate('/product/formatted');
+  await until('!!document.querySelector(".product-description h2")','rich description rendered');
+  for (const tag of ['h2','strong','ul','ol']) assert.ok(await evaluate(`!!document.querySelector('.product-description ${tag}')`));
+  assert.ok(await evaluate('document.querySelector(".product-description").textContent.includes("বাংলা")'));
+  assert.equal(await evaluate('!!document.querySelector(".product-description script,.product-description img,[onclick]") || window.richInjected === true'),false);
+  assert.ok(await evaluate('[...document.querySelectorAll(".trust-content")].every(row=>{const title=row.querySelector("strong").getBoundingClientRect();const copy=row.querySelector("span").getBoundingClientRect();return copy.top>=title.bottom})'));
+  await click('Black / M');
+  assert.equal(await evaluate('document.querySelectorAll(".pdp-discount").length'),1);
+  await navigate('/product/empty-reviews');
+  await until('document.querySelector(".pdp-feedback-link")?.textContent === "No reviews yet"','empty authoritative review summary');
+  assert.equal(await evaluate('document.querySelectorAll(".pdp-rating-stars").length'),0);
+  pass('admin-saved rich content renders safely with Bengali, marks and lists; benefits have distinct rows and empty reviews hide invented ratings');
   assert.ok(!logs.includes("blocking-prerender-metadata-dynamic"), logs);
   pass("no metadata prerender errors");
   console.log("Screenshots: " + artifacts);

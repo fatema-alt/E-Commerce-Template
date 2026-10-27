@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { toProductHtml } from '@commerce/product-content';
 import {
   InventoryMovementType,
   Prisma,
@@ -86,6 +87,10 @@ export class ProductsService {
   }
 
   async create(dto: CreateProductDto, actorId?: string) {
+    if (dto.description !== undefined) {
+      dto.description = toProductHtml(dto.description);
+      if (dto.description.length > 50000) throw new BadRequestException('Formatted description exceeds 50,000 characters');
+    }
     await this.checkCategory(dto.categoryId);
     this.checkPrices(dto.price, dto.salePrice);
     this.validateProduct(dto);
@@ -385,6 +390,12 @@ export class ProductsService {
     if (dto.status === undefined && dto.isActive !== undefined)
       dto.status = dto.isActive ? ProductStatus.ACTIVE : ProductStatus.DRAFT;
     const existing = await this.findOne(id);
+
+    // Opening and saving an unrelated field must not rewrite legacy content.
+    if (dto.description !== undefined && dto.description !== existing.description) {
+      dto.description = toProductHtml(dto.description);
+      if (dto.description.length > 50000) throw new BadRequestException('Formatted description exceeds 50,000 characters');
+    }
 
     if (dto.categoryId) {
       await this.checkCategory(dto.categoryId);

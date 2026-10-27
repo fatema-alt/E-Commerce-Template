@@ -247,12 +247,12 @@ export function ProductPurchase({
 
         {saving > 0 && (
           <p className="pdp-savings text-xs font-semibold text-emerald-600 dark:text-emerald-400 m-0">
-            You save {money(saving)} on this order
+            You save {money(saving)} per item
           </p>
         )}
 
         <p className="pdp-price-note text-[11px] text-[var(--c-muted)] m-0">
-          Delivery charges and any applicable tax are shown at checkout. Cash on Delivery available.
+          Delivery charges, applicable tax and enabled payment methods are shown at checkout.
         </p>
       </div>
 
@@ -496,39 +496,8 @@ export function ProductPurchase({
         <ShareProduct name={product.name} />
       </div>
 
-      {/* 6. Delivery & Shopping Guarantees */}
       <div className="pdp-trust-guarantees">
-        <div className="pdp-trust-card">
-          <span className="trust-icon" aria-hidden="true">🛡️</span>
-          <div className="trust-content">
-            <strong>100% Authentic</strong>
-            <span>Verified genuine source</span>
-          </div>
-        </div>
-
-        <div className="pdp-trust-card">
-          <span className="trust-icon" aria-hidden="true">💵</span>
-          <div className="trust-content">
-            <strong>Cash on Delivery</strong>
-            <span>Pay at your doorstep</span>
-          </div>
-        </div>
-
-        <div className="pdp-trust-card">
-          <span className="trust-icon" aria-hidden="true">🔄</span>
-          <div className="trust-content">
-            <strong>7-Day Returns</strong>
-            <span>Hassle-free guarantee</span>
-          </div>
-        </div>
-
-        <div className="pdp-trust-card">
-          <span className="trust-icon" aria-hidden="true">⚡</span>
-          <div className="trust-content">
-            <strong>Fast 24-48h Delivery</strong>
-            <span>Across Bangladesh</span>
-          </div>
-        </div>
+        {[["Clear pricing", "Review delivery charges and taxes before ordering.", "/checkout"], ["Order tracking", "Follow updates from your account or checkout browser.", "/orders"], ["Product support", "Ask our team about this product and return eligibility.", "/contact"], ["Payment options", "Choose an enabled payment method at checkout.", "/help"]].map(([title, description, href], index) => <Link className="pdp-trust-card" href={href} key={title}><span className="pdp-benefit-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d={index === 0 ? "M4 6h16v14H4zM8 3v6M16 3v6M8 13h8M8 17h5" : index === 1 ? "M3 7h12v10H3zM15 10h4l3 4v3h-7M7 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4M18 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4" : index === 2 ? "M4 4h16v13H8l-4 4zM8 8h8M8 12h5" : "M3 5h18v14H3zM3 10h18M7 15h4"}/></svg></span><div className="trust-content"><strong>{title}</strong><span>{description}</span></div></Link>)}
       </div>
 
       {/* 7. Mobile Sticky Bottom Purchase Bar (hidden on desktop via CSS) */}

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { ProductRichTextRenderer } from "../../../components/product-rich-text";
+import { productDescriptionText } from "@commerce/product-content";
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect, unstable_rethrow } from "next/navigation";
@@ -7,6 +9,7 @@ import {
   getProductPage,
   type Product,
 } from "../../../lib/storefront";
+import { ProductFeedbackProvider } from "../../../components/product-feedback";
 import { ProductOverview } from "../../../components/product-overview";
 import { ProductCard } from "../../../components/home-sections";
 import { ProductSkeleton } from "../../../components/product-skeleton";
@@ -24,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const description = (
       product.metaDescription ||
       product.shortDescription ||
-      product.description ||
+      productDescriptionText(product.description) ||
       `Discover ${product.name} at DS Mart.`
     ).slice(0, 160);
     const image = product.socialImage || product.imageUrl;
@@ -128,6 +131,7 @@ async function Content({ params }: Props) {
           <li aria-current="page">{product.name}</li>
         </ol>
       </nav>
+      <ProductFeedbackProvider key={product.id}>
       <ProductOverview key={product.id} product={product} />
       <div className="pdp-details-layout grid grid-cols-1 lg:grid-cols-[1.25fr_0.75fr] gap-8 mt-10">
         {/* Left: About & Specifications */}
@@ -139,11 +143,7 @@ async function Content({ params }: Props) {
           >
             <p className="eyebrow text-xs font-bold uppercase tracking-wider text-[var(--c-muted)] mb-2">The details</p>
             <h2 id="details-title" className="text-xl sm:text-2xl font-bold text-[var(--c-ink)] mb-4">About this product</h2>
-            <div className="pdp-description text-sm sm:text-base text-[var(--c-ink-2)] leading-relaxed whitespace-pre-line space-y-3">
-              {product.description ||
-                product.shortDescription ||
-                "Have a question about this product? Contact our team before ordering and we’ll help you choose."}
-            </div>
+            <ProductRichTextRenderer content={product.description || product.shortDescription || "Have a question about this product? Contact our team before ordering."} />
 
             {specifications.length > 0 && (
               <div className="mt-8 pt-6 border-t border-[var(--c-line)]">
@@ -178,7 +178,7 @@ async function Content({ params }: Props) {
                 <span className="text-xs transition-transform group-open:rotate-180">▼</span>
               </summary>
               <p className="text-xs text-[var(--c-ink-2)] mt-2.5 mb-0 leading-relaxed">
-                Enter your delivery address at checkout to see shipping charges. Nationwide Cash on Delivery (COD) available with parcel inspection before payment.
+                Review delivery charges and enabled payment methods at checkout before placing your order.
               </p>
             </details>
 
@@ -189,7 +189,7 @@ async function Content({ params }: Props) {
               </summary>
               <div className="text-xs text-[var(--c-ink-2)] mt-2.5 space-y-2 leading-relaxed">
                 <p className="m-0">
-                  Easy 7-day hassle-free replacements and returns on eligible items. Include your order number when requesting support.
+                  Contact the store to confirm return eligibility for this product. Include your order number when requesting support.
                 </p>
                 <Link href="/contact" className="inline-block text-xs font-bold underline hover:text-emerald-600">
                   Contact DS Mart support →
@@ -204,7 +204,7 @@ async function Content({ params }: Props) {
               </summary>
               <div className="text-xs text-[var(--c-ink-2)] mt-2.5 space-y-2 leading-relaxed">
                 <p className="m-0">
-                  Track live status of your order anytime with your order ID or phone number.
+                  View order updates from your account or the same browser used for guest checkout.
                 </p>
                 <Link href="/orders" className="inline-block text-xs font-bold underline hover:text-emerald-600">
                   Track order status →
@@ -227,6 +227,7 @@ async function Content({ params }: Props) {
           productName={product.name}
         />
       </div>
+      </ProductFeedbackProvider>
       <Suspense fallback={null}>
         <RelatedProducts product={product} />
       </Suspense>

@@ -15,6 +15,9 @@ const id = '11111111-1111-4111-8111-111111111111';
 const category = { id: '22222222-2222-4222-8222-222222222222', name: 'Test category', isActive: true, children: [] };
 let record, server, chrome, ws, role = 'SUPER_ADMIN';
 let createAttempts = 0, created = 0, uploads = 0, updates = 0;
+let replacements = 0;
+const firstImageId = '33333333-3333-4333-8333-333333333333', secondImageId = '44444444-4444-4444-8444-444444444444';
+const richDescription = '<h2>বাংলা Product 😀</h2><p>English <strong>bold</strong>, <em>italic</em> and <u>underline</u>.</p><h3>Features</h3><ul><li>বাংলা bullet</li><li>English bullet</li></ul><ol><li>First step</li><li>Second step</li></ol><blockquote><p>Mixed ভাষা 🛍️</p></blockquote>';
 const requests = new Map(); let sequence = 0;
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 function command(method, params = {}) {
@@ -42,6 +45,7 @@ async function field(label, value) {
   await pause(80);
 }
 async function click(text) {
+  await until(`[...document.querySelectorAll('#product-editor button')].some(el=>el.textContent.trim()===${JSON.stringify(text)}&&!el.disabled)`, 'enabled '+text);
   assert(await evaluate(`(()=>{const button=[...document.querySelectorAll('#product-editor button')].find(el=>el.textContent.trim()===${JSON.stringify(text)});if(!button||button.disabled)return false;button.click();return true;})()`), 'click ' + text);
   await pause(100);
 }
@@ -67,7 +71,21 @@ async function fulfill(event) {
   else if (path === '/products/' + id + '/images' && method === 'POST') {
     uploads++;
     if (uploads === 1) { status = 503; body = { message: 'Simulated image failure' }; }
-    else { body = { id: 'image-1', productId: id, url: '/uploads/editor-test.png', altText: 'Test product', isPrimary: true, sortOrder: 0 }; record.images = [body]; }
+    else { body = { id: firstImageId, productId: id, url: '/uploads/editor-test.png', altText: 'Test product', isPrimary: true, sortOrder: 0 }; record.images = [body]; }
+  } else if (path === '/products/'+id+'/images/order') {
+    const {imageIds} = JSON.parse(event.request.postData);
+    assert.equal(imageIds.length, record.images.length);
+    record.images = imageIds.map((imageId,index) => ({...record.images.find(image=>image.id===imageId),sortOrder:index,isPrimary:index===0})); body={success:true};
+  } else if (path.startsWith('/products/'+id+'/images/') && path.endsWith('/primary')) {
+    const imageId=path.split('/').at(-2); record.images=record.images.map(image=>({...image,isPrimary:image.id===imageId})); body={};
+  } else if (path.startsWith('/products/'+id+'/images/') && path.endsWith('/replace')) {
+    replacements++;
+    body={image:record.images.find(image=>image.id===path.split('/').at(-2))};
+  } else if (path.startsWith('/products/'+id+'/images/') && method==='PATCH') {
+    const imageId=path.split('/').at(-1); const payload=JSON.parse(event.request.postData);
+    record.images=record.images.map(image=>image.id===imageId?{...image,...payload}:image); body=record.images.find(image=>image.id===imageId);
+  } else if (path.startsWith('/products/'+id+'/images/') && method==='DELETE') {
+    record.images=record.images.filter(image=>image.id!==path.split('/').at(-1)); body={success:true};
   } else if (path === '/products/' + id + '/images') body = record?.images || [];
   else if (path === '/products/' + id + '/variants') body = [];
   else if (path === '/products/summary') body = { total: created, active: record?.isActive ? 1 : 0, draft: record?.isActive ? 0 : created };
@@ -101,6 +119,10 @@ try {
   await click('Save Draft');
   await until('!!document.querySelector("#product-editor [role=alert]")', 'inline errors'); assert.equal(created, 0);
   await field('Product Name', 'Test editor product'); await field('Category', category.id); await field('Regular Price (BDT)', '250'); await field('Stock Quantity', '7');
+  await until('!!document.querySelector(".product-rich-content[contenteditable=true]")', 'TipTap ready');
+  await evaluate(`(()=>{const data=new DataTransfer();data.setData('text/html',${JSON.stringify(richDescription)});const editor=document.querySelector('.product-rich-content');editor.focus();editor.dispatchEvent(new ClipboardEvent('paste',{clipboardData:data,bubbles:true,cancelable:true}));})()`);
+  await until('!!document.querySelector(".product-rich-content h2") && !!document.querySelector(".product-rich-content ol")', 'formatted paste');
+  assert.ok(await evaluate('document.querySelector(".product-rich-content").textContent.includes("বাংলা")'));
   const document = await command('DOM.getDocument');
   const file = await command('DOM.querySelector', { nodeId: document.root.nodeId, selector: '#product-editor input[type=file]' });
   await command('DOM.setFileInputFiles', { nodeId: file.nodeId, files: [resolve(app, '../storefront/public/brand/ds-symbol.png')] });
@@ -114,14 +136,59 @@ try {
   await click('Save Draft');
   await until('location.pathname === "/products"', 'draft saved');
   assert.equal(created, 1); assert.equal(uploads, 2);
+  for(const tag of ['h2','h3','strong','em','u','ul','ol','blockquote']) assert.ok(record.description.includes('<'+tag+'>'), 'saved '+tag);
   console.log('PASS: required fields, generated SKU, create draft, image upload failure/retry, no duplicate product');
   await navigate('/products/' + id + '/edit'); await until('!!document.querySelector("#product-editor")', 'edit product');
+  await until('document.querySelector(".product-rich-content")?.textContent.includes("বাংলা Product")', 'description reopens');
+  assert.equal(await evaluate('document.querySelectorAll(".product-rich-content li").length'),4);
   assert.equal(await evaluate('document.querySelector("#product-editor input").value'), 'Test editor product');
   await field('Regular Price (BDT)', '275'); await click('Publish Product');
   await until('location.pathname === "/products"', 'published product');
   assert.equal(record.status, 'ACTIVE'); assert.equal(record.price, '275'); assert.equal(record.stock, 7);
+  writeFileSync(join(artifacts,'rich-product.json'), JSON.stringify({description:record.description}));
   console.log('PASS: editing uses revision guard, publishes real payload and retains inventory');
+  record.images.push({id:secondImageId,productId:id,url:'/uploads/editor-test.png',altText:'Second image',isPrimary:false,sortOrder:1});
   await navigate('/products/' + id + '/edit'); await until('!!document.querySelector("#product-editor")', 'responsive editor');
+  await until('document.querySelectorAll(".product-gallery-tile").length===2', 'compact gallery');
+  await evaluate('document.querySelector("[aria-label=\\"Move image 2 earlier\\"]").click()');
+  await until('document.querySelector(".product-gallery-tile .gallery-primary-badge") && document.querySelector("[aria-label=\\"Move image 1 later\\"]")?.disabled===false','reordered gallery');
+  assert.equal(record.images[0].id,secondImageId); assert.equal(record.images[0].isPrimary,true);
+  await evaluate('document.querySelector("[aria-label=\\"Edit details for image 1\\"]").click()');
+  await until('!!document.querySelector(".gallery-image-details")', 'image details');
+  await evaluate(`(()=>{const input=document.querySelector('.gallery-image-details input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'বাংলা image alt');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+  await evaluate('[...document.querySelectorAll(".gallery-image-details button")].find(button=>button.textContent==="Save image details").click()');
+  await until('!document.querySelector(".gallery-image-details")','saved image alt');
+  assert.equal(record.images[0].altText,'বাংলা image alt');
+  await evaluate(`(()=>{const tiles=document.querySelectorAll('.product-gallery-tile');const data=new DataTransfer();tiles[0].dispatchEvent(new DragEvent('dragstart',{bubbles:true,dataTransfer:data}));tiles[1].dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:data}));tiles[1].dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:data}));})()`);
+  await until('document.querySelector("[aria-label=\\"Edit details for image 1\\"]")?.disabled===false','drag reorder saved');
+  assert.equal(record.images[0].id,firstImageId);
+  await evaluate('document.querySelector("[aria-label=\\"Edit details for image 2\\"]").click()');
+  await until('!!document.querySelector(".gallery-image-details")','secondary image details');
+  await evaluate('[...document.querySelectorAll(".gallery-image-details button")].find(button=>button.textContent==="Set as Primary").click()');
+  await until('document.querySelector("[aria-label=\\"Edit details for image 1\\"]")?.disabled===false','primary saved');
+  assert.equal(record.images.find(image=>image.id===secondImageId).isPrimary,true);
+  await evaluate('document.querySelector("[aria-label=\\"Edit details for image 1\\"]").click()');
+  await until('!!document.querySelector(".gallery-image-details input[type=file]")','replacement input');
+  const replaceDocument = await command('DOM.getDocument');
+  const replaceInput = await command('DOM.querySelector',{nodeId:replaceDocument.root.nodeId,selector:'.gallery-image-details input[type=file]'});
+  await command('DOM.setFileInputFiles',{nodeId:replaceInput.nodeId,files:[resolve(app,'../storefront/public/brand/ds-symbol.png')]});
+  await until('document.querySelector("[aria-label=\\"Edit details for image 1\\"]")?.disabled===false','replacement saved');
+  assert.equal(replacements,1); assert.equal(record.images.length,2);
+  await evaluate('document.querySelector("[aria-label=\\"Edit details for image 2\\"]").click()');
+  await until('!!document.querySelector(".gallery-image-details")','remove details');
+  await evaluate('[...document.querySelectorAll(".gallery-image-details button")].find(button=>button.textContent==="Remove image").click()');
+  await until('[...document.querySelectorAll("dialog[open] button")].some(button=>button.textContent.trim()==="Confirm")','remove confirmation');
+  await evaluate('[...document.querySelectorAll("dialog[open] button")].find(button=>button.textContent.trim()==="Confirm").click()');
+  await until('document.querySelectorAll(".product-gallery-tile").length===1','image removed');
+  assert.equal(record.images.length,1);
+  console.log('PASS: drag reorder, explicit primary selection, replacement preserves mapping, and confirmed image removal');
+  await until('!!document.querySelector(".product-rich-content")','editor after image edits');
+  await evaluate(`(()=>{const data=new DataTransfer();data.setData('text/html','<p>Edited again বাংলা 😀</p>');const editor=document.querySelector('.product-rich-content');editor.focus();editor.dispatchEvent(new ClipboardEvent('paste',{clipboardData:data,bubbles:true,cancelable:true}));})()`);
+  await click('Update Product'); await until('location.pathname==="/products"','edited rich text saved again');
+  assert.ok(record.description.includes('Edited again বাংলা')); assert.ok(record.description.includes('<h2>')); assert.ok(record.description.includes('<ul>'));
+  writeFileSync(join(artifacts,'rich-product.json'),JSON.stringify({description:record.description}));
+  await navigate('/products/'+id+'/edit'); await until('!!document.querySelector("#product-editor")','editor after rich update');
+  console.log('PASS: formatted description persists and reopens; compact gallery order/primary and alt text save');
   await field('Product type', 'VARIABLE');
   assert.ok(await evaluate('document.querySelector("#product-editor").textContent.includes("+ Add option")'));
   await field('Product type', 'SIMPLE');

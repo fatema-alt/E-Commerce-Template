@@ -152,9 +152,6 @@ export function ProductCard({
     ? Math.round(((product.compareAtPrice! - product.price) / product.compareAtPrice!) * 100)
     : 0;
 
-  // Rating fallback if not populated on basic product
-  const rating = 4.8;
-  const reviewCount = 28;
 
   return (
     <article className={`product-card ${compact ? "product-card-compact" : ""}`}>
@@ -249,15 +246,6 @@ export function ProductCard({
         >
           {product.name}
         </Link>
-
-        {/* Rating and Reviews */}
-        <div className="product-card-rating" aria-label={`Rating: ${rating} out of 5 stars`}>
-          <div className="stars-row" aria-hidden="true">
-            {"★★★★★".slice(0, 5)}
-          </div>
-          <span className="rating-score">{rating}</span>
-          <span className="reviews-count">({reviewCount})</span>
-        </div>
 
         {/* Price Row */}
         <div className="price-row">
