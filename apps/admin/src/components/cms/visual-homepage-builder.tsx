@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useId } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   type Asset,
   type Document,
@@ -12,6 +12,7 @@ import {
 } from "./cms-api";
 import { SchemaField, button, input } from "./schema-fields";
 import { getStandardEcommerceTemplate } from "./standard-template";
+import { editableHeroSlides } from "./hero-slides";
 
 export type Section = {
   id: string;
@@ -68,6 +69,17 @@ export function VisualHomepageBuilder({
   const selectedIndex = sections.findIndex((s) => s.id === selectedSectionId);
   const selectedSection = selectedIndex >= 0 ? sections[selectedIndex] : null;
 
+  const previewRef = useRef<HTMLElement>(null);
+  const sectionRefs = useRef(new Map<string, HTMLDivElement>());
+
+  useEffect(() => {
+    const preview = previewRef.current;
+    const section = selectedSectionId ? sectionRefs.current.get(selectedSectionId) : null;
+    if (!preview || !section) return;
+    const top = section.getBoundingClientRect().top - preview.getBoundingClientRect().top + preview.scrollTop - 24;
+    preview.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  }, [selectedSectionId]);
+
   // Reorder helper
   const handleMove = (index: number, delta: number) => {
     const nextIndex = index + delta;
@@ -123,9 +135,9 @@ export function VisualHomepageBuilder({
   };
 
   return (
-    <div className="flex h-[calc(100vh-130px)] flex-col bg-slate-100 dark:bg-slate-950 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl">
+    <div className="flex min-h-[480px] h-[calc(100dvh-220px)] flex-col bg-slate-100 dark:bg-slate-950 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl">
       {/* 1. TOP BUILDER TOOLBAR */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 z-20 gap-3 overflow-x-auto whitespace-nowrap">
+      <header className="flex min-h-14 shrink-0 flex-wrap py-2 items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 z-20 gap-3 whitespace-nowrap">
         {/* Left: Page Title & Status */}
         <div className="flex items-center gap-2.5 shrink-0">
           <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
@@ -238,9 +250,9 @@ export function VisualHomepageBuilder({
       </header>
 
       {/* 2. THREE-PANEL WORKSPACE BODY */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
         {/* PANEL A: LEFT SECTION NAVIGATOR */}
-        <aside className="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col z-10">
+        <aside className="w-48 xl:w-64 min-h-0 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col z-10">
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-3.5 py-3 bg-slate-50 dark:bg-slate-800/60">
             <div>
               <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
@@ -258,7 +270,7 @@ export function VisualHomepageBuilder({
           </div>
 
           {/* Section Items List */}
-          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 space-y-1.5">
             {sections.length === 0 ? (
               <div className="p-6 text-center text-xs text-slate-500 space-y-3">
                 <p>No sections on this page yet.</p>
@@ -378,14 +390,14 @@ export function VisualHomepageBuilder({
         </aside>
 
         {/* PANEL B: CENTER LIVE VIEWPORT PREVIEW */}
-        <main className="flex-1 min-w-0 bg-slate-200/70 dark:bg-slate-950 p-4 md:p-6 overflow-y-auto flex flex-col items-center">
+        <main ref={previewRef} aria-label="Homepage section preview" className="flex-1 min-h-0 min-w-[280px] bg-slate-200/70 dark:bg-slate-950 p-4 md:p-6 overflow-auto overscroll-contain">
           <div
-            className={`transition-all duration-300 rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-300 dark:border-slate-800 min-h-[600px] flex flex-col overflow-hidden ${
+            className={`transition-all duration-300 rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-300 dark:border-slate-800 min-h-[600px] mx-auto flex shrink-0 flex-col ${
               viewport === "desktop"
                 ? "w-full max-w-[1180px]"
                 : viewport === "tablet"
-                  ? "w-[768px]"
-                  : "w-[390px]"
+                  ? "w-full max-w-[768px]"
+                  : "w-full max-w-[390px]"
             }`}
           >
             {/* Viewport Frame Header */}
@@ -414,6 +426,10 @@ export function VisualHomepageBuilder({
                   return (
                     <div
                       key={section.id}
+                      ref={(node) => {
+                        if (node) sectionRefs.current.set(section.id, node);
+                        else sectionRefs.current.delete(section.id);
+                      }}
                       onClick={() => setSelectedSectionId(section.id)}
                       className={`relative rounded-xl transition-all duration-200 cursor-pointer overflow-hidden ${
                         isSelected
@@ -429,7 +445,22 @@ export function VisualHomepageBuilder({
                       )}
 
                       {/* Visual Preview Content based on type */}
-                      {section.type === "hero" ? (
+                      {section.type === "hero" && Array.isArray(c.slides) ? (
+                        <div className="space-y-3 rounded-xl bg-white p-4 pt-10 text-slate-900">
+                          <p className="text-xs font-semibold">Hero slideshow · {c.slides.length} slides · {String(c.intervalSeconds || 5)} seconds</p>
+                          {c.slides.map((value, slideIndex) => {
+                            const slide = value as Record<string, Value>;
+                            const image = slide.image as Record<string, Value> | undefined;
+                            const asset = assets.find((entry) => entry.id === image?.assetId);
+                            return <div key={slideIndex} className="rounded-lg border border-slate-200 p-3 space-y-2">
+                              <span className="text-xs text-slate-500">Slide {slideIndex + 1} · {slide.slideType === "full_banner" || (!slide.slideType && slide.bannerType === "without_button") ? "Full banner" : "Split content"}{slide.enabled === false ? " · Disabled" : ""}</span>
+                              {asset?.url && <img src={assetUrl(asset.url)} alt={String(image?.alt || "")} className="max-h-40 w-full rounded-lg object-contain" />}
+                              <h3 className="text-sm font-bold">{String(slide.title || "Untitled slide")}</h3>
+                              {!(slide.slideType === "full_banner" || (!slide.slideType && slide.bannerType === "without_button")) && <p className="text-xs">{String(slide.subtitle || "")}</p>}
+                            </div>;
+                          })}
+                        </div>
+                      ) : section.type === "hero" ? (
                         c.bannerType === "without_button" ? (
                           <div className="relative rounded-xl overflow-hidden border border-slate-200 min-h-[220px] bg-slate-900 flex flex-col justify-center items-center text-center p-6">
                             <span className="absolute top-3 right-3 px-2 py-0.5 rounded bg-black/60 text-white text-[10px] font-bold">
@@ -568,7 +599,7 @@ export function VisualHomepageBuilder({
         </main>
 
         {/* PANEL C: RIGHT SECTION SETTINGS INSPECTOR */}
-        <aside className="w-80 flex-shrink-0 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col z-10">
+        <aside className="w-72 xl:w-80 min-h-0 flex-shrink-0 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col z-10">
           <div className="border-b border-slate-100 dark:border-slate-800 px-4 py-3 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between">
             <div>
               <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
@@ -582,7 +613,7 @@ export function VisualHomepageBuilder({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 space-y-4">
             {!selectedSection ? (
               <div className="p-8 text-center text-xs text-slate-500">
                 Select a section from the navigator to edit its content and responsive settings.
@@ -655,7 +686,7 @@ export function VisualHomepageBuilder({
                   <span className="text-xs font-bold text-slate-800 block">Content & Layout</span>
 
                   {/* For HERO SECTION: 2 Banner Types (Button Soho & Button Chara) */}
-                  {selectedSection.type === "hero" && (
+                  {selectedSection.type === "hero" && !Array.isArray(selectedSection.config.slides) && (
                     <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 space-y-2">
                       <label className="text-xs font-bold text-slate-800 block">
                         ব্যানারের ধরন (Banner Style Option)
@@ -714,9 +745,27 @@ export function VisualHomepageBuilder({
                     </div>
                   )}
 
+                  {selectedSection.type === "hero" && !Array.isArray(selectedSection.config.slides) && (
+                    <div className="rounded-lg border border-indigo-300 p-3 space-y-2">
+                      <p className="text-sm">Edit hero slides individually. Your current banner is kept; add further slides from the Media Library.</p>
+                      <button type="button" className={button} disabled={!registry.blocks.hero.properties?.slides} onClick={() => {
+                        const next = [...sections];
+                        next[selectedIndex] = { ...selectedSection, config: { ...selectedSection.config, intervalSeconds: 5, slides: editableHeroSlides(selectedSection.config) } };
+                        onUpdateSections(next);
+                      }}>Edit hero slides</button>
+                      {!registry.blocks.hero.properties?.slides && <p className="text-xs">Restart the API to load the updated hero schema.</p>}
+                    </div>
+                  )}
+                  {selectedSection.type === "hero" && Array.isArray(selectedSection.config.slides) && <p className="text-xs">Edit each item under Slides. Choose Full banner image for artwork with embedded text, or Image + HTML content for a split layout. Add, reorder or disable slides below.</p>}
                   <SchemaField
                     name={label(selectedSection.type)}
-                    schema={registry.blocks[selectedSection.type]}
+                    schema={selectedSection.type === "hero" ? {
+                      ...registry.blocks.hero,
+                      properties: Array.isArray(selectedSection.config.slides)
+                        ? { slides: registry.blocks.hero.properties!.slides, intervalSeconds: registry.blocks.hero.properties!.intervalSeconds }
+                        : Object.fromEntries(Object.entries(registry.blocks.hero.properties ?? {}).filter(([key]) => key !== "slides")),
+                      required: Array.isArray(selectedSection.config.slides) ? ["slides", "intervalSeconds"] : [],
+                    } : registry.blocks[selectedSection.type]}
                     value={selectedSection.config}
                     assets={assets}
                     onChange={(nextConfig) => {

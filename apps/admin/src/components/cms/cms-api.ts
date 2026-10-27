@@ -38,6 +38,12 @@ export type Document = {
   scheduledAt: string | null;
   latestVersion: { version: number; content: Record<string, Value> } | null;
 };
+export class CmsRequestError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = "CmsRequestError";
+  }
+}
 export async function request<T>(
   path: string,
   init: RequestInit = {},
@@ -54,12 +60,13 @@ export async function request<T>(
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(
+    throw new CmsRequestError(
       response.status === 409
         ? "This document changed elsewhere. Reload before saving; your edits remain on screen."
         : Array.isArray(body.message)
           ? body.message.join(", ")
           : body.message || `Request failed (${response.status})`,
+      response.status,
     );
   }
   return response.json();

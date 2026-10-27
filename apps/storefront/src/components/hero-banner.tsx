@@ -1,405 +1,111 @@
 "use client";
 
+import NextImage from "next/image";
 import Link from "next/link";
-import { useState, useEffect, useCallback } from "react";
-import type { Asset, Image } from "../lib/cms";
-import { assetSource, safeHref } from "../lib/cms";
+import { useEffect, useRef, useState } from "react";
+import type { Asset } from "../lib/cms";
 import type { HeroBlock } from "../lib/storefront";
+import { heroSlides } from "../lib/hero-slides";
 
-interface HeroBannerProps {
-  config?: Record<string, unknown>;
-  assets?: Asset[];
-  block?: HeroBlock;
-}
-
-interface SlideItem {
-  id: string;
-  bannerType: string;
-  badge?: string;
-  badgeColor?: string;
-  title?: string;
-  subtitle?: string;
-  bannerLink: string;
-  primaryCta?: { label: string; href: string };
-  secondaryCta?: { label: string; href: string };
-  hasCustomImage: boolean;
-  imageSrc?: string | null;
-  imageAlt?: string;
-  floatingBadges?: Array<{ icon: string; text: string }>;
-  themeGradient: string;
-}
-
-export function HeroBanner({ config, assets = [], block }: HeroBannerProps) {
-  const [activeSlide, setActiveSlide] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-
-  // Extract merchant custom values if provided in CMS or fallback block
-  const cmsTitle = (config?.title as string) || block?.title;
-  const cmsSubtitle = (config?.subtitle as string) || block?.description;
-  const bannerType = (config?.bannerType as string) || "with_button";
-  const bannerLink =
-    (config?.bannerLink as string) ||
-    (config?.button as { href?: string })?.href ||
-    block?.ctaHref ||
-    "/shop";
-  const cmsButton = (config?.button as { label?: string; href?: string }) || (
-    block?.ctaLabel && block?.ctaHref
-      ? { label: block.ctaLabel, href: block.ctaHref }
-      : undefined
-  );
-  const cmsImage = config?.image as Image | undefined;
-  const cmsImageSrc = assetSource(assets, cmsImage?.assetId);
-
-  // 1. Determine slides:
-  // If merchant configured multi-slides array with 2+ slides, use those.
-  // Otherwise, provide a full 3-slide carousel where Slide 1 contains the merchant's configured banner
-  // (with custom image, custom title, subtitle, CTA button, bannerType and link),
-  // and Slides 2 & 3 provide engaging secondary campaign slides.
-  const customSlides = Array.isArray(config?.slides) && config.slides.length > 1 ? (config.slides as Record<string, unknown>[]) : null;
-
-  let slides: SlideItem[] = [];
-
-  if (customSlides) {
-    slides = customSlides.map((s, idx) => {
-      const sImg = s.image as Image | undefined;
-      const sImgSrc = assetSource(assets, sImg?.assetId);
-      const sBtn = s.button as { label?: string; href?: string } | undefined;
-      return {
-        id: `slide-custom-${idx}`,
-        bannerType: (s.bannerType as string) || bannerType,
-        badge: (s.badge as string) || "🔥 SPECIAL CAMPAIGN",
-        badgeColor: "amber",
-        title: (s.title as string) || "",
-        subtitle: (s.subtitle as string) || "",
-        bannerLink: (s.bannerLink as string) || sBtn?.href || "/shop",
-        primaryCta: sBtn ? { label: sBtn.label || "Shop Now ↗", href: sBtn.href || "/shop" } : undefined,
-        hasCustomImage: Boolean(sImgSrc),
-        imageSrc: sImgSrc,
-        imageAlt: sImg?.alt || (s.title as string) || "Promotional banner",
-        themeGradient: "linear-gradient(135deg, rgba(216,244,90,0.18), rgba(255,255,255,0.02))",
-      };
-    });
-  } else {
-    // Standard 3-Slide Carousel:
-    // Slide 1: Primary Merchant-Configured Banner (always retains uploaded image and settings)
-    // Slide 2: Next-Gen Electronics Deals
-    // Slide 3: Savings & Special Promo Vouchers
-    slides = [
-      {
-        id: "slide-merchant-primary",
-        bannerType,
-        badge: "🔥 MEGA SHOPPING FESTIVAL • UP TO 60% OFF",
-        badgeColor: "amber",
-        title: cmsTitle || "Shop Smart. Live Smart.",
-        subtitle:
-          cmsSubtitle ||
-          "Discover top-tier electronics, fashion, lifestyle, and daily essentials with lightning-fast delivery and Cash on Delivery across Bangladesh.",
-        bannerLink,
-        primaryCta: {
-          label: cmsButton?.label || "Start Shopping ↗",
-          href: cmsButton?.href ? safeHref(cmsButton.href) || "/shop" : "/shop",
-        },
-        secondaryCta: {
-          label: "Explore Top Deals",
-          href: "/shop",
-        },
-        hasCustomImage: Boolean(cmsImageSrc),
-        imageSrc: cmsImageSrc,
-        imageAlt: cmsImage?.alt || cmsTitle || "Featured promotional banner",
-        floatingBadges: [
-          { icon: "🏷️", text: "Flat 20% Extra OFF" },
-          { icon: "⚡", text: "Fast 24-48h Delivery" },
-          { icon: "★", text: "4.9 (1.2k+ Reviews)" },
-        ],
-        themeGradient: "linear-gradient(135deg, rgba(216,244,90,0.18), rgba(255,255,255,0.02))",
-      },
-      {
-        id: "slide-demo-tech",
-        bannerType: "with_button",
-        badge: "⚡ 100% GENUINE & AUTHORIZED DISTRIBUTOR",
-        badgeColor: "emerald",
-        title: "Next-Gen Electronics & Smart Gadgets",
-        subtitle:
-          "Directly sourced original smartphones, audio gear, computing accessories, and home appliances with manufacturer warranty support.",
-        bannerLink: "/category/electronics",
-        primaryCta: { label: "Shop Electronics ↗", href: "/category/electronics" },
-        secondaryCta: { label: "Official Warranty 🛡️", href: "/help" },
-        hasCustomImage: false,
-        floatingBadges: [
-          { icon: "🛡️", text: "100% Brand Warranty" },
-          { icon: "🎧", text: "Original Audio Gear" },
-          { icon: "💳", text: "0% EMI & bKash Cashback" },
-        ],
-        themeGradient: "linear-gradient(135deg, rgba(56,189,248,0.18), rgba(255,255,255,0.02))",
-      },
-      {
-        id: "slide-demo-savings",
-        bannerType: "with_button",
-        badge: "🎉 EXCLUSIVE VOUCHER DISCOUNT",
-        badgeColor: "purple",
-        title: "Save More on Every Single Order",
-        subtitle:
-          "Apply verified promo voucher codes during checkout. Free doorstep delivery on qualifying orders all across Bangladesh.",
-        bannerLink: "/shop",
-        primaryCta: { label: "Grab Discount Deals ↗", href: "/shop" },
-        secondaryCta: { label: "Use Code: DSMART250", href: "/shop" },
-        hasCustomImage: false,
-        floatingBadges: [
-          { icon: "💰", text: "Save Flat ৳250" },
-          { icon: "🚚", text: "Cash on Delivery (COD)" },
-          { icon: "🔄", text: "Easy 7-Day Returns" },
-        ],
-        themeGradient: "linear-gradient(135deg, rgba(244,114,182,0.18), rgba(255,255,255,0.02))",
-      },
-    ];
-  }
-
-  const totalSlides = slides.length;
-  const hasMultipleSlides = totalSlides > 1;
-
-  const nextSlide = useCallback(() => {
-    setActiveSlide((prev) => (prev + 1) % totalSlides);
-  }, [totalSlides]);
-
-  const prevSlide = useCallback(() => {
-    setActiveSlide((prev) => (prev - 1 + totalSlides) % totalSlides);
-  }, [totalSlides]);
+export function HeroBanner({ config, assets = [], block }: {
+  config?: Record<string, unknown>; assets?: Asset[]; block?: HeroBlock;
+}) {
+  const slides = heroSlides(config, assets, block);
+  const [active, setActive] = useState(0);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const touchStart = useRef<number | null>(null);
+  const count = slides.length;
+  const current = count ? active % count : 0;
+  const seconds = Math.min(30, Math.max(3, Number(config?.intervalSeconds) || 5));
+  const stopped = hovered || focused || paused || reducedMotion || hidden;
+  const move = (delta: number) => setActive((index) => (index + delta + count) % count);
 
   useEffect(() => {
-    if (isPaused || !hasMultipleSlides) return;
-    const interval = setInterval(nextSlide, 5000);
-    return () => clearInterval(interval);
-  }, [isPaused, hasMultipleSlides, nextSlide]);
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setReducedMotion(query.matches);
+    const visibility = () => setHidden(document.hidden);
+    sync(); visibility();
+    query.addEventListener("change", sync);
+    document.addEventListener("visibilitychange", visibility);
+    return () => { query.removeEventListener("change", sync); document.removeEventListener("visibilitychange", visibility); };
+  }, []);
+  useEffect(() => {
+    if (count < 2 || stopped) return;
+    const timer = setInterval(() => setActive((index) => (index + 1) % count), seconds * 1000);
+    return () => clearInterval(timer);
+  }, [count, seconds, stopped, current]);
 
+  if (!count) return null;
   return (
-    <section
-      className="hero-banner-ecosystem w-full"
-      aria-label="Promotional campaign banner slider"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
-    >
-      {/* 1. Full-Width Carousel Slider (No Side Cards) */}
-      <div className="hero-banner-main-grid w-full">
-        <div className="hero-carousel-card w-full relative overflow-hidden min-h-[380px] md:min-h-[460px]">
-          {/* Stacked Slides - ALL SLIDES REMAIN MOUNTED IN DOM SO IMAGES NEVER UNMOUNT OR DISAPPEAR */}
-          {slides.map((slide, idx) => {
-            const isActive = idx === activeSlide;
-            const isGraphicOnly = slide.bannerType === "without_button";
-
-            return (
-              <div
-                key={slide.id}
-                className={`hero-slide-surface ${isGraphicOnly ? "is-graphic" : ""} transition-opacity duration-700 ease-in-out ${
-                  isActive
-                    ? "opacity-100 relative z-10 pointer-events-auto"
-                    : "opacity-0 absolute inset-0 z-0 pointer-events-none"
-                }`}
-                style={{ background: slide.themeGradient }}
-              >
-                {isGraphicOnly ? (
-                  /* TYPE 2: WITHOUT BUTTON (Pure Graphic Image Banner - Fully Clickable) */
-                  <Link
-                    href={safeHref(slide.bannerLink) || "/shop"}
-                    className="hero-graphic-link block w-full h-full min-h-[360px]"
-                    aria-label={slide.title || "Promotional banner"}
-                  >
-                    {slide.hasCustomImage && slide.imageSrc ? (
-                      <img
-                        src={slide.imageSrc}
-                        alt={slide.imageAlt || slide.title || "Promotional Banner"}
-                        className="hero-graphic-img w-full h-full object-cover"
-                        loading="eager"
-                        decoding="sync"
-                      />
-                    ) : (
-                      <div className="hero-graphic-placeholder">
-                        <div className="hero-artwork-glow" aria-hidden="true" />
-                        <span className="inline-block px-3 py-1 rounded-full bg-white/20 text-white text-xs font-bold tracking-wider mb-3">
-                          🔥 SPECIAL PROMOTION
-                        </span>
-                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight mb-2">
-                          {slide.title || "DSMART PROMOTIONAL BANNER"}
-                        </h2>
-                        <p className="text-white/80 text-sm md:text-base max-w-xl mb-4">
-                          {slide.subtitle ||
-                            "Discover top electronics, fashion, lifestyle with verified warranties & nationwide Cash on Delivery."}
-                        </p>
-                        <span className="inline-flex items-center gap-1.5 text-xs text-white/70 font-semibold uppercase tracking-wider">
-                          Click anywhere on banner to explore deals ↗
-                        </span>
-                      </div>
-                    )}
-                  </Link>
-                ) : (
-                  /* TYPE 1: WITH BUTTON (Interactive Banner with Headline, Subtitle & Action Buttons) */
-                  <>
-                    <div className="hero-slide-content">
-                      {slide.badge && (
-                        <span className={`hero-campaign-badge badge-${slide.badgeColor || "amber"}`}>
-                          {slide.badge}
-                        </span>
-                      )}
-
-                      <h1 className="hero-title">{slide.title}</h1>
-
-                      <p className="hero-subtitle">{slide.subtitle}</p>
-
-                      <div className="hero-cta-group">
-                        {slide.primaryCta && (
-                          <Link
-                            href={slide.primaryCta.href}
-                            className="primary-button hero-primary-btn"
-                          >
-                            {slide.primaryCta.label}
-                          </Link>
-                        )}
-
-                        {slide.secondaryCta && (
-                          <Link
-                            href={slide.secondaryCta.href}
-                            className="hero-secondary-btn"
-                          >
-                            {slide.secondaryCta.label}
-                          </Link>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="hero-slide-visual">
-                      {slide.hasCustomImage && slide.imageSrc ? (
-                        <div className="hero-custom-image-wrapper">
-                          <img
-                            src={slide.imageSrc}
-                            alt={slide.imageAlt || slide.title || "Featured product"}
-                            className="hero-uploaded-img"
-                            loading="eager"
-                            decoding="sync"
-                          />
-                        </div>
-                      ) : (
-                        <div className="hero-visual-composition">
-                          <div className="hero-artwork-glow" aria-hidden="true" />
-                          <div className="hero-central-emblem">
-                            <img
-                              src="/brand/ds-symbol.png"
-                              alt="DS Mart"
-                              width={280}
-                              height={280}
-                              className="hero-floating-emblem"
-                            />
-                          </div>
-
-                          {slide.floatingBadges?.map((b, bIdx) => (
-                            <div
-                              key={bIdx}
-                              className={`hero-micro-badge badge-pos-${bIdx + 1}`}
-                              aria-hidden="true"
-                            >
-                              <span className="badge-icon">{b.icon}</span>
-                              <span className="badge-text">{b.text}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            );
+    <section className="hero-banner-ecosystem" aria-label="Featured offers" aria-roledescription="carousel"
+      tabIndex={0} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false); }}
+      onKeyDown={(event) => {
+        if (event.altKey || event.ctrlKey || event.metaKey || count < 2) return;
+        if (event.key === "ArrowRight") { event.preventDefault(); move(1); }
+        if (event.key === "ArrowLeft") { event.preventDefault(); move(-1); }
+        if (event.key === "Home") { event.preventDefault(); setActive(0); }
+        if (event.key === "End") { event.preventDefault(); setActive(count - 1); }
+      }}>
+      <div className="ds-hero-shell">
+        <div className="ds-hero-stage"
+          onTouchStart={(event) => { touchStart.current = event.changedTouches[0].clientX; }}
+          onTouchEnd={(event) => {
+            if (touchStart.current !== null && count > 1) {
+              const distance = touchStart.current - event.changedTouches[0].clientX;
+              if (Math.abs(distance) > 50) move(distance > 0 ? 1 : -1);
+            }
+            touchStart.current = null;
+          }}>
+          {slides.map((slide, index) => {
+            const full = slide.type === "full_banner";
+            const visual = <div className={full ? "ds-hero-banner-image" : "ds-hero-split-image"} data-mobile={!!slide.mobileSrc}>
+              {slide.imageSrc ? <>
+                <NextImage src={slide.imageSrc} alt={slide.alt} fill sizes={full ? "(max-width: 1280px) 100vw, 1280px" : "(max-width: 700px) 100vw, 55vw"}
+                  className={slide.mobileSrc ? "ds-hero-desktop-image" : undefined} loading={index === 0 ? "eager" : "lazy"}
+                  fetchPriority={index === 0 ? "high" : "auto"} unoptimized={slide.imageSrc.startsWith("http:") || slide.imageSrc.startsWith("data:")} />
+                {slide.mobileSrc && <NextImage src={slide.mobileSrc} alt={slide.mobileAlt || slide.alt} fill sizes="100vw" className="ds-hero-mobile-image" unoptimized={slide.mobileSrc.startsWith("http:") || slide.mobileSrc.startsWith("data:")} />}
+              </> : <NextImage src="/brand/ds-symbol.png" alt="DS Mart" fill sizes="40vw" className="ds-hero-brand-placeholder" />}
+            </div>;
+            return <article key={slide.id} className={`ds-hero-slide ds-hero-${slide.type} ${index === current ? "is-active" : ""}`}
+              style={{ background: slide.gradient }} role="group" aria-roledescription="slide" aria-label={`${index + 1} of ${count}: ${slide.title || "Featured offer"}`}
+              aria-hidden={index !== current} inert={index !== current}>
+              {full ? (slide.href ? <Link href={slide.href} className="ds-hero-banner-link" aria-label={slide.title || slide.alt}>{visual}</Link> : visual) : <>
+                <div className="ds-hero-copy">
+                  {slide.badge && <span className={`hero-campaign-badge badge-${slide.badgeColor}`}>{slide.badge}</span>}
+                  {slide.title && <h2>{slide.title}</h2>}
+                  {slide.description && <p>{slide.description}</p>}
+                  <div className="hero-cta-group">
+                    {slide.primary && <Link href={slide.primary.href} className="hero-primary-btn">{slide.primary.label}<span aria-hidden="true"> ↗</span></Link>}
+                    {slide.secondary && <Link href={slide.secondary.href} className="hero-secondary-btn">{slide.secondary.label}</Link>}
+                  </div>
+                </div>
+                {visual}
+              </>}
+            </article>;
           })}
-
-          {/* Carousel Controls Overlay (Only if multiple slides exist) */}
-          {hasMultipleSlides && (
-            <div className="hero-carousel-controls">
-              <button
-                type="button"
-                onClick={prevSlide}
-                aria-label="Previous promotional slide"
-                className="carousel-arrow-btn prev-btn"
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </button>
-
-              <div className="carousel-dots-row">
-                {slides.map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setActiveSlide(i)}
-                    aria-label={`Go to slide ${i + 1}`}
-                    className={`carousel-dot ${i === activeSlide ? "active" : ""}`}
-                  />
-                ))}
-              </div>
-
-              <button
-                type="button"
-                onClick={nextSlide}
-                aria-label="Next promotional slide"
-                className="carousel-arrow-btn next-btn"
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </button>
-            </div>
-          )}
         </div>
+        {count > 1 && <div className="ds-hero-controls" aria-label="Slideshow controls">
+          <button type="button" onClick={() => move(-1)} aria-label="Previous slide">←</button>
+          <div className="ds-hero-pagination">{slides.map((slide, index) => <button type="button" key={slide.id}
+            className={index === current ? "is-active" : ""} aria-label={`Show slide ${index + 1}: ${slide.title || "Featured offer"}`}
+            aria-current={index === current ? "true" : undefined} onClick={() => setActive(index)}><span /></button>)}</div>
+          <button type="button" onClick={() => move(1)} aria-label="Next slide">→</button>
+          <button type="button" onClick={() => setPaused(!paused)} aria-label={paused ? "Start autoplay" : "Pause autoplay"} aria-pressed={paused}>{paused ? "▶" : "Ⅱ"}</button>
+        </div>}
+        <span className="sr-only" aria-live={stopped ? "polite" : "off"} aria-atomic="true">Slide {current + 1} of {count}</span>
       </div>
-
-      {/* 2. Bottom Trust & Value Strip (Compact & Modern) */}
       <div className="hero-trust-strip" aria-label="Customer service promises">
-        <div className="trust-strip-item">
-          <div className="trust-icon-box">🛡️</div>
-          <div className="trust-text">
-            <strong>100% Authentic Guarantee</strong>
-            <span>Directly sourced from authorized brand distributors</span>
-          </div>
-        </div>
-
-        <div className="trust-strip-item">
-          <div className="trust-icon-box">💵</div>
-          <div className="trust-text">
-            <strong>Cash on Delivery (COD)</strong>
-            <span>Pay safely at doorstep anywhere across Bangladesh</span>
-          </div>
-        </div>
-
-        <div className="trust-strip-item">
-          <div className="trust-icon-box">🔄</div>
-          <div className="trust-text">
-            <strong>7-Day Easy Returns</strong>
-            <span>Simple replacements or hassle-free full refunds</span>
-          </div>
-        </div>
-
-        <div className="trust-strip-item">
-          <div className="trust-icon-box">📞</div>
-          <div className="trust-text">
-            <strong>24/7 Dedicated Care</strong>
-            <span>Friendly customer assistance via hotline & chat</span>
-          </div>
-        </div>
+        {[
+          ["🛡️", "100% Authentic Guarantee", "Directly sourced from authorized brand distributors"],
+          ["💵", "Cash on Delivery (COD)", "Pay safely at doorstep anywhere across Bangladesh"],
+          ["🔄", "7-Day Easy Returns", "Simple replacements or hassle-free full refunds"],
+          ["☎", "24/7 Dedicated Care", "Friendly customer assistance via hotline & chat"],
+        ].map(([icon, title, text]) => <div key={title} className="trust-strip-item"><div className="trust-icon-box" aria-hidden="true">{icon}</div><div className="trust-text"><strong>{title}</strong><span>{text}</span></div></div>)}
       </div>
     </section>
   );

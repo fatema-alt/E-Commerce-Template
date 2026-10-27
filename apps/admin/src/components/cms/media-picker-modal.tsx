@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { type Asset, assetUrl } from "./cms-api";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { type Asset, assetUrl, request } from "./cms-api";
 
 interface MediaPickerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (assetId: string) => void;
+  onSelect: (assetId: string, asset?: Asset) => void;
   assets: Asset[];
   currentAssetId?: string;
 }
@@ -19,10 +20,45 @@ export function MediaPickerModal({
   currentAssetId,
 }: MediaPickerModalProps) {
   const [search, setSearch] = useState("");
+  const [library, setLibrary] = useState<Asset[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    let live = true;
+    request<{ items: Asset[]; total: number }>(`/admin/cms/media?page=${page}&limit=100`)
+      .then((result) => {
+        if (!live) return;
+        setLibrary((previous) => page === 1 ? result.items : [...previous, ...result.items.filter((item) => !previous.some((old) => old.id === item.id))]);
+        setTotal(result.total);
+      }).catch((e: Error) => { if (live) setError(e.message); });
+    return () => { live = false; };
+  }, [isOpen, page]);
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+      if (event.key === "Tab") {
+        const controls = dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex="0"]');
+        if (!controls?.length) { event.preventDefault(); return; }
+        const first = controls[0]; const last = controls[controls.length - 1];
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialogRef.current)) { event.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener("keydown", close);
+    return () => { document.removeEventListener("keydown", close); previousFocus?.focus(); };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const filteredAssets = assets.filter((a) => {
+  const available = [...library, ...assets.filter((item) => !library.some((loaded) => loaded.id === item.id))];
+  const filteredAssets = available.filter((a) => {
     if (!search) return true;
     const term = search.toLowerCase();
     return (
@@ -32,8 +68,8 @@ export function MediaPickerModal({
     );
   });
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+  return createPortal(
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Select image from Media Library" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
       <div className="flex h-[80vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50">
@@ -52,6 +88,25 @@ export function MediaPickerModal({
 
         {/* Search Toolbar */}
         <div className="border-b border-slate-200 px-6 py-3 bg-white">
+          <label className="mb-3 block text-sm text-slate-900">Upload a new image
+            <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} className="block mt-2 text-xs" onChange={async (event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (!file) return;
+              if (file.size > 5 * 1024 * 1024) { setError("Image must be at most 5 MB."); return; }
+              setBusy(true); setError("");
+              try {
+                const form = new FormData(); form.append("file", file);
+                const uploaded = await request<Asset>("/admin/cms/media", { method: "POST", body: form });
+                setLibrary((previous) => [uploaded, ...previous]);
+                window.dispatchEvent(new CustomEvent("cms-media-uploaded", { detail: uploaded }));
+                onSelect(uploaded.id, uploaded); onClose();
+              } catch (e) { setError((e as Error).message); }
+              finally { setBusy(false); }
+            }} />
+          </label>
+          {busy && <p role="status" className="text-sm text-slate-600">Uploading…</p>}
+          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
           <input
             type="text"
             placeholder="Search images by name or alt text..."
@@ -80,7 +135,7 @@ export function MediaPickerModal({
                     key={asset.id}
                     type="button"
                     onClick={() => {
-                      onSelect(asset.id);
+                      onSelect(asset.id, asset);
                       onClose();
                     }}
                     className={`group relative flex flex-col rounded-xl border p-2 text-left transition overflow-hidden ${
@@ -120,6 +175,7 @@ export function MediaPickerModal({
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-slate-200 px-6 py-3.5 bg-slate-50 text-xs text-slate-500">
           <span>{filteredAssets.length} image assets available</span>
+          {library.length < total && <button type="button" onClick={() => setPage(page + 1)}>Load more images</button>}
           <button
             type="button"
             onClick={onClose}
@@ -129,6 +185,6 @@ export function MediaPickerModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>, document.body
   );
 }

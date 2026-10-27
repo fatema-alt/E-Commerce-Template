@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:product": "node scripts/verify-product.mjs",
-    "test:analytics": "node scripts/verify-analytics.mjs"
+    "test:analytics": "node scripts/verify-analytics.mjs",
+    "test:hero": "node scripts/verify-hero.mjs"
   },
   "dependencies": {
     "next": "16.4.3",

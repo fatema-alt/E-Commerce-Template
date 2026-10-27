@@ -116,7 +116,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .hero-banner-main-grid{display:block;width:100%}
 .hero-carousel-card{position:relative;width:100%;border-radius:var(--r-xl);overflow:hidden;border:1px solid var(--c-line);box-shadow:var(--shadow);background:var(--glass);display:flex;flex-direction:column;justify-content:space-between}
 .hero-slide-surface{display:grid;grid-template-columns:1.2fr .8fr;gap:var(--gap);align-items:center;min-height:clamp(380px,46vh,480px);padding:clamp(24px,3.5vw,48px);padding-bottom:clamp(48px,5vw,60px);transition:background .6s ease}
-.hero-slide-surface.is-graphic{display:block;padding:0;min-height:clamp(340px,40vw,480px);position:relative;overflow:hidden}
+.hero-slide-surface.is-graphic{display:block;padding:0;min-height:clamp(340px,40vw,480px);overflow:hidden}
+.hero-carousel-card > .hero-slide-surface{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .7s ease,background .6s ease}
+.hero-carousel-card > .hero-slide-surface.is-active{position:relative;opacity:1;pointer-events:auto;z-index:1}
 .hero-graphic-link{display:block;width:100%;height:100%;min-height:inherit;position:relative}
 .hero-graphic-img{width:100%;height:100%;min-height:inherit;max-height:500px;object-fit:cover;display:block}
 .hero-graphic-placeholder{width:100%;height:100%;min-height:clamp(340px,40vw,480px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem;background:linear-gradient(135deg,#064e3b 0%,#0f172a 60%,#1e1b4b 100%);color:#fff;position:relative}
@@ -196,6 +198,47 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .hero-side-banners{grid-template-columns:1fr}
   .hero-trust-strip{grid-template-columns:1fr}
   .hero-slide-visual{min-height:180px}
+}
+
+/* CMS hero: shared grid sizing keeps every slide at the same height. */
+.ds-hero-shell{border:1px solid var(--c-line);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow);background:var(--glass-solid)}
+.ds-hero-stage{display:grid;isolation:isolate;touch-action:pan-y}
+.ds-hero-slide{grid-area:1/1;min-width:0;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .55s ease,visibility .55s;overflow:hidden}
+.ds-hero-slide.is-active{opacity:1;visibility:visible;pointer-events:auto;z-index:1}
+.ds-hero-full_banner{display:grid;align-items:center}
+.ds-hero-banner-link{display:block;width:100%;height:100%;color:inherit}
+.ds-hero-banner-image{position:relative;width:100%;aspect-ratio:3/1;min-height:100%}
+.ds-hero-banner-image img{object-fit:contain}
+.ds-hero-mobile-image{display:none}
+.ds-hero-split_content{display:grid;grid-template-columns:45% 55%;min-height:clamp(340px,33.333vw,440px)}
+.ds-hero-copy{padding:clamp(24px,3.5vw,48px);display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0}
+.ds-hero-copy h2{font-size:clamp(1.8rem,3.1vw,2.85rem);line-height:1.08;letter-spacing:-.045em;margin:0 0 16px;text-wrap:balance;overflow-wrap:anywhere;color:var(--c-ink)}
+.ds-hero-copy p{font-size:clamp(.9rem,1.1vw,1.05rem);line-height:1.6;color:var(--c-ink-2);max-width:44ch;margin:0 0 24px;overflow-wrap:anywhere}
+.ds-hero-copy .hero-campaign-badge{font-size:.65rem;max-width:100%}
+.ds-hero-copy .hero-cta-group{gap:10px}
+.ds-hero-copy .hero-primary-btn,.ds-hero-copy .hero-secondary-btn{font-size:.85rem;padding:12px 18px;min-height:44px;text-align:center}
+.ds-hero-split-image{position:relative;min-width:0;min-height:300px;overflow:hidden}
+.ds-hero-split-image img{object-fit:cover;object-position:center}
+.ds-hero-split-image .ds-hero-brand-placeholder,.ds-hero-banner-image .ds-hero-brand-placeholder{object-fit:contain;padding:15%}
+.ds-hero-controls{display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 16px;background:var(--glass-solid);border-top:1px solid var(--c-line)}
+.ds-hero-controls>button{width:44px;height:44px;display:grid;place-items:center;flex-shrink:0;border:1px solid var(--c-line);border-radius:50%;background:var(--glass);color:var(--c-ink);cursor:pointer;font-size:1rem;transition:background .2s}
+.ds-hero-controls>button:hover{background:var(--lime);color:var(--lime-ink)}
+.ds-hero-pagination{display:flex;min-width:0;flex-wrap:wrap;align-items:center;justify-content:center}
+.ds-hero-pagination button{width:32px;height:44px;display:grid;place-items:center;cursor:pointer;background:none;border:0;padding:4px}
+.ds-hero-pagination span{height:6px;width:6px;border-radius:20px;background:var(--c-muted);opacity:.4;transition:width .25s,opacity .25s}
+.ds-hero-pagination .is-active span{width:24px;opacity:1;background:var(--c-ink)}
+.hero-banner-ecosystem:focus-visible,.ds-hero-shell a:focus-visible,.ds-hero-controls button:focus-visible{outline:3px solid #00aeef;outline-offset:-3px}
+@media(max-width:900px) and (min-width:701px){.ds-hero-copy{padding:24px}.ds-hero-copy h2{font-size:1.8rem}.ds-hero-copy .hero-campaign-badge{font-size:.6rem;padding:6px 9px}}
+@media(max-width:700px){
+  .ds-hero-split_content{grid-template-columns:1fr;grid-template-rows:auto minmax(220px,1fr)}
+  .ds-hero-copy{padding:28px 24px}
+  .ds-hero-copy h2{font-size:clamp(1.75rem,6.5vw,2.4rem)}
+  .ds-hero-split-image{min-height:240px;aspect-ratio:16/10}
+  .ds-hero-banner-image[data-mobile=true]{aspect-ratio:4/5}
+  .ds-hero-desktop-image{display:none}
+  .ds-hero-mobile-image{display:block}
+  .ds-hero-controls{gap:3px;padding:6px}
+  .ds-hero-pagination button{width:24px}
 }
 
 /* sections */

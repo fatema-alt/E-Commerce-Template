@@ -9,25 +9,25 @@ import {
   label,
 } from "./cms-api";
 import { MediaPickerModal } from "./media-picker-modal";
+import { CatalogPicker } from "./catalog-picker";
 export const input =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900";
 export const button =
   "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50";
 function AssetField({
   id,
-  name,
   value,
   assets,
   onChange,
 }: {
   id: string;
-  name: string;
   value: Value;
   assets: Asset[];
   onChange: (value: Value) => void;
 }) {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const selectedAsset = assets.find((a) => a.id === value);
+  const [pickedAsset, setPickedAsset] = useState<Asset | undefined>();
+  const selectedAsset = pickedAsset?.id === value ? pickedAsset : assets.find((a) => a.id === value);
 
   return (
     <div className="space-y-2">
@@ -85,7 +85,7 @@ function AssetField({
       <MediaPickerModal
         isOpen={isPickerOpen}
         onClose={() => setIsPickerOpen(false)}
-        onSelect={(assetId) => onChange(assetId)}
+        onSelect={(assetId, asset) => { setPickedAsset(asset); onChange(assetId); }}
         assets={assets}
         currentAssetId={String(value ?? "")}
       />
@@ -107,19 +107,41 @@ export function SchemaField({
   assets: Asset[];
 }) {
   const id = useId();
+  if (["productIds", "categoryIds", "productId", "categoryId"].includes(name)) {
+    return <CatalogPicker kind={name.startsWith("product") ? "products" : "categories"} multiple={name.endsWith("Ids")} value={value} max={schema.maxItems} onChange={onChange} />;
+  }
   if (schema.type === "object") {
     const data = (value ?? {}) as Record<string, Value>;
     return (
       <div className="grid gap-4">
         {Object.entries(schema.properties ?? {}).map(([key, child]) => {
+          const graphicOnly = data.slideType === "full_banner" || (!data.slideType && data.bannerType === "without_button");
+          if (graphicOnly && ["subtitle", "button", "secondaryButton", "badge", "badgeColor", "floatingBadges", "theme"].includes(key)) return null;
+          if (key === "bannerType" && schema.properties?.slideType) return null;
+          if (key === "slideType" || key === "bannerType") return (
+            <fieldset key={key} className="space-y-2 rounded-lg border border-indigo-300 p-3">
+              <legend className="text-sm font-semibold">Banner display</legend>
+              <div className="flex flex-wrap gap-2">
+                {(key === "slideType" ? [["split_content", "Image + HTML content"], ["full_banner", "Full banner image"]] : [["with_button", "With button"], ["without_button", "Without button"]]).map(([mode, text]) => (
+                  <button type="button" key={mode} aria-pressed={key === "slideType" ? (graphicOnly ? "full_banner" : "split_content") === mode : (data.bannerType || "with_button") === mode}
+                    className={`rounded-lg border px-3 py-2 text-sm ${(key === "slideType" ? (graphicOnly ? "full_banner" : "split_content") === mode : (data.bannerType || "with_button") === mode) ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-300 bg-white text-slate-900"}`}
+                    onClick={() => onChange({ ...data, [key]: mode })}>{text}</button>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500">{graphicOnly ? "Use a 3:1 desktop banner with embedded text. No HTML overlay or cropping. Optional mobile image: 4:5. Set Banner Link to make it clickable. Title is an accessible label only." : "Use an image without embedded text. HTML content takes 45% and image takes 55% on desktop; they stack on mobile."}</p>
+            </fieldset>
+          );
+          if (key === "enabled") return <label key={key} className="flex gap-2 text-sm font-semibold"><input type="checkbox" checked={data.enabled !== false} onChange={(event) => onChange({ ...data, enabled: event.target.checked })} />Enable this slide</label>;
           const required = schema.required?.includes(key);
           const enabled = data[key] !== undefined;
+          const imageField = child.type === "object" && !!child.properties?.assetId;
           return (
             <div
               key={key}
               className="min-w-0 rounded-lg border border-slate-200 p-3"
             >
-              {!required && (
+              {imageField && <p className="mb-2 text-sm font-semibold">{key === "image" ? "Desktop image" : key === "mobileImage" ? "Mobile image (optional)" : label(key)}</p>}
+              {!required && !imageField && (
                 <label className="mb-2 flex gap-2 text-sm font-medium">
                   <input
                     type="checkbox"
@@ -134,13 +156,19 @@ export function SchemaField({
                   {label(key)}
                 </label>
               )}
-              {(enabled || required) && (
+              {(enabled || required || imageField) && (
                 <SchemaField
                   name={key}
                   schema={child}
                   value={data[key] ?? initialValue(child)}
                   assets={assets}
-                  onChange={(next) => onChange({ ...data, [key]: next })}
+                  onChange={(next) => {
+                    const updated = { ...data, [key]: next };
+                    if (key === "productIds" && Array.isArray(next) && next.length && schema.properties?.source?.enum?.includes("selected")) updated.source = "selected";
+                    if (key === "categoryId" && next && schema.properties?.source?.enum?.includes("category")) updated.source = "category";
+                    if (imageField && !(next as Record<string, Value>).assetId && !required) delete updated[key];
+                    onChange(updated);
+                  }}
                 />
               )}
             </div>
@@ -163,7 +191,8 @@ export function SchemaField({
           >
             <div className="flex flex-wrap items-center gap-2">
               <span className="mr-auto text-xs font-semibold">
-                Item {index + 1}
+                {name === "slides" ? "Slide" : "Item"} {index + 1}
+                {name === "slides" && row && typeof row === "object" && !Array.isArray(row) && typeof row.title === "string" ? ` · ${row.title}` : ""}
               </span>
               {[-1, 1].map((delta) => (
                 <button
@@ -209,6 +238,10 @@ export function SchemaField({
           className={button}
           onClick={() => {
             const next = initialValue(schema.items!);
+            if (name === "slides" && next && typeof next === "object" && !Array.isArray(next) && schema.items?.properties?.slideType) {
+              next.slideType = "split_content";
+              next.enabled = true;
+            }
             if (
               next &&
               typeof next === "object" &&
@@ -245,7 +278,6 @@ export function SchemaField({
       {asset ? (
         <AssetField
           id={id}
-          name={name}
           value={value}
           assets={assets}
           onChange={onChange}

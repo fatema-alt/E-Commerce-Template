@@ -12,6 +12,7 @@ import {
   initialValue,
   label,
   request,
+  CmsRequestError,
 } from "./cms-api";
 import { button, input, SchemaField } from "./schema-fields";
 import { getStandardEcommerceTemplate } from "./standard-template";
@@ -66,6 +67,14 @@ export function CmsWorkspace({
   const sequence = useRef(0);
   const editable = role === "ADMIN" || role === "SUPER_ADMIN";
   const publisher = role === "SUPER_ADMIN";
+  useEffect(() => {
+    const addAsset = (event: Event) => {
+      const asset = (event as CustomEvent<Asset>).detail;
+      setAssets((previous) => [asset, ...previous.filter((item) => item.id !== asset.id)]);
+    };
+    window.addEventListener("cms-media-uploaded", addAsset);
+    return () => window.removeEventListener("cms-media-uploaded", addAsset);
+  }, []);
   const refreshList = useCallback(async () => {
     if (kind === "MEDIA") {
       const result = await request<{ items: Asset[]; total: number }>(
@@ -184,13 +193,12 @@ export function CmsWorkspace({
       setDirty(false);
       setPreview(false);
     } catch (e) {
-      if (documentKey === "home" && kind === "PAGE") {
+      if (documentKey === "home" && kind === "PAGE" && e instanceof CmsRequestError && e.status === 404) {
         if (current !== sequence.current) return;
         setKey("home");
         setDoc(null);
         setContent({
           title: "Home",
-          description: "Production E-commerce Homepage",
           sections: getStandardEcommerceTemplate() as unknown as Value,
         });
         setVersions([]);

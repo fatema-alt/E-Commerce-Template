@@ -7,6 +7,24 @@ import {
 } from './cms-validation.js';
 import { BLOCK_SCHEMAS } from './cms-schema.js';
 describe('CMS content validation', () => {
+  it('accepts full banners, split content, mobile images and disabled slides', () => {
+    const image = { assetId: '12345678-1234-1234-1234-123456789abc', alt: 'Shopping campaign' };
+    const content = { title: 'Home', sections: [{ id: 'hero', type: 'hero', visible: true, config: {
+      intervalSeconds: 5,
+      slides: [
+        { title: 'Shopping', slideType: 'full_banner', image, mobileImage: image, bannerLink: '/shop', enabled: true },
+        { title: 'Fashion', slideType: 'split_content', image, subtitle: 'New arrivals', button: { label: 'Shop fashion', href: '/shop' }, backgroundGradient: 'linear-gradient(120deg, #fae6ef, #ffffff)', enabled: false },
+      ],
+    } }] };
+    expect(validateCmsContent('PAGE', content)).toEqual(content);
+  });
+  it('rejects unsupported hero types, unsafe gradients and invalid mobile assets', () => {
+    const page = (slide: Record<string, unknown>) => ({ title: 'Home', sections: [{ id: 'hero', type: 'hero', visible: true, config: { slides: [{ title: 'Offer', ...slide }] } }] });
+    expect(() => validateCmsContent('PAGE', page({ slideType: 'unknown' }))).toThrow();
+    expect(() => validateCmsContent('PAGE', page({ backgroundGradient: 'url(https://example.com/image)' }))).toThrow();
+    expect(() => validateCmsContent('PAGE', page({ mobileImage: { assetId: 'invalid', alt: '' } }))).toThrow();
+    expect(validateCmsContent('PAGE', page({ bannerType: 'without_button' }))).toBeTruthy();
+  });
   it('accepts a homepage key and rejects URL-shaped homepage selectors', () => {
     const settings = { storeName: 'Store', locale: 'en', currency: 'BDT', homePageKey: 'hero' };
     expect(validateCmsContent('SITE_SETTINGS', settings)).toEqual(settings);
