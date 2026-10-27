@@ -71,22 +71,27 @@ export type Order = {
   shippingTotal: string;
   taxTotal: string;
   customerName: string;
+  customerPhone?: string;
+  customerNote?: string | null;
   items: {
     nameSnapshot: string;
     skuSnapshot: string;
+    variantSnapshot?: unknown;
+    product?: { images: { url: string }[] } | null;
     quantity: number;
     unitPrice: string;
     lineTotal: string;
   }[];
   addresses: {
     recipientName: string;
+    phone?: string;
     line1: string;
     line2?: string;
     city: string;
     district?: string;
     postalCode?: string;
   }[];
-  shipments: { provider?: string; trackingNumber?: string; status: string }[];
+  shipments: { provider?: string; trackingNumber?: string; status: string; shippedAt?: string | null; deliveredAt?: string | null }[];
 };
 export type Payments = {
   methods: { id: string; label: string; enabled: boolean }[];

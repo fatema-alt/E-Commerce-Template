@@ -400,6 +400,8 @@ export class ShopService {
         'Your cart changed or quote expired. Review it again.',
       );
     const availablePayments = await this.payments();
+    if (!availablePayments.methods.some(method => method.id === (dto.paymentMethod || 'COD') && method.enabled))
+      throw new BadRequestException('The selected payment method is currently unavailable');
     if (dto.paymentMethod === 'BANK_TRANSFER' && !availablePayments.bank)
       throw new BadRequestException('Bank transfer is not available');
     const { quoteToken: _quote, ...data } = dto;
@@ -464,10 +466,14 @@ export class ShopService {
         taxTotal: true,
         subtotal: true,
         customerName: true,
+        customerPhone: true,
+        customerNote: true,
         items: {
           select: {
             nameSnapshot: true,
             skuSnapshot: true,
+            variantSnapshot: true,
+            product: { select: { images: { take: 1, orderBy: { sortOrder: 'asc' }, select: { url: true } } } },
             quantity: true,
             unitPrice: true,
             lineTotal: true,
@@ -476,6 +482,7 @@ export class ShopService {
         addresses: {
           select: {
             recipientName: true,
+            phone: true,
             line1: true,
             line2: true,
             city: true,
@@ -484,7 +491,7 @@ export class ShopService {
           },
         },
         shipments: {
-          select: { provider: true, trackingNumber: true, status: true },
+          select: { provider: true, trackingNumber: true, status: true, shippedAt: true, deliveredAt: true },
         },
       },
     });

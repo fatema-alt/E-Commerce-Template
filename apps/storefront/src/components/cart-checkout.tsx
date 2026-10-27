@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable @next/next/no-img-element -- Cart thumbnails use validated public catalog media. */
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -13,6 +12,7 @@ import {
   type Quote,
   type Shopper,
 } from "../lib/shop-client";
+import { SectionCard, PriceSummary, ProductThumbnail } from "./shopping-ui";
 
 const pending = new Map<string, Promise<Quote>>();
 
@@ -39,7 +39,8 @@ async function repairObsoleteVariants(lines: CartLine[]) {
 }
 
 function requestQuote(serialized: string, couponCode?: string) {
-  const cacheKey = serialized + (couponCode ? `::${couponCode.trim().toUpperCase()}` : "");
+  const cacheKey =
+    serialized + (couponCode ? `::${couponCode.trim().toUpperCase()}` : "");
   let promise = pending.get(cacheKey);
   if (!promise) {
     promise = shopRequest<Quote>("quote", {
@@ -55,21 +56,36 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
   const cart = useCart();
   const router = useRouter();
   const [quote, setQuote] = useState<Quote | null>(null);
-  const [quotedItems, setQuotedItems] = useState("");
+  const [quotedKey, setQuotedKey] = useState("");
   const [error, setError] = useState("");
-  const [repairNotice, setRepairNotice] = useState("");
+  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [review, setReview] = useState(0);
   const [payments, setPayments] = useState<Payments | null>(null);
-  const [paymentMethod, setPayment] = useState("COD");
+  const [paymentError, setPaymentError] = useState("");
+  const [paymentMethod, setPayment] = useState("");
   const [user, setUser] = useState<Shopper | null>(null);
   const [placed, setPlaced] = useState("");
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState("");
   const [couponError, setCouponError] = useState("");
   const [couponBusy, setCouponBusy] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
+  const mutationLock = useRef(false);
+  const submissionLock = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const draftFields = [
+    "name",
+    "phone",
+    "email",
+    "address",
+    "city",
+    "district",
+    "postalCode",
+    "note",
+  ];
   const attempt = useRef({ fingerprint: "", key: "" });
-
   const serialized = JSON.stringify(
     cart.lines.map(({ productId, variantId, quantity }) => ({
       productId,
@@ -77,29 +93,62 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       quantity,
     })),
   );
+  const currentKey = serialized + "::" + appliedCoupon;
+  const validQuote = quote && quotedKey === currentKey;
+  const locked = busy || updating || couponBusy;
+
+  useEffect(() => {
+    if (!checkout) return;
+    try {
+      const draft = JSON.parse(
+        sessionStorage.getItem("ds-checkout-draft") || "{}",
+      );
+      for (const name of [
+        "name",
+        "phone",
+        "email",
+        "address",
+        "city",
+        "district",
+        "postalCode",
+        "note",
+      ]) {
+        const field = formRef.current?.elements.namedItem(name);
+        if (
+          (field instanceof HTMLInputElement ||
+            field instanceof HTMLTextAreaElement) &&
+          !field.value &&
+          typeof draft[name] === "string"
+        )
+          field.value = draft[name];
+      }
+    } catch {
+      /* Storage is optional; the form remains usable. */
+    }
+  }, [checkout, cart.lines.length]);
 
   useEffect(() => {
     let live = true;
     if (serialized !== "[]")
-      requestQuote(serialized, appliedCoupon)
+      void requestQuote(serialized, appliedCoupon)
         .then((result) => {
           if (live) {
             setQuote(result);
-            setQuotedItems(serialized);
+            setQuotedKey(currentKey);
             setError("");
           }
         })
-        .catch(async (e) => {
+        .catch(async (e: Error) => {
           if (live && e.message === "Choose an available product variant") {
             try {
               if (await repairObsoleteVariants(cart.lines)) {
-                setRepairNotice(
+                setNotice(
                   "Your cart was updated to match the current product options. Please review the refreshed total.",
                 );
                 return;
               }
             } catch {
-              /* Preserve the actionable quote error if reconciliation fails. */
+              /* Keep the original actionable quote error. */
             }
           }
           if (live) {
@@ -110,85 +159,229 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
     return () => {
       live = false;
     };
-  }, [serialized, review, cart.lines, appliedCoupon]);
+  }, [serialized, currentKey, review, appliedCoupon, cart.lines]);
 
   useEffect(() => {
     let live = true;
-    Promise.all([
-      shopRequest<Payments>("payment-methods"),
-      shopRequest<{ user: Shopper | null }>("me"),
-    ])
-      .then(([methods, me]) => {
-        if (live) {
-          setPayments(methods);
-          setUser(me.user);
-        }
-      })
-      .catch((e) => {
-        if (live) setError(e.message);
-      });
+    if (checkout) {
+      void shopRequest<Payments>("payment-methods")
+        .then((methods) => {
+          if (live) {
+            setPayments(methods);
+            setPayment((current) =>
+              methods.methods.some(
+                (method) => method.id === current && method.enabled,
+              )
+                ? current
+                : methods.methods.find((method) => method.enabled)?.id || "",
+            );
+            setPaymentError("");
+          }
+        })
+        .catch((e: Error) => {
+          if (live) setPaymentError(e.message);
+        });
+      void shopRequest<{ user: Shopper | null }>("me")
+        .then((me) => {
+          if (live) setUser(me.user);
+        })
+        .catch(() => {
+          /* Guest checkout remains available. */
+        });
+    }
     return () => {
       live = false;
     };
-  }, []);
+  }, [checkout, review]);
 
-  const handleApplyCoupon = async (e: React.FormEvent) => {
+  async function changeQuantity(line: CartLine, quantity: number) {
+    if (
+      mutationLock.current ||
+      submissionLock.current ||
+      quantity < 1 ||
+      quantity > 10000
+    )
+      return;
+    mutationLock.current = true;
+    setUpdating(true);
+    setNotice("");
+    try {
+      const next = cart.lines.map((row) =>
+        row.productId === line.productId && row.variantId === line.variantId
+          ? { ...row, quantity }
+          : row,
+      );
+      const nextItems = JSON.stringify(
+        next.map(({ productId, variantId, quantity }) => ({
+          productId,
+          ...(variantId ? { variantId } : {}),
+          quantity,
+        })),
+      );
+      // The quote endpoint checks current stock, limits, price and coupon eligibility.
+      const result = await requestQuote(nextItems, appliedCoupon);
+      cart.update(line, quantity);
+      setQuote(result);
+      setQuotedKey(nextItems + "::" + appliedCoupon);
+      setError("");
+    } catch (e) {
+      setNotice(
+        (e as Error).message || "Unable to update quantity. Please try again.",
+      );
+    } finally {
+      mutationLock.current = false;
+      setUpdating(false);
+    }
+  }
+
+  async function applyCoupon(e: React.FormEvent) {
     e.preventDefault();
-    if (!couponCode.trim() || couponBusy) return;
+    if (!couponCode.trim() || mutationLock.current || submissionLock.current)
+      return;
+    mutationLock.current = true;
     setCouponBusy(true);
     setCouponError("");
     try {
       const code = couponCode.trim().toUpperCase();
-      const res = await requestQuote(serialized, code);
-      if (res.coupon) {
-        setAppliedCoupon(code);
-        setQuote(res);
-        setCouponCode("");
-      } else {
-        setCouponError("Coupon code could not be applied");
-      }
-    } catch (err) {
-      setCouponError((err as Error).message || "Invalid coupon code");
+      const result = await requestQuote(serialized, code);
+      if (!result.coupon) throw new Error("Coupon code could not be applied.");
+      setAppliedCoupon(code);
+      setQuote(result);
+      setQuotedKey(serialized + "::" + code);
+      setCouponCode("");
+    } catch (e) {
+      setCouponError((e as Error).message || "Invalid coupon code.");
     } finally {
+      mutationLock.current = false;
       setCouponBusy(false);
     }
-  };
+  }
 
-  const handleRemoveCoupon = () => {
-    setAppliedCoupon("");
-    setCouponError("");
-    setCouponCode("");
-  };
-
-  const validQuote = quote && quotedItems === serialized;
+  async function placeOrder(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (
+      !validQuote ||
+      submissionLock.current ||
+      mutationLock.current ||
+      !payments?.methods.some(
+        (method) => method.id === paymentMethod && method.enabled,
+      )
+    )
+      return;
+    const data = new FormData(e.currentTarget);
+    const value = (key: string) => String(data.get(key) || "").trim();
+    const phone = value("phone").replace(/[\s()-]/g, "");
+    const payload = {
+      items: JSON.parse(serialized),
+      customerName: value("name"),
+      ...(value("email") ? { customerEmail: value("email") } : {}),
+      customerPhone: phone,
+      paymentMethod,
+      shippingAddress: {
+        recipientName: value("name"),
+        phone,
+        line1: value("address"),
+        city: value("city"),
+        ...(value("district") ? { district: value("district") } : {}),
+        ...(value("postalCode") ? { postalCode: value("postalCode") } : {}),
+      },
+      ...(value("note") ? { customerNote: value("note") } : {}),
+      ...(appliedCoupon ? { couponCode: appliedCoupon } : {}),
+    };
+    const fingerprint = JSON.stringify(payload);
+    if (attempt.current.fingerprint !== fingerprint)
+      attempt.current = { fingerprint, key: crypto.randomUUID() };
+    submissionLock.current = true;
+    setBusy(true);
+    setCheckoutError("");
+    try {
+      const order = await shopRequest<Order>(
+        "orders",
+        { ...payload, quoteToken: quote.quoteToken },
+        attempt.current.key,
+      );
+      setPlaced(order.id);
+      // A storage failure must never encourage creating another order.
+      try {
+        cart.clear();
+      } catch {
+        /* The persisted order already succeeded. */
+      }
+      try {
+        sessionStorage.removeItem("ds-checkout-draft");
+      } catch {
+        /* Optional draft storage. */
+      }
+      if (paymentMethod === "BKASH" || paymentMethod === "SSLCOMMERZ") {
+        try {
+          const result = await shopRequest<{ redirectUrl: string }>(
+            "payments/initiate",
+            { orderId: order.id, method: paymentMethod },
+          );
+          if (result.redirectUrl) {
+            window.location.href = result.redirectUrl;
+            return;
+          }
+          throw new Error("Payment gateway did not return a redirect.");
+        } catch {
+          router.push(`/orders/${order.id}?payment=initiate_failed`);
+          return;
+        }
+      }
+      router.push(`/orders/${order.id}`);
+    } catch (e) {
+      setCheckoutError((e as Error).message);
+      setReview((v) => v + 1);
+    } finally {
+      submissionLock.current = false;
+      setBusy(false);
+    }
+  }
 
   if (placed)
     return (
-      <main id="main" className="container main-content">
-        <h1>Thank you for your order</h1>
-        <Link className="primary-button" href={`/orders/${placed}`}>
-          View order confirmation
-        </Link>
+      <main id="main" className="container main-content shopping-page">
+        <SectionCard title="Thank you for your order">
+          <p>
+            Your order has been created. Review its payment and delivery status
+            below.
+          </p>
+          <Link className="primary-button" href={`/orders/${placed}`}>
+            View order confirmation
+          </Link>
+        </SectionCard>
       </main>
     );
 
   return (
-    <main id="main" className="container main-content">
+    <main id="main" className="container main-content shopping-page">
       <nav className="breadcrumbs" aria-label="Breadcrumb">
         <Link href="/">Home</Link> / <Link href="/cart">Cart</Link>
         {checkout && " / Checkout"}
       </nav>
-      <h1>{checkout ? "Checkout" : "Your cart"}</h1>
-      {repairNotice && (
-        <p className="shop-success" role="status">
-          {repairNotice}
+      <header className="shopping-header">
+        <h1>{checkout ? "Checkout" : "Your cart"}</h1>
+        <p className="muted">
+          {checkout
+            ? "Complete your details and review your order."
+            : `${cart.count} ${cart.count === 1 ? "item" : "items"} in your shopping bag`}
+        </p>
+      </header>
+      {notice && (
+        <p className="shopping-notice" role="status">
+          {notice}
         </p>
       )}
       {error && (
-        <div role="alert" className="shop-error">
-          {error}
+        <div className="shop-error shopping-alert" role="alert">
+          <p>
+            {error === "Request origin rejected"
+              ? "We could not verify this store’s checkout connection. Please refresh and try again. If this continues, contact the store."
+              : error}
+          </p>
           <button
             className="secondary-button"
+            disabled={locked}
             onClick={() => setReview((v) => v + 1)}
           >
             Refresh prices and availability
@@ -197,409 +390,491 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       )}
       {!cart.lines.length ? (
         <div className="empty-content">
+          <ProductThumbnail name="Shopping bag" />
           <h2>Your cart is empty</h2>
           <p>Explore the catalog and find something you love.</p>
           <Link className="primary-button" href="/shop">
-            Continue shopping
+            Explore Products
           </Link>
         </div>
       ) : (
-        <div className="checkout-grid">
-          <section className="shop-panel">
-            <h2>{checkout ? "Review your items" : "Cart items"}</h2>
-            {cart.lines.map((line) => (
-              <article
-                className="cart-line"
-                key={`${line.productId}:${line.variantId || ""}`}
-              >
-                {typeof line.imageUrl === "string" &&
-                  /^https?:\/\//.test(line.imageUrl) && (
-                    <img
-                      className="cart-thumbnail"
-                      src={line.imageUrl}
-                      alt=""
-                    />
-                  )}
-                <div>
-                  <Link
-                    href={`/product/${encodeURIComponent(line.slug)}`}
-                    className="product-name"
-                  >
-                    {line.name}
-                  </Link>
-                  {line.variantName && (
-                    <p className="muted small">{line.variantName}</p>
-                  )}
-                  {error === "Choose an available product variant" && (
-                    <Link
-                      className="text-button"
-                      href={`/product/${encodeURIComponent(line.slug)}`}
+        <div
+          className={`checkout-grid ${checkout ? "is-checkout" : "is-cart"}`}
+        >
+          {!checkout && (
+            <SectionCard title="Cart items" className="cart-items">
+              <div aria-busy={updating}>
+                {cart.lines.map((line) => {
+                  const item = validQuote
+                    ? quote.items.find(
+                        (i) =>
+                          i.productId === line.productId &&
+                          i.variantId === line.variantId,
+                      )
+                    : undefined;
+                  const href = `/product/${encodeURIComponent(line.slug)}`;
+                  return (
+                    <article
+                      className="cart-line"
+                      key={`${line.productId}:${line.variantId || ""}`}
                     >
-                      Review product options
-                    </Link>
+                      <ProductThumbnail
+                        src={line.imageUrl}
+                        name={line.name}
+                        href={href}
+                      />
+                      <div className="cart-product-info">
+                        <Link className="product-name" href={href}>
+                          {line.name}
+                        </Link>
+                        {line.variantName && (
+                          <p className="muted small">{line.variantName}</p>
+                        )}
+                        <p className="muted small">
+                          {money(item?.unitPrice ?? line.price)} each
+                          {!item && " · estimated"}
+                        </p>
+                        {error === "Choose an available product variant" && (
+                          <Link className="text-button" href={href}>
+                            Review product options
+                          </Link>
+                        )}
+                      </div>
+                      <div className="cart-row-actions">
+                        <div
+                          className="quantity-stepper"
+                          role="group"
+                          aria-label={`Quantity for ${line.name}`}
+                        >
+                          <button
+                            type="button"
+                            aria-label={`Decrease quantity for ${line.name}`}
+                            disabled={locked || line.quantity <= 1}
+                            onClick={() =>
+                              void changeQuantity(line, line.quantity - 1)
+                            }
+                          >
+                            −
+                          </button>
+                          <output aria-live="polite">{line.quantity}</output>
+                          <button
+                            type="button"
+                            aria-label={`Increase quantity for ${line.name}`}
+                            disabled={locked || line.quantity >= 10000}
+                            onClick={() =>
+                              void changeQuantity(line, line.quantity + 1)
+                            }
+                          >
+                            +
+                          </button>
+                        </div>
+                        <strong className="line-total">
+                          {money(item?.lineTotal ?? line.price * line.quantity)}
+                          {!item && <small> estimated</small>}
+                        </strong>
+                        <button
+                          type="button"
+                          className="remove-item"
+                          aria-label={`Remove ${line.name}`}
+                          disabled={locked}
+                          onClick={() => {
+                            try {
+                              cart.remove(line);
+                              setNotice(`${line.name} removed from your cart.`);
+                            } catch {
+                              setError("Unable to update cart storage.");
+                            }
+                          }}
+                        >
+                          <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                            aria-hidden="true"
+                          >
+                            <path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" />
+                          </svg>
+                          Remove
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              <p className="muted small" role="status">
+                {updating
+                  ? "Verifying quantity and availability…"
+                  : "Prices and stock are checked with the store."}
+              </p>
+              <Link className="shopping-back" href="/shop">
+                ← Continue Shopping
+              </Link>
+            </SectionCard>
+          )}
+          {checkout && (
+            <form
+              ref={formRef}
+              className="checkout-form"
+              onSubmit={placeOrder}
+              onChange={() => {
+                if (!formRef.current) return;
+                const data = new FormData(formRef.current);
+                try {
+                  sessionStorage.setItem(
+                    "ds-checkout-draft",
+                    JSON.stringify(
+                      Object.fromEntries(
+                        draftFields.map((name) => [
+                          name,
+                          String(data.get(name) || ""),
+                        ]),
+                      ),
+                    ),
+                  );
+                } catch {
+                  /* Optional draft storage. */
+                }
+              }}
+            >
+              <fieldset disabled={locked}>
+                <SectionCard title="Contact Information">
+                  {!user && (
+                    <p className="muted small">
+                      Checkout as a guest, or{" "}
+                      <Link href="/account">sign in</Link> to keep orders in
+                      your account.
+                    </p>
                   )}
-                  <p>
-                    {validQuote
-                      ? money(
-                          quote.items.find(
-                            (i) =>
-                              i.productId === line.productId &&
-                              i.variantId === line.variantId,
-                          )?.unitPrice || line.price,
-                        )
-                      : `${money(line.price)} estimated`}
-                  </p>
-                </div>
-                <label>
-                  Quantity
-                  <input
-                    aria-label={`Quantity for ${line.name}`}
-                    type="number"
-                    min={1}
-                    max={10000}
-                    value={line.quantity}
-                    disabled={busy}
-                    onChange={(e) => {
-                      try {
-                        cart.update(line, Number(e.target.value));
-                      } catch {
-                        setError("Cart storage is unavailable.");
-                      }
-                    }}
-                  />
-                </label>
-                <button
-                  className="text-button"
-                  disabled={busy}
-                  onClick={() => {
-                    try {
-                      cart.remove(line);
-                    } catch {
-                      setError("Unable to update cart storage.");
-                    }
-                  }}
-                >
-                  Remove
-                </button>
-              </article>
-            ))}
-            <Link href="/shop">← Continue shopping</Link>
-          </section>
-          <aside className="shop-panel order-summary">
-            <h2>Order summary</h2>
-            {validQuote ? (
-              <>
-                <dl>
-                  <div>
-                    <dt>Subtotal</dt>
-                    <dd>{money(quote.subtotal)}</dd>
+                  <div className="form-grid">
+                    <label>
+                      Full name
+                      <input
+                        name="name"
+                        autoComplete="name"
+                        required
+                        minLength={2}
+                        maxLength={120}
+                        defaultValue={[user?.firstName, user?.lastName]
+                          .filter(Boolean)
+                          .join(" ")}
+                      />
+                    </label>
+                    <label>
+                      Mobile number
+                      <input
+                        name="phone"
+                        type="tel"
+                        autoComplete="tel"
+                        required
+                        pattern="(?:\+?88)?01[3-9][0-9]{8}"
+                        title="Enter a Bangladesh mobile number: 01712345678 or +8801712345678"
+                        maxLength={14}
+                        defaultValue={user?.phone || ""}
+                      />
+                      <small className="muted">For example, 01712345678</small>
+                    </label>
+                    <label className="full-field">
+                      Email address (optional)
+                      <input
+                        name="email"
+                        type="email"
+                        autoComplete="email"
+                        maxLength={254}
+                        defaultValue={user?.email}
+                      />
+                    </label>
                   </div>
-                  {quote.coupon && (
-                    <div style={{ color: "#059669", fontWeight: 600 }}>
-                      <dt>Discount ({quote.coupon.code})</dt>
-                      <dd>-{money(quote.discount || "0")}</dd>
+                </SectionCard>
+                <SectionCard title="Delivery Address">
+                  <div className="form-grid">
+                    <label className="full-field">
+                      Full address
+                      <input
+                        name="address"
+                        autoComplete="street-address"
+                        required
+                        minLength={3}
+                        maxLength={240}
+                      />
+                    </label>
+                    <label>
+                      City
+                      <input
+                        name="city"
+                        autoComplete="address-level2"
+                        required
+                        minLength={2}
+                        maxLength={120}
+                      />
+                    </label>
+                    <label>
+                      District (optional)
+                      <input
+                        name="district"
+                        autoComplete="address-level1"
+                        maxLength={120}
+                      />
+                    </label>
+                    <label>
+                      Postal code (optional)
+                      <input
+                        name="postalCode"
+                        autoComplete="postal-code"
+                        maxLength={20}
+                      />
+                    </label>
+                    <label className="full-field">
+                      Delivery instructions (optional)
+                      <textarea name="note" rows={3} maxLength={2000} />
+                    </label>
+                  </div>
+                </SectionCard>
+                <SectionCard title="Payment Method">
+                  {paymentError && (
+                    <p className="shop-error" role="alert">
+                      {paymentError}
+                    </p>
+                  )}
+                  {!payments && !paymentError && (
+                    <p role="status">Loading available payment methods…</p>
+                  )}
+                  <div className="payment-options">
+                    {payments?.methods.map((method) => (
+                      <label
+                        key={method.id}
+                        className={!method.enabled ? "payment-disabled" : ""}
+                      >
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value={method.id}
+                          checked={paymentMethod === method.id}
+                          disabled={!method.enabled}
+                          onChange={() => setPayment(method.id)}
+                        />
+                        <span>
+                          <strong>{method.label}</strong>
+                          <small>
+                            {!method.enabled
+                              ? "Currently unavailable"
+                              : method.id === "COD"
+                                ? "Pay the courier when your order arrives."
+                                : "Complete payment using the store’s verified payment flow."}
+                          </small>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  {payments &&
+                    !payments.methods.some((method) => method.enabled) && (
+                      <p role="alert">
+                        No payment methods are currently available. Please
+                        contact the store.
+                      </p>
+                    )}
+                  {paymentMethod === "BANK_TRANSFER" && payments?.bank && (
+                    <div className="bank-details">
+                      <p>
+                        {payments.bank.name} · {payments.bank.branch}
+                      </p>
+                      <p>
+                        {payments.bank.accountName} ·{" "}
+                        {payments.bank.accountNumber}
+                      </p>
+                      <p>
+                        Use your order number as the transfer reference. Payment
+                        remains pending until the store verifies the transfer.
+                      </p>
                     </div>
                   )}
-                  <div>
-                    <dt>Delivery</dt>
-                    <dd>{money(quote.shipping)}</dd>
-                  </div>
-                  <div>
-                    <dt>Additional tax</dt>
-                    <dd>{money(quote.tax)}</dd>
-                  </div>
-                  <div className="summary-total">
-                    <dt>Total</dt>
-                    <dd>{money(quote.total)}</dd>
-                  </div>
-                </dl>
-
-                {/* Coupon Code Section */}
-                <div style={{ margin: "1rem 0", borderTop: "1px solid #e2e8f0", paddingTop: "1rem" }}>
+                </SectionCard>
+                <SectionCard title="Confirm your order">
+                  {checkoutError && (
+                    <p className="shop-error" role="alert">
+                      {checkoutError}
+                    </p>
+                  )}
+                  {validQuote && (
+                    <p className="confirmation-total">
+                      Total payable <strong>{money(quote.total)}</strong>
+                    </p>
+                  )}
+                  <label className="consent-row">
+                    <input type="checkbox" required />{" "}
+                    <span>
+                      I confirm my delivery details and agree to place this
+                      order.
+                    </span>
+                  </label>
+                  <button
+                    type="submit"
+                    className="primary-button place-order"
+                    disabled={
+                      !validQuote ||
+                      locked ||
+                      !payments?.methods.some(
+                        (method) =>
+                          method.enabled && method.id === paymentMethod,
+                      )
+                    }
+                  >
+                    {busy ? "Processing your order…" : "Place Order"}
+                  </button>
+                  <p className="muted small">
+                    Your final price and stock are verified securely before the
+                    order is created.
+                  </p>
+                </SectionCard>
+              </fieldset>
+            </form>
+          )}
+          <aside
+            className="shop-panel order-summary"
+            aria-busy={updating || couponBusy}
+          >
+            <h2>Order Summary</h2>
+            {checkout && (
+              <div className="checkout-summary-items">
+                {cart.lines.map((line) => (
+                  <article
+                    className="summary-product"
+                    key={`${line.productId}:${line.variantId || ""}`}
+                  >
+                    <ProductThumbnail
+                      src={line.imageUrl}
+                      name={line.name}
+                      href={`/product/${encodeURIComponent(line.slug)}`}
+                    />
+                    <div>
+                      <Link href={`/product/${encodeURIComponent(line.slug)}`}>
+                        {line.name}
+                      </Link>
+                      {line.variantName && (
+                        <small className="muted">{line.variantName}</small>
+                      )}
+                      <small className="muted">Quantity {line.quantity}</small>
+                      <strong>
+                        {validQuote
+                          ? money(
+                              quote.items.find(
+                                (item) =>
+                                  item.productId === line.productId &&
+                                  item.variantId === line.variantId,
+                              )?.lineTotal ?? line.price * line.quantity,
+                            )
+                          : "Awaiting price verification"}
+                      </strong>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+            {validQuote ? (
+              <>
+                <PriceSummary
+                  subtotal={quote.subtotal}
+                  shipping={quote.shipping}
+                  tax={quote.tax}
+                  total={quote.total}
+                  discount={quote.discount}
+                  coupon={quote.coupon?.code}
+                />
+                <div className="coupon-section">
                   {appliedCoupon ? (
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f0fdf4", padding: "0.5rem 0.75rem", borderRadius: "0.5rem", border: "1px solid #bbf7d0" }}>
-                      <div>
-                        <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#166534" }}>
-                          🏷️ {appliedCoupon}
-                        </span>
-                        <p style={{ margin: 0, fontSize: "0.75rem", color: "#15803d" }}>
-                          Discount applied
-                        </p>
-                      </div>
+                    <div className="applied-coupon">
+                      <span>
+                        {appliedCoupon}
+                        <small>Discount applied</small>
+                      </span>
                       <button
                         type="button"
-                        onClick={handleRemoveCoupon}
-                        style={{ background: "none", border: "none", color: "#dc2626", fontSize: "0.75rem", cursor: "pointer", fontWeight: 600 }}
+                        className="text-button"
+                        disabled={locked}
+                        onClick={() => {
+                          setAppliedCoupon("");
+                          setCouponError("");
+                          setCouponCode("");
+                        }}
                       >
                         Remove
                       </button>
                     </div>
                   ) : (
-                    <form onSubmit={handleApplyCoupon} style={{ display: "flex", gap: "0.5rem" }}>
+                    <form className="coupon-form" onSubmit={applyCoupon}>
+                      <label className="sr-only" htmlFor="coupon-code">
+                        Coupon code
+                      </label>
                       <input
-                        type="text"
+                        id="coupon-code"
                         placeholder="Coupon code"
                         value={couponCode}
-                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                        onChange={(e) =>
+                          setCouponCode(e.target.value.toUpperCase())
+                        }
                         maxLength={32}
-                        disabled={couponBusy}
-                        style={{ flex: 1, padding: "0.4rem 0.6rem", fontSize: "0.875rem", border: "1px solid #cbd5e1", borderRadius: "0.375rem" }}
+                        disabled={locked}
                       />
                       <button
                         type="submit"
-                        disabled={!couponCode.trim() || couponBusy}
-                        style={{ padding: "0.4rem 0.8rem", fontSize: "0.875rem", fontWeight: 600, background: "#4f46e5", color: "#fff", border: "none", borderRadius: "0.375rem", cursor: "pointer" }}
+                        className="secondary-button"
+                        disabled={!couponCode.trim() || locked}
                       >
-                        {couponBusy ? "…" : "Apply"}
+                        {couponBusy ? "Applying…" : "Apply"}
                       </button>
                     </form>
                   )}
                   {couponError && (
-                    <p style={{ color: "#dc2626", fontSize: "0.75rem", marginTop: "0.35rem" }}>
+                    <p className="coupon-error" role="alert">
                       {couponError}
                     </p>
                   )}
                 </div>
-
                 <p className="muted small">
                   Delivery within Bangladesh. Your final total is verified again
                   when placing the order.
                 </p>
                 {!checkout && (
-                  <Link className="primary-button" href="/checkout">
-                    Proceed to checkout →
+                  <Link
+                    className="primary-button checkout-link"
+                    href="/checkout"
+                    aria-disabled={locked}
+                    onClick={(e) => {
+                      if (locked) e.preventDefault();
+                    }}
+                  >
+                    Proceed to Checkout →
                   </Link>
                 )}
               </>
             ) : (
               <p role="status">
                 {error
-                  ? "Review the availability message above."
+                  ? "We need to verify prices and availability before checkout."
                   : "Checking current prices and stock…"}
               </p>
             )}
+            {!validQuote && appliedCoupon && (
+              <button
+                type="button"
+                className="text-button"
+                disabled={locked}
+                onClick={() => {
+                  setAppliedCoupon("");
+                  setCouponError("");
+                }}
+              >
+                Remove coupon {appliedCoupon}
+              </button>
+            )}
+            {checkout && (
+              <Link className="shopping-back" href="/cart">
+                ← Edit cart
+              </Link>
+            )}
           </aside>
-          {checkout && (
-            <form
-              className="shop-panel checkout-form"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (!validQuote || busy) return;
-                const data = new FormData(e.currentTarget);
-                const value = (key: string) =>
-                  String(data.get(key) || "").trim();
-                const payload = {
-                  items: JSON.parse(serialized),
-                  customerName: value("name"),
-                  ...(value("email") ? { customerEmail: value("email") } : {}),
-                  customerPhone: value("phone"),
-                  paymentMethod,
-                  shippingAddress: {
-                    recipientName: value("name"),
-                    phone: value("phone"),
-                    line1: value("address"),
-                    city: value("city"),
-                    ...(value("district")
-                      ? { district: value("district") }
-                      : {}),
-                    ...(value("postalCode")
-                      ? { postalCode: value("postalCode") }
-                      : {}),
-                  },
-                  ...(value("note") ? { customerNote: value("note") } : {}),
-                  ...(appliedCoupon ? { couponCode: appliedCoupon } : {}),
-                };
-                const fingerprint = JSON.stringify(payload);
-                if (attempt.current.fingerprint !== fingerprint)
-                  attempt.current = { fingerprint, key: crypto.randomUUID() };
-                setBusy(true);
-                setError("");
-                try {
-                  const order = await shopRequest<Order>(
-                    "orders",
-                    { ...payload, quoteToken: quote.quoteToken },
-                    attempt.current.key,
-                  );
-                  setPlaced(order.id);
-                  cart.clear();
-
-                  if (
-                    paymentMethod === "BKASH" ||
-                    paymentMethod === "SSLCOMMERZ"
-                  ) {
-                    try {
-                      const initRes = await shopRequest<{
-                        redirectUrl: string;
-                        provider: string;
-                        transactionReference: string;
-                      }>("payments/initiate", {
-                        orderId: order.id,
-                        method: paymentMethod,
-                      });
-                      if (initRes.redirectUrl) {
-                        window.location.href = initRes.redirectUrl;
-                        return;
-                      }
-                    } catch (payErr) {
-                      router.push(
-                        `/orders/${order.id}?payment=initiate_failed&reason=${encodeURIComponent(
-                          (payErr as Error).message || "Initiation failed",
-                        )}`,
-                      );
-                      return;
-                    }
-                  }
-
-                  router.push(`/orders/${order.id}`);
-                } catch (e) {
-                  setError((e as Error).message);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              <h2>Delivery information</h2>
-              {!user && (
-                <p>
-                  Checkout as a guest, or <Link href="/account">sign in</Link>{" "}
-                  to keep orders in your account.
-                </p>
-              )}
-              <fieldset disabled={busy}>
-                <div className="form-grid">
-                  <label>
-                    Full name
-                    <input
-                      name="name"
-                      autoComplete="name"
-                      required
-                      minLength={2}
-                      maxLength={120}
-                      defaultValue={user?.firstName}
-                    />
-                  </label>
-                  <label>
-                    Phone
-                    <input
-                      name="phone"
-                      autoComplete="tel"
-                      type="tel"
-                      required
-                      minLength={6}
-                      maxLength={32}
-                      defaultValue={user?.phone || ""}
-                    />
-                  </label>
-                  <label>
-                    Email (optional)
-                    <input
-                      name="email"
-                      autoComplete="email"
-                      type="email"
-                      maxLength={254}
-                      defaultValue={user?.email}
-                    />
-                  </label>
-                  <label>
-                    City
-                    <input
-                      name="city"
-                      autoComplete="address-level2"
-                      required
-                      minLength={2}
-                      maxLength={120}
-                    />
-                  </label>
-                  <label className="full-field">
-                    Street address
-                    <input
-                      name="address"
-                      autoComplete="street-address"
-                      required
-                      minLength={3}
-                      maxLength={240}
-                    />
-                  </label>
-                  <label>
-                    District (optional)
-                    <input
-                      name="district"
-                      autoComplete="address-level1"
-                      maxLength={120}
-                    />
-                  </label>
-                  <label>
-                    Postal code (optional)
-                    <input
-                      name="postalCode"
-                      autoComplete="postal-code"
-                      maxLength={20}
-                    />
-                  </label>
-                  <label className="full-field">
-                    Order note (optional)
-                    <textarea name="note" rows={3} maxLength={2000} />
-                  </label>
-                </div>
-                <h2>Payment</h2>
-                <div className="payment-options">
-                  {payments?.methods.map((method) => (
-                    <label
-                      key={method.id}
-                      className={!method.enabled ? "payment-disabled" : ""}
-                    >
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        value={method.id}
-                        checked={paymentMethod === method.id}
-                        disabled={!method.enabled}
-                        onChange={() => setPayment(method.id)}
-                      />
-                      <span>
-                        {method.label}
-                        {!method.enabled && (
-                          <small>Currently unavailable</small>
-                        )}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                {paymentMethod === "BANK_TRANSFER" && payments?.bank && (
-                  <div className="bank-details">
-                    <p>
-                      {payments.bank.name} — {payments.bank.branch}
-                    </p>
-                    <p>
-                      {payments.bank.accountName} ·{" "}
-                      {payments.bank.accountNumber}
-                    </p>
-                    <p>
-                      Use your order number as the transfer reference. Payment
-                      remains pending until the store verifies the transfer.
-                    </p>
-                  </div>
-                )}
-                <label className="consent-row">
-                  <input type="checkbox" required />I confirm my delivery
-                  details and agree to place this order.
-                </label>
-                <button
-                  type="submit"
-                  className="primary-button"
-                  disabled={!validQuote || busy || !payments}
-                >
-                  {busy
-                    ? "Processing your order…"
-                    : paymentMethod === "BKASH"
-                      ? `Pay with bKash${validQuote ? " · " + money(quote.total) : ""}`
-                      : paymentMethod === "SSLCOMMERZ"
-                        ? `Pay with SSLCommerz${validQuote ? " · " + money(quote.total) : ""}`
-                        : `Place order${validQuote ? " · " + money(quote.total) : ""}`}
-                </button>
-              </fieldset>
-            </form>
-          )}
         </div>
       )}
     </main>

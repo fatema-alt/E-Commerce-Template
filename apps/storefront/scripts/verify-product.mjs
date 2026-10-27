@@ -86,11 +86,26 @@ const product = {
 let productUnavailable = true;
 let reviewAttempts = 0;
 let newsletterAttempts = 0;
+let orderAttempts = 0;
+const fixtureOrder = { id: '00000000-0000-4000-8000-000000000010', orderNumber: '00000000-0000-4000-8000-000000000010', status: 'PROCESSING', paymentStatus: 'UNPAID', paymentMethod: 'COD', createdAt: '2026-10-20T09:00:00Z', customerName: 'Test Shopper', customerPhone: '01712345678', subtotal: '500.00', shippingTotal: '60.00', taxTotal: '0.00', grandTotal: '560.00', items: [{ nameSnapshot: 'Historical cotton shirt', skuSnapshot: 'HISTORY-001', quantity: 1, unitPrice: '500.00', lineTotal: '500.00' }], addresses: [{ recipientName: 'Test Shopper', phone: '01712345678', line1: 'Test address', city: 'Dhaka' }], shipments: [] };
 const reviewFixtures = Array.from({ length: 7 }, (_, index) => ({ id: 'review-' + index, authorName: 'Test shopper ' + index, rating: index % 2 ? 4 : 5, content: 'Isolated browser-test review.', title: 'Test feedback', photos: [], helpfulCount: 0, isVerifiedPurchase: index < 2, createdAt: '2026-10-01T00:00:00Z' }));
 const simpleId = "00000000-0000-4000-8000-000000000003";
 const api = http.createServer(async (req, res) => {
   const path = new URL(req.url, "http://localhost").pathname;
   res.setHeader("Content-Type", "application/json");
+  if (path.endsWith('/shop/orders') && req.method === 'POST') {
+    let body = ''; for await (const chunk of req) body += chunk;
+    const fields = JSON.parse(body); orderAttempts++;
+    assert.equal(fields.customerPhone, '01712345678');
+    assert.equal(fields.shippingAddress.line1, 'Test address');
+    assert.equal(fields.quoteToken, 'isolated-fixture');
+    assert.ok(req.headers['idempotency-key']);
+    await new Promise(resolve => setTimeout(resolve, 250));
+    if (orderAttempts === 1) { res.statusCode = 409; res.end(JSON.stringify({ message: 'Prices changed. Review the refreshed total.' })); }
+    else res.end(JSON.stringify(fixtureOrder));
+    return;
+  }
+  if (path.includes('/shop/orders/')) { res.end(JSON.stringify(fixtureOrder)); return; }
   if (/\/shop\/products\/[^/]+\/reviews$/.test(path)) {
     if (req.method === 'POST') {
       let body = ''; for await (const chunk of req) body += chunk;
@@ -119,7 +134,7 @@ const api = http.createServer(async (req, res) => {
   if (path.endsWith("/shop/payment-methods")) {
     res.end(
       JSON.stringify({
-        methods: [{ id: "COD", label: "Cash on delivery", enabled: true }],
+        methods: [{ id: "COD", label: "Cash on delivery", enabled: true }, { id: 'BKASH', label: 'bKash', enabled: false }],
       }),
     );
     return;
@@ -127,7 +142,9 @@ const api = http.createServer(async (req, res) => {
   if (path.endsWith("/shop/quote")) {
     let body = "";
     for await (const chunk of req) body += chunk;
-    const { items } = JSON.parse(body);
+    const { items, couponCode } = JSON.parse(body);
+    if (couponCode && couponCode !== 'SAVE50') { res.statusCode = 400; res.end(JSON.stringify({ message: 'Coupon is invalid or expired' })); return; }
+    if (items.some(line => line.quantity > (line.variantId === 'black' ? 3 : 2))) { res.statusCode = 400; res.end(JSON.stringify({ message: 'Requested quantity is unavailable' })); return; }
     if (
       items.some((line) =>
         line.productId === simpleId
@@ -162,9 +179,10 @@ const api = http.createServer(async (req, res) => {
       JSON.stringify({
         items: quoted,
         subtotal: total,
-        shipping: "0.00",
+        shipping: "60.00",
         tax: "0.00",
-        total,
+        total: (Number(total) + 60 - (couponCode ? 50 : 0)).toFixed(2),
+        ...(couponCode ? { discount: '50.00', coupon: { code: couponCode, discount: '50.00' } } : {}),
         quoteToken: "isolated-fixture",
       }),
     );
@@ -340,7 +358,7 @@ try {
       env: {
         ...process.env,
         STOREFRONT_API_BASE_URL: "http://127.0.0.1:4109/api/v1",
-        STOREFRONT_ORIGIN: "http://localhost:3015",
+        STOREFRONT_ORIGIN: "http://localhost:3015/",
         CMS_HOME_KEY: "home",
       },
       stdio: ["ignore", "pipe", "pipe"],
@@ -780,6 +798,74 @@ try {
     await until('!!document.querySelector(".newsletter-form")', 'newsletter after review checks');
   }
   pass('newsletter responsive layout and light/dark screenshots at mobile, tablet and desktop widths');
+  // Shopping flow uses the real Next route handlers with an isolated upstream API.
+  const shoppingLine = { productId: simpleId, slug: 'simple', name: 'Cotton shirt with a deliberately long readable product title', quantity: 1, price: 500, imageUrl: 'http://127.0.0.1:4109/uploads/general.svg' };
+  await evaluate(`localStorage.setItem('commerce-cart-v1',${JSON.stringify(JSON.stringify([shoppingLine]))})`);
+  await navigate('/cart');
+  await until('!!document.querySelector(".summary-total")', 'cart quote');
+  await evaluate('document.querySelector(".quantity-stepper button:last-child").click()');
+  await until('document.querySelector(".quantity-stepper output").textContent === "2" && !document.querySelector(".quantity-stepper button:last-child").disabled', 'quantity updated');
+  await evaluate('document.querySelector(".quantity-stepper button:last-child").click()');
+  await until('document.querySelector(".shopping-notice")?.textContent.includes("unavailable")', 'stock validation');
+  assert.equal(await evaluate('document.querySelector(".quantity-stepper output").textContent'), '2');
+  await evaluate('document.querySelector(".quantity-stepper button:first-child").click()');
+  await until('document.querySelector(".quantity-stepper output").textContent === "1"', 'quantity decreased');
+  await fill('#coupon-code', 'INVALID');
+  await evaluate('document.querySelector(".coupon-form").requestSubmit()');
+  await until('document.querySelector(".coupon-error")?.textContent.includes("expired")', 'invalid coupon');
+  await fill('#coupon-code', 'SAVE50');
+  await evaluate('document.querySelector(".coupon-form").requestSubmit()');
+  await until('!!document.querySelector(".applied-coupon")', 'coupon applied');
+  assert.ok(await evaluate('document.querySelector(".summary-discount").textContent.includes("50")'));
+  await evaluate('document.querySelector(".applied-coupon button").click()');
+  await until('!!document.querySelector("#coupon-code") && !document.querySelector(".summary-discount")', 'coupon removed');
+  pass('cart quantity updates, server stock rejection without stale quantity, coupon validation and removal');
+  await navigate('/checkout');
+  await until('!!document.querySelector(".payment-options input[value=COD]")', 'payment methods');
+  assert.equal(await evaluate('document.querySelector(".payment-options input[value=BKASH]").disabled'), true);
+  await evaluate('document.querySelector(".checkout-form").requestSubmit()');
+  assert.equal(orderAttempts, 0);
+  await fill('[name=name]', 'Test Shopper'); await fill('[name=phone]', '12345');
+  assert.equal(await evaluate('document.querySelector("[name=phone]").checkValidity()'), false);
+  await fill('[name=phone]', '01712345678'); await fill('[name=address]', 'Test address'); await fill('[name=city]', 'Dhaka');
+  await navigate('/cart'); await navigate('/checkout');
+  await until('document.querySelector("[name=address]")?.value === "Test address"', 'address draft restored');
+  await until('!!document.querySelector(".summary-total") && !!document.querySelector(".payment-options input[value=COD]")', 'checkout ready');
+  await evaluate('document.querySelector(".consent-row input").click();document.querySelector(".checkout-form").requestSubmit();document.querySelector(".checkout-form").dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}))');
+  await until('document.querySelector(".checkout-form .shop-error")?.textContent.includes("Prices changed")', 'order price conflict');
+  assert.equal(orderAttempts, 1);
+  assert.equal(await evaluate('document.querySelector("[name=address]").value'), 'Test address');
+  await until('!document.querySelector(".place-order").disabled', 'retry enabled');
+  await evaluate('document.querySelector(".checkout-form").requestSubmit()');
+  await until('!!document.querySelector(".order-heading")', 'successful order details');
+  assert.equal(orderAttempts, 2);
+  assert.equal(await evaluate('document.querySelectorAll(".order-timeline li").length'), 1);
+  assert.ok(await evaluate('document.querySelector(".order-reference").textContent.length < 30'));
+  assert.ok(await evaluate('document.querySelector(".ordered-products").textContent.includes("Historical cotton shirt")'));
+  assert.ok(await evaluate('document.querySelector(".payment-details").textContent.includes("Cash on Delivery")'));
+  assert.equal(await evaluate('JSON.parse(localStorage.getItem("commerce-cart-v1")).length'), 0);
+  pass('guest checkout validation, disabled gateway, address draft, price-conflict retry, duplicate guard and successful redirect');
+  pass('order snapshot prices, compact reference, separate statuses and truthful timeline');
+  for (const width of [320,375,430,768,1024,1440]) {
+    await command('Emulation.setDeviceMetricsOverride', { width, height: 1000, deviceScaleFactor: 1, mobile: width < 768 });
+    for (const path of ['/cart','/checkout','/orders/'+fixtureOrder.id]) {
+      await evaluate(`localStorage.setItem('commerce-cart-v1',${JSON.stringify(JSON.stringify([shoppingLine]))})`);
+      await navigate(path);
+      await until(path.includes('/orders/') ? '!!document.querySelector(".order-heading")' : '!!document.querySelector(".summary-total")', 'responsive shopping content');
+      for (const theme of ['light','dark']) {
+        await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)};window.scrollTo({top:0,behavior:'instant'})`);
+        assert.equal(await evaluate('document.documentElement.scrollWidth <= window.innerWidth'), true, `${path} ${theme} ${width} overflow`);
+        const shot = await command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
+        writeFileSync(join(artifacts, `shopping-${path.split('/')[1]}-${theme}-${width}.png`), Buffer.from(shot.data, 'base64'));
+      }
+    }
+  }
+  pass('cart checkout order responsive layouts at 320/375/430/768/1024/1440 in light and dark modes');
+  await navigate('/cart'); await until('!!document.querySelector(".remove-item")', 'remove control');
+  await evaluate('document.querySelector(".remove-item").click()');
+  await until('!!document.querySelector(".empty-content")', 'empty cart');
+  assert.equal(await evaluate('!!document.querySelector(".order-summary")'), false);
+  pass('remove product updates storage and empty cart hides summary');
   assert.ok(!logs.includes("blocking-prerender-metadata-dynamic"), logs);
   pass("no metadata prerender errors");
   console.log("Screenshots: " + artifacts);
