@@ -11,7 +11,7 @@ export type Schema = {
   maxItems?: number;
   minItems?: number;
   pattern?: string;
-  format?: 'link' | 'email';
+  format?: 'link' | 'email' | 'datetime';
 };
 const text = (maxLength = 200, minLength = 1): Schema => ({
   type: 'string',
@@ -305,6 +305,28 @@ export const SETTINGS_SCHEMA = object(
       'enabled',
       'text',
     ]),
+    announcementRibbon: object({
+      enabled: bool,
+      animation: choice('fade', 'slide_up', 'slide_left', 'static'),
+      intervalSeconds: number(3, 30),
+      backgroundColor: color, textColor: color, accentColor: color,
+      items: array(object({ id, enabled: bool, text: text(240), icon: text(12, 0), ctaLabel: text(60, 0), ctaUrl: link,
+        startsAt: { ...text(40, 0), format: 'datetime' }, endsAt: { ...text(40, 0), format: 'datetime' },
+        device: choice('both', 'desktop', 'mobile'),
+      }, ['id', 'enabled', 'text', 'device']), 20),
+    }, ['enabled', 'animation', 'intervalSeconds', 'items']),
+    contactWidget: object({
+      enabled: bool, title: text(100), description: text(300, 0), statusText: text(100, 0), supportHours: text(150, 0),
+      iconStyle: choice('chat', 'headset'), position: choice('right', 'left'), desktop: bool, mobile: bool,
+      whatsapp: object({ enabled: bool, number: { ...text(20, 0), pattern: '^$|^\\+?[1-9][0-9]{6,14}$' }, message: text(500, 0) }, ['enabled']),
+      phone: object({ enabled: bool, number: { ...text(20, 0), pattern: '^$|^\\+?[0-9]{7,15}$' } }, ['enabled']),
+      email: object({ enabled: bool, address: { ...text(254), format: 'email', pattern: '^[^\\s@?&#%<>]+@[^\\s@?&#%<>]+\\.[^\\s@?&#%<>]+$' } }, ['enabled']),
+      launcherColor: color, accentColor: color, panelColor: color, iconColor: color,
+      lightPanelColor: color, lightTextColor: color, darkPanelColor: color, darkTextColor: color,
+      borderRadius: number(12, 28), animation: choice('none', 'subtle'),
+      excludedRoutes: array({ ...text(200), pattern: '^/(?!/)[a-zA-Z0-9/_%.-]*$' }, 30),
+      delaySeconds: number(0, 60), closeOnOutsideClick: bool, rememberDismissal: bool,
+    }, ['enabled', 'title', 'description', 'position', 'desktop', 'mobile']),
     header: object(
       {
         layout: choice('classic', 'centered', 'compact'),

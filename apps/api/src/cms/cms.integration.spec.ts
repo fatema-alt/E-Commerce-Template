@@ -34,6 +34,24 @@ describe.skipIf(!process.env.CMS_TEST_DATABASE_URL)(
       await db?.$disconnect();
     });
 
+    it('persists ribbon CRUD, order, contact settings and independent published snapshots', async () => {
+      const name = key();
+      const content = { storeName: 'DS Mart', locale: 'en', currency: 'BDT', announcementRibbon: { enabled: true, animation: 'fade', intervalSeconds: 5, items: [{ id: 'one', enabled: true, text: 'First message', device: 'both' }, { id: 'two', enabled: false, text: 'Second message', device: 'mobile' }] }, contactWidget: { enabled: true, title: 'Store Support', description: 'Contact us', position: 'right', desktop: true, mobile: true, phone: { enabled: true, number: '+8801712345678' } } };
+      await cms.draft('SITE_SETTINGS', name, content, 0, actor);
+      await cms.publish('SITE_SETTINGS', name, 1, actor);
+      expect((await cms.published('SITE_SETTINGS', name)).content).toEqual(content);
+      const edited = structuredClone(content);
+      edited.announcementRibbon.items.reverse(); edited.announcementRibbon.items[0]!.enabled = true; edited.announcementRibbon.items[0]!.text = 'Edited message';
+      edited.contactWidget.phone.number = '+8801812345678';
+      await cms.draft('SITE_SETTINGS', name, edited, 2, actor);
+      expect((await cms.published('SITE_SETTINGS', name)).content).toEqual(content);
+      await cms.publish('SITE_SETTINGS', name, 3, actor);
+      expect((await cms.published('SITE_SETTINGS', name)).content).toEqual(edited);
+      edited.announcementRibbon.items.pop(); edited.contactWidget.enabled = false;
+      await cms.draft('SITE_SETTINGS', name, edited, 4, actor);
+      await cms.publish('SITE_SETTINGS', name, 5, actor);
+      expect((await cms.published('SITE_SETTINGS', name)).content).toEqual(edited);
+    });
     it('keeps drafts private and supports repeated publish after revision changes', async () => {
       const name = key();
       const draft = await cms.draft('THEME', name, DEFAULT_THEME, 0, actor);

@@ -8,6 +8,7 @@ import { Footer, Header } from "../components/store-shell";
 import { StoreBenefits } from "../components/store-benefits";
 import { themeScript } from "../lib/theme-init";
 import { connection } from "next/server";
+import { FloatingContact } from "../components/store-engagement";
 import { StoreAnalytics } from "../components/store-analytics";
 import "./globals.css";
 
@@ -67,6 +68,7 @@ async function StoreFrame({ children }: { children: ReactNode }) {
       {unavailable ? <main id="main" className="container main-content"><div className="shop-panel store-unavailable"><p className="eyebrow">DS Mart</p><h1>We’ll be right back.</h1><p>Our store is temporarily unavailable. Please try again shortly.</p><a className="primary-button" href="/">Try again</a><a className="secondary-button" href="/help">Shopping help</a></div></main> : children}
       <StoreBenefits />
       <Footer config={config} />
+      <FloatingContact initial={config.settings} />
     </div>
   );
 }

@@ -74,6 +74,8 @@ function validate(schema: Schema, value: unknown, path: string): void {
         fail(path, 'invalid format');
       if (schema.format === 'link' && !safeLink(value))
         fail(path, 'unsafe link');
+      if (schema.format === 'datetime' && value && (!/^\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d(?:\.\d{1,3})?)?Z$/.test(value) || !Number.isFinite(Date.parse(value))))
+        fail(path, 'invalid UTC date');
       if (
         schema.format === 'email' &&
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
@@ -102,6 +104,21 @@ export function validateCmsContent(
     fail('content', 'maximum size is 100 KB');
   validate(schema, content, 'content');
   const object = content as Record<string, unknown>;
+  if (kind === 'SITE_SETTINGS') {
+    const ribbon = object.announcementRibbon as { items?: { id: string; startsAt?: string; endsAt?: string; ctaLabel?: string; ctaUrl?: string }[] } | undefined;
+    const seen = new Set<string>();
+    for (const item of ribbon?.items ?? []) {
+      if (seen.has(item.id)) fail('announcementRibbon.items', 'duplicate announcement ID');
+      seen.add(item.id);
+      if (item.startsAt && item.endsAt && Date.parse(item.startsAt) >= Date.parse(item.endsAt)) fail('announcementRibbon.items', 'end must be after start');
+      if (item.ctaLabel && !item.ctaUrl) fail('announcementRibbon.items', 'CTA URL is required for a CTA label');
+    }
+    const widget = object.contactWidget as Record<string, unknown> | undefined;
+    for (const [channel, field] of [['whatsapp', 'number'], ['phone', 'number'], ['email', 'address']]) {
+      const config = widget?.[channel] as Record<string, unknown> | undefined;
+      if (config?.enabled && !config[field]) fail('contactWidget.' + channel, field + ' is required when enabled');
+    }
+  }
   const identifiers = new Set<string>();
   if (kind === 'PAGE')
     for (const section of object.sections as Record<string, unknown>[]) {

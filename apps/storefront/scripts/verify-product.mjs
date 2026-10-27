@@ -87,12 +87,32 @@ let productUnavailable = true;
 let reviewAttempts = 0;
 let newsletterAttempts = 0;
 let orderAttempts = 0;
+let loggedIn = false, authAttempts = 0, suggestionRequests = 0;
+const browserErrors = [];
+const shopper = { id: 'shopper-fixture', firstName: 'Test Shopper', email: 'test@example.com' };
+let engagementSettings = { storeName: 'DS Mart', locale: 'en', currency: 'BDT', announcementRibbon: { enabled: true, animation: 'fade', intervalSeconds: 3, items: [
+  { id: 'one', enabled: true, text: 'First published announcement', device: 'both', ctaLabel: 'Browse', ctaUrl: '/shop' },
+  { id: 'two', enabled: true, text: 'Second published announcement', device: 'both' },
+  { id: 'expired', enabled: true, text: 'Expired announcement', device: 'both', endsAt: '2000-01-01T00:00:00Z' },
+  { id: 'future', enabled: true, text: 'Future announcement', device: 'both', startsAt: '2099-01-01T00:00:00Z' },
+  { id: 'disabled', enabled: false, text: 'Disabled announcement', device: 'both' },
+] }, contactWidget: { enabled: true, title: 'How can we help you?', description: 'Choose your preferred way to contact our team.', statusText: 'DS Mart Support', position: 'right', desktop: true, mobile: true, whatsapp: { enabled: true, number: '+8801712345678', message: 'Hello DS Mart' }, phone: { enabled: true, number: '+8801712345678' }, email: { enabled: true, address: 'support@example.com' }, excludedRoutes: ['/contact'], closeOnOutsideClick: true, rememberDismissal: true } };
 const fixtureOrder = { id: '00000000-0000-4000-8000-000000000010', orderNumber: '00000000-0000-4000-8000-000000000010', status: 'PROCESSING', paymentStatus: 'UNPAID', paymentMethod: 'COD', createdAt: '2026-10-20T09:00:00Z', customerName: 'Test Shopper', customerPhone: '01712345678', subtotal: '500.00', shippingTotal: '60.00', taxTotal: '0.00', grandTotal: '560.00', items: [{ nameSnapshot: 'Historical cotton shirt', skuSnapshot: 'HISTORY-001', quantity: 1, unitPrice: '500.00', lineTotal: '500.00' }], addresses: [{ recipientName: 'Test Shopper', phone: '01712345678', line1: 'Test address', city: 'Dhaka' }], shipments: [] };
 const reviewFixtures = Array.from({ length: 7 }, (_, index) => ({ id: 'review-' + index, authorName: 'Test shopper ' + index, rating: index % 2 ? 4 : 5, content: 'Isolated browser-test review.', title: 'Test feedback', photos: [], helpfulCount: 0, isVerifiedPurchase: index < 2, createdAt: '2026-10-01T00:00:00Z' }));
 const simpleId = "00000000-0000-4000-8000-000000000003";
 const api = http.createServer(async (req, res) => {
   const path = new URL(req.url, "http://localhost").pathname;
   res.setHeader("Content-Type", "application/json");
+  if (path.endsWith('/storefront/cms/SITE_SETTINGS/default')) { res.end(JSON.stringify({ content: engagementSettings, assets: [], version: 1 })); return; }
+  if (/\/shop\/(login|register)$/.test(path)) {
+    let body = ''; for await (const chunk of req) body += chunk;
+    const data = JSON.parse(body); authAttempts++;
+    if (data.password === 'wrong-password') { res.statusCode = 401; res.end(JSON.stringify({ message: 'Invalid email or password' })); return; }
+    loggedIn = true; res.end(JSON.stringify({ user: shopper })); return;
+  }
+  if (path.endsWith('/shop/logout')) { loggedIn = false; res.end('{}'); return; }
+  if (path.endsWith('/shop/newsletter') && req.method === 'GET') { res.end(JSON.stringify({ subscribed: false })); return; }
+  if (path.endsWith('/shop/orders') && req.method === 'GET') { res.end(JSON.stringify({ items: [fixtureOrder], total: 1 })); return; }
   if (path.endsWith('/shop/orders') && req.method === 'POST') {
     let body = ''; for await (const chunk of req) body += chunk;
     const fields = JSON.parse(body); orderAttempts++;
@@ -128,7 +148,7 @@ const api = http.createServer(async (req, res) => {
     res.end(JSON.stringify({ message: newsletterAttempts === 1 ? 'Temporary subscription failure' : 'Your newsletter request has been recorded.' })); return;
   }
   if (path.endsWith("/shop/me")) {
-    res.end(JSON.stringify({ user: null }));
+    res.end(JSON.stringify({ user: loggedIn ? shopper : null }));
     return;
   }
   if (path.endsWith("/shop/payment-methods")) {
@@ -263,6 +283,12 @@ const api = http.createServer(async (req, res) => {
     return;
   }
   if (path.endsWith("/products")) {
+    const search = new URL(req.url, 'http://localhost').searchParams.get('search');
+    if (search) {
+      suggestionRequests++;
+      if (search === 'error') { res.statusCode = 503; res.end(JSON.stringify({ message: 'Catalog unavailable' })); return; }
+      if (search === 'zzempty') { res.end(JSON.stringify({ items: [], total: 0 })); return; }
+    }
     res.end(
       JSON.stringify({
         items: [
@@ -323,6 +349,7 @@ async function until(expression, label) {
     if (await evaluate(expression)) return;
     await pause(100);
   }
+  console.error(await evaluate(`JSON.stringify({url:location.href,search:document.querySelector(".search-combobox input")?.value,expanded:document.querySelector(".search-combobox input")?.getAttribute("aria-expanded"),feedback:document.querySelector(".search-feedback")?.textContent,buttons:[...document.querySelectorAll("button")].map(b=>b.textContent.trim()).slice(0,10)})`));
   throw new Error("Timed out: " + label);
 }
 async function navigate(path) {
@@ -348,6 +375,10 @@ async function quantity(value) {
 function pass(label) {
   console.log("PASS: " + label);
 }
+  async function fill(selector, value) {
+    await evaluate(`(()=>{const input=document.querySelector(${JSON.stringify(selector)});const proto=input instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(input,${JSON.stringify(value)});input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+    await pause(60);
+  }
 try {
   await new Promise((resolve) => api.listen(4109, "127.0.0.1", resolve));
   server = spawn(
@@ -425,6 +456,11 @@ try {
   });
   ws.onmessage = (event) => {
     const response = JSON.parse(event.data);
+    if (response.method === 'Runtime.exceptionThrown') browserErrors.push(response.params.exceptionDetails.exception?.description || response.params.exceptionDetails.text);
+    if (response.method === 'Runtime.consoleAPICalled' && response.params.type === 'error') {
+      const message = response.params.args.map(arg => arg.value || arg.description || '').join(' ');
+      if (/hydrat|Minified React error #(?:418|423|425)/i.test(message)) browserErrors.push(message);
+    }
     if (!response.id) return;
     const task = pending.get(response.id);
     if (task) {
@@ -436,12 +472,14 @@ try {
   };
   await command("Page.enable");
   await command("Runtime.enable");
+  await command('Emulation.setFocusEmulationEnabled', { enabled: true });
   await command("Emulation.setDeviceMetricsOverride", {
     width: 1366,
     height: 1000,
     deviceScaleFactor: 1,
     mobile: false,
   });
+  if (!process.env.ENGAGEMENT_ONLY) {
   await navigate("/product/cotton-t-shirt");
   await until(
     '!!document.querySelector(".pdp-option")',
@@ -743,10 +781,7 @@ try {
   await evaluate('document.querySelector(".review-pagination button:last-child").click()');
   await until('document.querySelectorAll(".review-card").length === 2', 'review page two');
   pass('compact 22px stars, actual rating summary, verified count and review pagination');
-  async function fill(selector, value) {
-    await evaluate(`(()=>{const input=document.querySelector(${JSON.stringify(selector)});const proto=input instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(input,${JSON.stringify(value)});input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
-    await pause(60);
-  }
+
   await evaluate('document.querySelector(".feedback-form input[type=radio][value=\\"4\\"]").click()');
   await fill('.feedback-form input[name=authorName]', 'Test shopper');
   await fill('.feedback-form input[name=authorEmail]', 'test@example.com');
@@ -866,6 +901,111 @@ try {
   await until('!!document.querySelector(".empty-content")', 'empty cart');
   assert.equal(await evaluate('!!document.querySelector(".order-summary")'), false);
   pass('remove product updates storage and empty cart hides summary');
+  }
+  await command('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+  await navigate('/account'); await until('!!document.querySelector(".auth-card")', 'account sign in');
+  assert.equal(await evaluate('document.querySelector(".auth-card").textContent.includes("Use at least")'), false);
+  assert.ok(await evaluate('document.querySelector(".auth-card").getBoundingClientRect().width <= 480'));
+  await fill('.auth-card [name=email]', 'test@example.com'); await fill('.auth-card [name=password]', 'wrong-password');
+  await evaluate('document.querySelector(".auth-password button").click()');
+  assert.equal(await evaluate('document.querySelector(".auth-card [name=password]").type'), 'text');
+  await evaluate('document.querySelector(".auth-card").requestSubmit()');
+  await until('document.querySelector(".account-auth [role=alert]")?.textContent.includes("Invalid email or password")', 'generic sign-in error');
+  await fill('.auth-card [name=password]', 'valid-password-for-tests');
+  await evaluate('document.querySelector(".auth-card").requestSubmit();document.querySelector(".auth-card").dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}))');
+  await until('!!document.querySelector(".account-dashboard")', 'signed-in account overview');
+  assert.equal(authAttempts, 2);
+  await until('!!document.querySelector(".account-recent-orders")', 'recent account orders');
+  await click('Sign out'); await until('!!document.querySelector(".auth-card")', 'sign out');
+  await evaluate('document.querySelector(".auth-card>.text-button").click()');
+  assert.ok(await evaluate('document.querySelector(".auth-card").textContent.includes("Use at least 12")'));
+  await fill('.auth-card [name=name]', 'Test Shopper'); await fill('.auth-card [name=email]', 'test@example.com'); await fill('.auth-card [name=password]', 'valid-password-for-tests');
+  await evaluate('document.querySelector(".auth-card").requestSubmit()');
+  await until('!!document.querySelector(".account-dashboard")', 'registration');
+  await click('Sign out'); await until('!!document.querySelector(".auth-card")', 'signed out again');
+  pass('account sign-in error, password visibility, duplicate guard, authenticated overview, recent orders, sign-out and registration');
+  const beforeSearch = suggestionRequests;
+  await evaluate('document.querySelector(".search-combobox input").focus()');
+  await command('Input.insertText', {text:'c'}); await pause(70); await command('Input.insertText', {text:'o'}); await pause(70); await command('Input.insertText', {text:'tton'});
+  await evaluate('document.querySelector(".search-combobox input").focus()');
+  await until('document.querySelectorAll(".search-option").length > 0', 'catalog suggestions');
+  assert.equal(suggestionRequests - beforeSearch, 1);
+  assert.equal(await evaluate('document.querySelector(".search-combobox input").autocomplete'), 'off');
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".search-combobox input")).outlineStyle'), 'none');
+  await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 });
+  assert.ok(await evaluate('!!document.querySelector(".search-combobox input").getAttribute("aria-activedescendant")'));
+  await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+  await until('location.pathname === "/product/cotton-t-shirt"', 'keyboard result navigation');
+  await evaluate('document.querySelector(".search-combobox input").focus();document.querySelector(".search-combobox input").select()'); await command('Input.insertText',{text:'zzempty'}); await evaluate('document.querySelector(".search-combobox input").focus()');
+  await until('document.querySelector(".search-feedback")?.textContent.includes("No matching")', 'no search results');
+  await evaluate('document.querySelector(".search-combobox input").focus();document.querySelector(".search-combobox input").select()'); await command('Input.insertText',{text:'error'});
+  await until('document.querySelector(".search-feedback")?.textContent.includes("temporarily unavailable")', 'search API error');
+  assert.ok(await evaluate('document.querySelector(".search-all").href.includes("q=error")'));
+  await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  assert.equal(await evaluate('!!document.querySelector(".search-panel")'), false);
+  pass('catalog search debounce, autocomplete hint, focus ring, keyboard navigation, empty/error states and full-search fallback');
+  await navigate('/account'); await until('document.querySelectorAll(".ribbon-dots button").length === 2', 'scheduled announcements');
+  const firstMessage = await evaluate('document.querySelector(".ribbon-message").textContent');
+  await until(`document.querySelector('.ribbon-message').textContent !== ${JSON.stringify(firstMessage)}`, 'ribbon rotation');
+  await evaluate('document.querySelector(".ribbon-pause").focus()');
+  await pause(100);
+  assert.equal(await evaluate('document.activeElement === document.querySelector(".ribbon-pause")'), true, 'keyboard focus enters ribbon');
+  const focusedMessage = await evaluate('document.querySelector(".ribbon-message").textContent'); await pause(3300);
+  assert.equal(await evaluate('document.querySelector(".ribbon-message").textContent'), focusedMessage);
+  await evaluate('document.querySelector(".ribbon-pause").click();document.querySelector(".ribbon-pause").blur()');
+  const pausedMessage = await evaluate('document.querySelector(".ribbon-message").textContent'); await pause(3300);
+  assert.equal(await evaluate('document.querySelector(".ribbon-message").textContent'), pausedMessage);
+  await command('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".ribbon-message")).animationName'), 'none');
+  await command('Emulation.setEmulatedMedia', { features: [] });
+  pass('announcement scheduling, disabled filtering, rotation, focus/manual pause and reduced motion');
+  await until('!!document.querySelector(".contact-launcher")', 'contact launcher');
+  await evaluate('document.querySelector(".contact-launcher").click()');
+  await until('document.activeElement?.className === "contact-close"', 'contact focus handling');
+  assert.ok(await evaluate('document.querySelector(".channel-whatsapp").href.includes("https://wa.me/8801712345678?text=Hello%20DS%20Mart")'));
+  assert.equal(await evaluate('document.querySelector(".channel-phone").getAttribute("href")'), 'tel:+8801712345678');
+  assert.equal(await evaluate('document.querySelector(".channel-email").getAttribute("href")'), 'mailto:support@example.com');
+  await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  assert.equal(await evaluate('!!document.querySelector(".contact-panel")'), false);
+  assert.equal(await evaluate('document.activeElement.className'), 'contact-launcher');
+  assert.equal(await evaluate('sessionStorage.getItem("ds-contact-dismissed")'), '1');
+  await evaluate('document.querySelector(".contact-launcher").click()');
+  await until('!!document.querySelector(".contact-panel")', 'reopened contact panel');
+  await evaluate('document.body.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}))');
+  await until('!document.querySelector(".contact-panel")', 'outside contact close');
+  await navigate('/contact'); assert.equal(await evaluate('!!document.querySelector(".floating-contact")'), false);
+  await navigate('/account');
+  engagementSettings = { ...engagementSettings, announcementRibbon: { ...engagementSettings.announcementRibbon, items: [{ id: 'updated', enabled: true, text: 'Published without rebuilding', device: 'both' }] } };
+  await evaluate('window.dispatchEvent(new Event("focus"))');
+  await until('document.querySelector(".ribbon-message")?.textContent.includes("Published without rebuilding")', 'live published update');
+  pass('contact open/close, focus, valid configured channels, session dismissal, route exclusions and live published refresh');
+  engagementSettings.contactWidget.enabled = false;
+  await evaluate('window.dispatchEvent(new Event("focus"))');
+  await until('!document.querySelector(".floating-contact")', 'published widget master toggle');
+  engagementSettings.contactWidget.enabled = true; engagementSettings.contactWidget.delaySeconds = 1;
+  await evaluate('window.dispatchEvent(new Event("focus"))');
+  await until('!!document.querySelector(".contact-launcher")', 'configured widget delay');
+  engagementSettings.announcementRibbon.items = [{ id: 'desktop-only', enabled: true, text: 'Desktop-only announcement', device: 'desktop' }, { id: 'mobile-only', enabled: true, text: 'Mobile-only announcement', device: 'mobile' }];
+  for (const width of [320,375,768,1440]) {
+    await command('Emulation.setDeviceMetricsOverride', { width, height: 1000, deviceScaleFactor: 1, mobile: width < 768 });
+    await navigate('/account'); await until('!!document.querySelector(".auth-card") && !!document.querySelector(".contact-launcher")', 'responsive account');
+    await until(`document.querySelector('.ribbon-message')?.textContent.includes(${JSON.stringify(width < 768 ? 'Mobile-only' : 'Desktop-only')})`, 'device-targeted announcement');
+    await evaluate('document.querySelector(".contact-launcher").click()');
+    for (const theme of ['light','dark']) {
+      await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)};window.scrollTo({top:0,behavior:'instant'})`);
+      await pause(300);
+      assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
+      const shot = await command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
+      writeFileSync(join(artifacts, `engagement-${theme}-${width}.png`), Buffer.from(shot.data, 'base64'));
+      await evaluate('document.querySelector(".contact-close").click()');
+      await pause(100);
+      const closed = await command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
+      writeFileSync(join(artifacts, `account-${theme}-${width}.png`), Buffer.from(closed.data, 'base64'));
+      await evaluate('document.querySelector(".contact-launcher").click()');
+    }
+  }
+  pass('account ribbon and contact responsive light/dark layouts at 320/375/768/1440');
+  assert.deepEqual(browserErrors, [], 'no uncaught browser exceptions or hydration errors');
   assert.ok(!logs.includes("blocking-prerender-metadata-dynamic"), logs);
   pass("no metadata prerender errors");
   console.log("Screenshots: " + artifacts);

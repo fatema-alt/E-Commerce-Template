@@ -131,7 +131,7 @@ export function SchemaField({
               <p className="text-xs text-slate-500">{graphicOnly ? "Use a 3:1 desktop banner with embedded text. No HTML overlay or cropping. Optional mobile image: 4:5. Set Banner Link to make it clickable. Title is an accessible label only." : "Use an image without embedded text. HTML content takes 45% and image takes 55% on desktop; they stack on mobile."}</p>
             </fieldset>
           );
-          if (key === "enabled") return <label key={key} className="flex gap-2 text-sm font-semibold"><input type="checkbox" checked={data.enabled !== false} onChange={(event) => onChange({ ...data, enabled: event.target.checked })} />Enable this slide</label>;
+          if (key === "enabled") return <label key={key} className="flex gap-2 text-sm font-semibold"><input type="checkbox" checked={data.enabled !== false} onChange={(event) => onChange({ ...data, enabled: event.target.checked })} />{name.startsWith("slides") ? "Enable this slide" : "Enabled"}</label>;
           const required = schema.required?.includes(key);
           const enabled = data[key] !== undefined;
           const imageField = child.type === "object" && !!child.properties?.assetId;
@@ -314,9 +314,11 @@ export function SchemaField({
                 ? "number"
                 : schema.format === "email"
                   ? "email"
+                  : schema.format === "datetime"
+                    ? "datetime-local"
                   : "text"
             }
-            value={String(value ?? "")}
+            value={schema.format === "datetime" && value ? new Date(String(value)).toLocaleString('sv-SE').replace(' ', 'T').slice(0, 16) : String(value ?? "")}
             min={schema.min}
             max={schema.max}
             minLength={schema.minLength}
@@ -326,6 +328,8 @@ export function SchemaField({
               onChange(
                 schema.type === "number"
                   ? Number(e.target.value)
+                  : schema.format === "datetime" && e.target.value
+                    ? new Date(e.target.value).toISOString()
                   : e.target.value,
               )
             }

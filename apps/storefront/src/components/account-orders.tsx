@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { BrandLogo } from "./brand-logo";
 import { OrderDetails } from "./order-details";
 import { statusLabel } from "./shopping-ui";
 import { useSearchParams } from "next/navigation";
@@ -18,6 +19,9 @@ export function Account() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const authLock = useRef(false);
+  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   useEffect(() => {
     let live = true;
     shopRequest<{ user: Shopper | null }>("me")
@@ -30,13 +34,36 @@ export function Account() {
       .finally(() => {
         if (live) setLoading(false);
       });
+
     return () => {
       live = false;
     };
   }, []);
+  useEffect(() => {
+    let live = true;
+    if (user)
+      void shopRequest<{ items: Order[] }>("orders?page=1")
+        .then((result) => {
+          if (live) setRecentOrders(result.items.slice(0, 3));
+        })
+        .catch(() => {
+          /* The orders page exposes retry and access errors. */
+        });
+    return () => {
+      live = false;
+    };
+  }, [user]);
   return (
-    <main id="main" className="container main-content account-page">
-      <h1>{user ? `Welcome, ${user.firstName}` : "Your account"}</h1>
+    <main
+      id="main"
+      className={`container main-content account-page ${user ? "account-dashboard shopping-page" : "account-auth"}`}
+    >
+      {user && (
+        <header>
+          <h1>Welcome, {user.firstName}</h1>
+          <p className="muted">Manage your account and follow your orders.</p>
+        </header>
+      )}
       {error && (
         <p role="alert" className="shop-error">
           {error}
@@ -68,6 +95,9 @@ export function Account() {
                   try {
                     await shopRequest("logout", {});
                     setUser(null);
+                    setRecentOrders([]);
+                    setNotice("You have been signed out.");
+                    setError("");
                   } catch (e) {
                     setError((e as Error).message);
                   } finally {
@@ -79,6 +109,25 @@ export function Account() {
               </button>
             </div>
           </div>
+          {recentOrders.length > 0 && (
+            <section className="shop-panel">
+              <h2>Recent orders</h2>
+              <div className="account-recent-orders">
+                {recentOrders.map((order) => (
+                  <Link key={order.id} href={`/orders/${order.id}`}>
+                    <strong>
+                      {order.orderNumber.length < 30
+                        ? order.orderNumber
+                        : `#${order.id.slice(-12)}`}
+                    </strong>
+                    <span>
+                      {statusLabel(order.status)} ? {money(order.grandTotal)}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
           <form
             className="shop-panel"
             onSubmit={async (e) => {
@@ -133,12 +182,15 @@ export function Account() {
         </>
       ) : (
         <form
-          className="shop-panel"
+          className="shop-panel auth-card"
           onSubmit={async (e) => {
             e.preventDefault();
+            if (authLock.current) return;
+            authLock.current = true;
             const data = new FormData(e.currentTarget);
             setBusy(true);
             setError("");
+            setNotice("");
             try {
               const result = await shopRequest<{ user: Shopper }>(
                 register ? "register" : "login",
@@ -153,11 +205,20 @@ export function Account() {
             } catch (e) {
               setError((e as Error).message);
             } finally {
+              authLock.current = false;
               setBusy(false);
             }
           }}
         >
-          <h2>{register ? "Create an account" : "Sign in"}</h2>
+          <Link href="/" className="auth-brand" aria-label="DS Mart homepage">
+            <BrandLogo />
+          </Link>
+          <h1>{register ? "Create your account" : "Welcome Back"}</h1>
+          <p className="muted">
+            {register
+              ? "Join DS Mart for easier shopping and order tracking."
+              : "Sign in to your DS Mart account"}
+          </p>
           <fieldset disabled={busy}>
             {register && (
               <label>
@@ -183,16 +244,28 @@ export function Account() {
             </label>
             <label>
               Password
-              <input
-                name="password"
-                type="password"
-                autoComplete={register ? "new-password" : "current-password"}
-                minLength={12}
-                maxLength={256}
-                required
-              />
+              <span className="auth-password">
+                <input
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete={register ? "new-password" : "current-password"}
+                  minLength={register ? 12 : undefined}
+                  maxLength={256}
+                  required
+                />
+                <button
+                  type="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((value) => !value)}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </span>
             </label>
-            <p className="muted small">Use at least 12 characters.</p>
+            {register && (
+              <p className="muted small">Use at least 12 characters.</p>
+            )}
             <button className="primary-button">
               {busy ? "Please wait…" : register ? "Create account" : "Sign in"}
             </button>
@@ -203,6 +276,7 @@ export function Account() {
             onClick={() => {
               setRegister(!register);
               setError("");
+              setShowPassword(false);
             }}
           >
             {register

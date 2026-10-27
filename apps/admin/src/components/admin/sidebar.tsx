@@ -72,6 +72,8 @@ const navigation: NavItem[] = [
       { label: "Navigation Menus", href: "/cms/navigation", icon: FolderTree },
       { label: "Media Library", href: "/cms/media", icon: ImageIcon },
       { label: "Site Settings", href: "/cms/settings", icon: Settings },
+      { label: "Announcement Bar", href: "/cms/announcements", icon: Sparkles },
+      { label: "Floating Contact Widget", href: "/cms/contact-widget", icon: Users },
     ],
   },
   {

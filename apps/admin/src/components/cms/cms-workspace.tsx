@@ -17,6 +17,7 @@ import {
 import { button, input, SchemaField } from "./schema-fields";
 import { getStandardEcommerceTemplate } from "./standard-template";
 import { VisualHomepageBuilder } from "./visual-homepage-builder";
+import { EngagementPreview, engagementDefaults } from "./engagement-preview";
 
 const tabs = [
   ["SITE_SETTINGS", "Site Settings", "settings"],
@@ -24,6 +25,8 @@ const tabs = [
   ["PAGE", "Pages", "pages"],
   ["NAVIGATION", "Navigation", "navigation"],
   ["MEDIA", "Media Library", "media"],
+  ["ANNOUNCEMENTS", "Announcement Bar", "announcements"],
+  ["CONTACT_WIDGET", "Floating Contact Widget", "contact-widget"],
 ];
 type Version = { id: string; version: number; createdAt: string };
 type Section = {
@@ -36,9 +39,11 @@ type Section = {
 export function CmsWorkspace({
   kind,
   defaultKey,
+  scope,
 }: {
   kind: string;
   defaultKey?: string;
+  scope?: "announcementRibbon" | "contactWidget";
 }) {
   const [registry, setRegistry] = useState<Registry | null>(null);
   const [role, setRole] = useState("STAFF");
@@ -160,8 +165,8 @@ export function CmsWorkspace({
     setDirty(true);
     setNotice("");
   }
-  async function open(documentKey: string) {
-    if (!canLeave()) return;
+  const open = useCallback(async (documentKey: string) => {
+    if (dirty && !window.confirm("Discard unsaved changes?")) return;
     const current = ++sequence.current;
     setBusy(true);
     setError("");
@@ -193,7 +198,13 @@ export function CmsWorkspace({
       setDirty(false);
       setPreview(false);
     } catch (e) {
-      if (documentKey === "home" && kind === "PAGE" && e instanceof CmsRequestError && e.status === 404) {
+      if (scope && kind === "SITE_SETTINGS" && e instanceof CmsRequestError && e.status === 404) {
+        if (current !== sequence.current) return;
+        setKey(documentKey); setDoc(null);
+        setContent({ storeName: "DS Mart", locale: "en", currency: "BDT", [scope]: engagementDefaults[scope] });
+        setVersions([]); setHistoryTotal(0); setDirty(true);
+        setNotice("New Site Settings draft. Configure, save and publish when ready.");
+      } else if (documentKey === "home" && kind === "PAGE" && e instanceof CmsRequestError && e.status === 404) {
         if (current !== sequence.current) return;
         setKey("home");
         setDoc(null);
@@ -213,7 +224,7 @@ export function CmsWorkspace({
     } finally {
       if (current === sequence.current) setBusy(false);
     }
-  }
+  }, [dirty, kind, scope, setError, setNotice]);
 
   const initialOpenedRef = useRef(false);
   useEffect(() => {
@@ -225,9 +236,9 @@ export function CmsWorkspace({
         : null;
     const targetKey = urlKey || defaultKey || (kind === "PAGE" ? "home" : "");
     if (targetKey) {
-      open(targetKey);
+      void Promise.resolve().then(() => open(targetKey));
     }
-  }, [loading, kind, defaultKey]);
+  }, [loading, kind, defaultKey, open]);
   function create() {
     if (!registry || !canLeave()) return;
     if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(newKey)) {
@@ -366,7 +377,7 @@ export function CmsWorkspace({
   function updateSections(next: Section[]) {
     change({ ...content, sections: next as unknown as Value });
   }
-  const heading = tabs.find((tab) => tab[0] === kind)?.[1];
+  const heading = scope === "announcementRibbon" ? "Announcement Bar" : scope === "contactWidget" ? "Floating Contact Widget" : tabs.find((tab) => tab[0] === kind)?.[1];
   return (
     <div className="space-y-6">
       <div>
@@ -390,8 +401,8 @@ export function CmsWorkspace({
             onClick={(e) => {
               if (!canLeave()) e.preventDefault();
             }}
-            aria-current={kind === id ? "page" : undefined}
-            className={`rounded-lg px-4 py-2 text-sm font-medium ${kind === id ? "bg-indigo-600 text-white" : "bg-white text-slate-600"}`}
+            aria-current={(scope ? (scope === "announcementRibbon" ? id === "ANNOUNCEMENTS" : id === "CONTACT_WIDGET") : kind === id) ? "page" : undefined}
+            className={`rounded-lg px-4 py-2 text-sm font-medium ${(scope ? (scope === "announcementRibbon" ? id === "ANNOUNCEMENTS" : id === "CONTACT_WIDGET") : kind === id) ? "bg-indigo-600 text-white" : "bg-white text-slate-600"}`}
           >
             {title}
           </Link>
@@ -696,7 +707,12 @@ export function CmsWorkspace({
                   disabled={!editable || busy}
                   className="mt-6 min-w-0 space-y-5"
                 >
-                  {preview ? (
+                  {scope ? (
+                    <div className="engagement-editor">
+                      <div><p className="mb-4 text-sm text-slate-500">Settings are part of the selected Site Settings document. Publishing also publishes its other saved changes. Times use your local timezone and are saved in UTC. Array order controls display order.</p><SchemaField name={heading || scope} schema={registry.documents.SITE_SETTINGS.properties![scope]} value={content[scope] ?? engagementDefaults[scope]} assets={assets} onChange={value => change({ ...content, [scope]: value })} /></div>
+                      <EngagementPreview scope={scope} value={content[scope] ?? engagementDefaults[scope]} />
+                    </div>
+                  ) : preview ? (
                     <DraftPreview
                       kind={kind}
                       content={content}

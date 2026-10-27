@@ -1,4 +1,5 @@
 import { cache } from "react";
+import type { ContactSettings, RibbonSettings } from "./engagement";
 import {
   fallbackConfig,
   imageUrl,
@@ -38,6 +39,8 @@ export type CmsPage = {
   sections: Section[];
 };
 export type Settings = {
+  announcementRibbon?: RibbonSettings;
+  contactWidget?: ContactSettings;
   homePageKey?: string;
   storeName?: string;
   tagline?: string;
@@ -81,6 +84,7 @@ export const published = cache(
   },
 );
 export type CmsConfig = StorefrontConfig & {
+  renderedAt?: number;
   settings: Settings;
   tokens: Record<string, string | number>;
   menus: Record<string, MenuItem[]>;
@@ -133,6 +137,7 @@ export const getCmsConfig = cache(async (): Promise<CmsConfig> => {
   const menus = Object.fromEntries(entries);
   return {
     ...fallbackConfig,
+    renderedAt: Date.now(),
     siteName: fallbackConfig.siteName,
     announcement: settingsDoc
       ? settings.announcement?.enabled
@@ -157,7 +162,9 @@ export const getCmsConfig = cache(async (): Promise<CmsConfig> => {
 export const getCmsPage = (key: string) => published<CmsPage>("PAGE", key);
 export const getHomePage = cache(async () => {
   const config = await getCmsConfig();
-  return getCmsPage(config.settings.homePageKey || process.env.CMS_HOME_KEY || 'home');
+  return getCmsPage(
+    config.settings.homePageKey || process.env.CMS_HOME_KEY || "home",
+  );
 });
 export function assetSource(assets: Asset[], id?: string) {
   return imageUrl(assets.find((asset) => asset.id === id)?.url);

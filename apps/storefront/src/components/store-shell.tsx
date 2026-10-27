@@ -1,13 +1,10 @@
-/* eslint-disable @next/next/no-img-element -- Public CMS images support configured media storage. */
 import Link from "next/link";
+import { SearchCombobox } from "./search-combobox";
+import { AnnouncementRibbon } from "./store-engagement";
 import { ThemeSwitcher } from "./theme-switcher";
 import { ShoppingLinks } from "./shopping-actions";
 import { BrandLogo } from "./brand-logo";
-import {
-  safeHref,
-  type CmsConfig,
-  type MenuItem,
-} from "../lib/cms";
+import { safeHref, type CmsConfig, type MenuItem } from "../lib/cms";
 function Menu({ items }: { items: MenuItem[] }) {
   return (
     <ul className="cms-menu">
@@ -27,23 +24,6 @@ function Menu({ items }: { items: MenuItem[] }) {
     </ul>
   );
 }
-function Search() {
-  return (
-    <form action="/search" className="search" role="search">
-      <label className="sr-only" htmlFor="search-products">
-        Search products
-      </label>
-      <input
-        id="search-products"
-        name="q"
-        type="search"
-        placeholder="Search products…"
-        minLength={1}
-      />
-      <button type="submit">Search</button>
-    </form>
-  );
-}
 export function Header({ config }: { config: CmsConfig }) {
   const { settings } = config;
   const menu = config.menus[settings.header?.menuKey || "main"] || [];
@@ -52,17 +32,17 @@ export function Header({ config }: { config: CmsConfig }) {
     : [];
   return (
     <>
-      {config.announcement && (
-        <div className="announcement">
-          {safeHref(settings.announcement?.href) ? (
-            <Link href={safeHref(settings.announcement?.href)!}>
-              {config.announcement}
-            </Link>
-          ) : (
-            config.announcement
-          )}
-        </div>
-      )}
+      <AnnouncementRibbon
+        initial={{
+          ...settings,
+          announcement:
+            settings.announcement ||
+            (config.announcement
+              ? { enabled: true, text: config.announcement }
+              : undefined),
+        }}
+        initialNow={config.renderedAt || 0}
+      />
       <header
         className={`site-header header-${settings.header?.layout || "classic"} tone-${config.tokens.headerStyle || "light"}`}
       >
@@ -75,20 +55,26 @@ export function Header({ config }: { config: CmsConfig }) {
             <BrandLogo />
           </Link>
           {(!settings.header ||
-            settings.header.searchPlacement === "header") && <Search />}
+            settings.header.searchPlacement === "header") && <SearchCombobox />}
           <ShoppingLinks />
           <ThemeSwitcher />
         </div>
         {settings.header?.searchPlacement === "below" && (
           <div className="container search-below">
-            <Search />
+            <SearchCombobox />
           </div>
         )}
         <nav className="container category-nav" aria-label="Store navigation">
           {menu.length ? (
             <Menu items={menu} />
           ) : (
-            <><Link href="/shop">Shop all</Link><Link href="/categories">Browse categories</Link><Link href="/wishlist">Your wishlist</Link><Link href="/orders">Track order</Link><Link href="/help">Shopping help</Link></>
+            <>
+              <Link href="/shop">Shop all</Link>
+              <Link href="/categories">Browse categories</Link>
+              <Link href="/wishlist">Your wishlist</Link>
+              <Link href="/orders">Track order</Link>
+              <Link href="/help">Shopping help</Link>
+            </>
           )}
         </nav>
         {categoryMenu?.length ? (
@@ -109,7 +95,9 @@ export function Footer({ config }: { config: CmsConfig }) {
     <footer className={`footer tone-${config.tokens.footerStyle || "light"}`}>
       <div className="container footer-layout">
         <div>
-          <Link href="/" className="wordmark" aria-label="DS Mart homepage"><BrandLogo /></Link>
+          <Link href="/" className="wordmark" aria-label="DS Mart homepage">
+            <BrandLogo />
+          </Link>
           <p className="footer-tagline">Shop smart. Live smart.</p>
           <p>Everyday essentials and fresh discoveries, delivered.</p>
           {settings.contact?.address && <p>{settings.contact.address}</p>}
@@ -156,7 +144,9 @@ export function Footer({ config }: { config: CmsConfig }) {
         </nav>
       </div>
       <div className="container footer-bottom">
-        <span>© {new Date().getUTCFullYear()} DS Mart. All rights reserved.</span>
+        <span>
+          © {new Date().getUTCFullYear()} DS Mart. All rights reserved.
+        </span>
         <span>Shop smart. Live smart.</span>
       </div>
     </footer>
