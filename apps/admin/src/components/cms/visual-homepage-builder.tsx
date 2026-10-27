@@ -123,36 +123,44 @@ export function VisualHomepageBuilder({
   };
 
   return (
-    <div className="flex h-[calc(100vh-130px)] flex-col bg-slate-100 overflow-hidden rounded-2xl border border-slate-200 shadow-xl">
+    <div className="flex h-[calc(100vh-130px)] flex-col bg-slate-100 dark:bg-slate-950 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl">
       {/* 1. TOP BUILDER TOOLBAR */}
-      <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-5 z-20">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 z-20 gap-3 overflow-x-auto whitespace-nowrap">
         {/* Left: Page Title & Status */}
-        <div className="flex items-center gap-3">
-          <span className="font-bold text-slate-900 text-sm">
+        <div className="flex items-center gap-2.5 shrink-0">
+          <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
             {pageTitle || "Homepage Builder"}
           </span>
-          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600 border border-slate-200">
-            {doc?.state ?? "NEW"} · Rev {doc?.revision ?? 0}
+          <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+            {doc?.state ?? "NEW"} · v{doc?.revision ?? 0}
           </span>
           {dirty ? (
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 border border-amber-200 flex items-center gap-1">
+            <span className="rounded-full bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 flex items-center gap-1">
               <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-              Unsaved changes
+              Unsaved
             </span>
           ) : (
-            <span className="text-xs text-slate-500 font-medium">✓ Saved</span>
+            <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">✓ Saved</span>
           )}
+          <a
+            href="http://localhost:3000"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-0.5 ml-1"
+          >
+            <span>Live Store ↗</span>
+          </a>
         </div>
 
         {/* Center: Responsive Viewport Switcher */}
-        <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-1 shadow-2xs">
+        <div className="flex items-center rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 p-1 shadow-2xs shrink-0">
           <button
             type="button"
             onClick={() => setViewport("desktop")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition ${
+            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition ${
               viewport === "desktop"
-                ? "bg-white text-indigo-600 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
+                ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
             }`}
             title="Desktop View (100%)"
           >
@@ -162,10 +170,10 @@ export function VisualHomepageBuilder({
           <button
             type="button"
             onClick={() => setViewport("tablet")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition ${
+            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition ${
               viewport === "tablet"
-                ? "bg-white text-indigo-600 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
+                ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
             }`}
             title="Tablet View (768px)"
           >
@@ -175,10 +183,10 @@ export function VisualHomepageBuilder({
           <button
             type="button"
             onClick={() => setViewport("mobile")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition ${
+            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition ${
               viewport === "mobile"
-                ? "bg-white text-indigo-600 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
+                ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
             }`}
             title="Mobile View (390px)"
           >
@@ -188,7 +196,7 @@ export function VisualHomepageBuilder({
         </div>
 
         {/* Right: Actions (Template, Save, Publish) */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => {
@@ -200,9 +208,9 @@ export function VisualHomepageBuilder({
               onUpdateSections(getStandardEcommerceTemplate() as unknown as Section[]);
               onNotice("Standard template loaded. Customize each section in the inspector.");
             }}
-            className="rounded-lg bg-indigo-50 border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
+            className="rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 px-3 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition shadow-2xs"
           >
-            ✨ Load Standard Template
+            ✨ Reset Template
           </button>
 
           {editable && (
@@ -210,7 +218,7 @@ export function VisualHomepageBuilder({
               type="button"
               disabled={busy || !dirty}
               onClick={onSaveDraft}
-              className="rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50 transition"
+              className="rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50 transition"
             >
               {busy ? "Saving..." : "Save draft"}
             </button>
@@ -221,7 +229,7 @@ export function VisualHomepageBuilder({
               type="button"
               disabled={busy || dirty}
               onClick={onPublish}
-              className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50 transition"
+              className="rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50 transition"
             >
               Publish live
             </button>
@@ -232,32 +240,32 @@ export function VisualHomepageBuilder({
       {/* 2. THREE-PANEL WORKSPACE BODY */}
       <div className="flex flex-1 overflow-hidden">
         {/* PANEL A: LEFT SECTION NAVIGATOR */}
-        <aside className="w-80 flex-shrink-0 border-r border-slate-200 bg-white flex flex-col z-10">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-slate-50">
+        <aside className="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col z-10">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-3.5 py-3 bg-slate-50 dark:bg-slate-800/60">
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                Sections Navigator
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Sections
               </span>
-              <span className="ml-1.5 text-xs text-slate-600">({sections.length})</span>
+              <span className="ml-1.5 text-xs text-slate-500">({sections.length})</span>
             </div>
             <button
               type="button"
               onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700 shadow-2xs transition"
+              className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700 shadow-2xs transition"
             >
-              + Add Section
+              + Add
             </button>
           </div>
 
           {/* Section Items List */}
           <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
             {sections.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-600 space-y-3">
+              <div className="p-6 text-center text-xs text-slate-500 space-y-3">
                 <p>No sections on this page yet.</p>
                 <button
                   type="button"
                   onClick={() => setShowAddModal(true)}
-                  className="rounded-lg bg-indigo-50 border border-indigo-200 px-3 py-1.5 font-semibold text-indigo-700 hover:bg-indigo-100"
+                  className="rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 px-3 py-1.5 font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100"
                 >
                   + Add First Section
                 </button>
@@ -274,14 +282,14 @@ export function VisualHomepageBuilder({
                   <div
                     key={section.id}
                     onClick={() => setSelectedSectionId(section.id)}
-                    className={`group relative flex items-center gap-2 rounded-xl border p-2.5 text-left text-xs transition cursor-pointer ${
+                    className={`group relative flex items-center gap-2 rounded-xl border p-2 text-left text-xs transition cursor-pointer ${
                       isSelected
-                        ? "border-indigo-500 bg-indigo-50/70 shadow-xs ring-1 ring-indigo-500"
-                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                        ? "border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/40 shadow-xs ring-1 ring-indigo-500"
+                        : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/50 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
                     }`}
                   >
                     {/* Reorder Buttons */}
-                    <div className="flex flex-col gap-0.5 text-slate-600">
+                    <div className="flex flex-col gap-0.5 text-slate-400">
                       <button
                         type="button"
                         disabled={index === 0}
@@ -289,7 +297,7 @@ export function VisualHomepageBuilder({
                           e.stopPropagation();
                           handleMove(index, -1);
                         }}
-                        className="rounded hover:bg-slate-200 p-0.5 disabled:opacity-30"
+                        className="rounded hover:bg-slate-200 dark:hover:bg-slate-700 p-0.5 disabled:opacity-20"
                         title="Move Up"
                       >
                         ▲
@@ -301,7 +309,7 @@ export function VisualHomepageBuilder({
                           e.stopPropagation();
                           handleMove(index, 1);
                         }}
-                        className="rounded hover:bg-slate-200 p-0.5 disabled:opacity-30"
+                        className="rounded hover:bg-slate-200 dark:hover:bg-slate-700 p-0.5 disabled:opacity-20"
                         title="Move Down"
                       >
                         ▼
@@ -311,11 +319,11 @@ export function VisualHomepageBuilder({
                     {/* Section Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-slate-900 truncate">
+                        <span className="font-semibold text-slate-900 dark:text-slate-100 truncate">
                           {index + 1}. {sectionTitle}
                         </span>
                       </div>
-                      <span className="text-[10px] text-slate-600 uppercase tracking-wider font-mono">
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider font-mono">
                         {label(section.type)}
                       </span>
                     </div>
@@ -331,8 +339,8 @@ export function VisualHomepageBuilder({
                           ),
                         );
                       }}
-                      className={`p-1 rounded hover:bg-slate-200 transition ${
-                        section.visible ? "text-emerald-600" : "text-slate-600"
+                      className={`p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition ${
+                        section.visible ? "text-emerald-600" : "text-slate-400"
                       }`}
                       title={section.visible ? "Section is visible" : "Section is hidden"}
                     >
@@ -346,7 +354,7 @@ export function VisualHomepageBuilder({
                         e.stopPropagation();
                         handleDuplicate(index);
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-slate-600 hover:text-indigo-600 transition"
+                      className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-indigo-600 transition"
                       title="Duplicate Section"
                     >
                       ⧉
@@ -357,7 +365,7 @@ export function VisualHomepageBuilder({
                         e.stopPropagation();
                         handleDelete(index);
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-slate-600 hover:text-red-600 transition"
+                      className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-600 transition"
                       title="Delete Section"
                     >
                       ✕
@@ -370,9 +378,9 @@ export function VisualHomepageBuilder({
         </aside>
 
         {/* PANEL B: CENTER LIVE VIEWPORT PREVIEW */}
-        <main className="flex-1 bg-slate-200/70 p-6 overflow-y-auto flex flex-col items-center">
+        <main className="flex-1 min-w-0 bg-slate-200/70 dark:bg-slate-950 p-4 md:p-6 overflow-y-auto flex flex-col items-center">
           <div
-            className={`transition-all duration-300 rounded-2xl bg-white shadow-2xl border border-slate-300 min-h-[600px] flex flex-col overflow-hidden ${
+            className={`transition-all duration-300 rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-300 dark:border-slate-800 min-h-[600px] flex flex-col overflow-hidden ${
               viewport === "desktop"
                 ? "w-full max-w-[1180px]"
                 : viewport === "tablet"
@@ -560,30 +568,30 @@ export function VisualHomepageBuilder({
         </main>
 
         {/* PANEL C: RIGHT SECTION SETTINGS INSPECTOR */}
-        <aside className="w-96 flex-shrink-0 border-l border-slate-200 bg-white flex flex-col z-10">
-          <div className="border-b border-slate-100 px-5 py-3.5 bg-slate-50 flex items-center justify-between">
+        <aside className="w-80 flex-shrink-0 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col z-10">
+          <div className="border-b border-slate-100 dark:border-slate-800 px-4 py-3 bg-slate-50 dark:bg-slate-800/60 flex items-center justify-between">
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                 Section Settings
               </span>
               {selectedSection && (
-                <span className="ml-2 text-xs font-mono text-indigo-600 font-semibold">
+                <span className="ml-2 text-xs font-mono text-indigo-600 dark:text-indigo-400 font-semibold">
                   [{label(selectedSection.type)}]
                 </span>
               )}
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {!selectedSection ? (
-              <div className="p-8 text-center text-xs text-slate-600">
+              <div className="p-8 text-center text-xs text-slate-500">
                 Select a section from the navigator to edit its content and responsive settings.
               </div>
             ) : (
               <div className="space-y-4">
                 {/* Responsive Visibility Controls */}
-                <div className="rounded-xl border border-slate-200 p-3.5 bg-slate-50 space-y-2.5">
-                  <span className="text-xs font-bold text-slate-800 block">Responsive Visibility</span>
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 p-3 bg-slate-50 dark:bg-slate-800/50 space-y-2">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">Responsive Visibility</span>
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <label className="flex items-center gap-1.5 cursor-pointer">
                       <input

@@ -39,11 +39,10 @@ p{margin:0 0 1em}
 .announcement{text-align:center;font-size:.85rem;padding:9px 16px;background:var(--c-ink);color:var(--bg-c)}
 .announcement a{text-decoration:underline;text-underline-offset:3px}
 
-/* header: floating glass pill */
-.site-header{display:contents}
-.header-row{position:sticky;top:12px;z-index:40;margin-top:12px;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r-xl);
-  background:var(--glass);backdrop-filter:blur(22px) saturate(1.4);-webkit-backdrop-filter:blur(22px) saturate(1.4);
-  border:1px solid var(--c-line);box-shadow:var(--shadow)}
+/* header: professional sticky unified navbar */
+.site-header{position:sticky;top:0;left:0;right:0;width:100%;z-index:50;background:var(--bg-c);backdrop-filter:blur(22px) saturate(1.4);-webkit-backdrop-filter:blur(22px) saturate(1.4);border-bottom:1px solid var(--c-line);box-shadow:0 4px 16px -4px rgba(0,0,0,.08);transition:all .2s ease}
+:root[data-theme=dark] .site-header{background:rgba(15,23,42,.95);border-bottom-color:rgba(255,255,255,.08)}
+.header-row{display:flex;align-items:center;gap:12px;padding:10px 0;margin-top:0;border:none;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none;border-radius:0}
 .wordmark{display:flex;align-items:center;padding:0 6px}
 .search{flex:1;display:flex;align-items:center;min-width:0;background:var(--glass-solid);border-radius:var(--r-pill);padding:4px 4px 4px 22px;border:1px solid var(--c-line)}
 .search input{flex:1;min-width:0;border:0;background:transparent;font:inherit;color:inherit;padding:10px 0;outline:0}
@@ -66,8 +65,8 @@ p{margin:0 0 1em}
 :root[data-theme=dark] .theme-switcher .moon{color:var(--lime-ink)}
 
 
-.search-below{margin-top:10px}
-.category-nav{margin-top:10px;margin-bottom:clamp(14px,2vw,22px);padding-bottom:2px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.search-below{margin-top:8px}
+.category-nav{margin-top:0;margin-bottom:0;padding:6px 0 10px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
 .cms-menu{display:flex;gap:6px;list-style:none;margin:0;padding:0}
 .cms-menu a,.category-nav>a{display:block;white-space:nowrap;padding:8px 18px;border-radius:var(--r-pill);font-size:.92rem;color:var(--c-ink-2);background:var(--glass);border:1px solid var(--c-line);transition:background .2s,color .2s}
 .cms-menu a:hover,.category-nav>a:hover{background:var(--c-ink);color:var(--bg-c)}

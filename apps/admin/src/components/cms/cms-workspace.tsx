@@ -480,20 +480,118 @@ export function CmsWorkspace({
             </p>
           )}
         </>
+      ) : kind === "PAGE" && builderMode && key && registry ? (
+        <div className="w-full space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-2.5 shadow-xs">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                <span>✨</span>
+                <span>Visual Homepage Builder</span>
+              </span>
+              <span className="text-slate-300 dark:text-slate-700">|</span>
+              <div className="flex items-center gap-1.5 text-xs font-medium">
+                <span className="text-slate-500">Page:</span>
+                <select
+                  aria-label="Switch document"
+                  value={key}
+                  disabled={busy}
+                  onChange={(e) => open(e.target.value)}
+                  className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                >
+                  {documents.map((item) => (
+                    <option key={item.key} value={item.key}>
+                      {item.key} ({item.state.toLowerCase()} · v{item.revision})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setBuilderMode(false)}
+                className="text-xs font-semibold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
+              >
+                ← Switch to Classic Form View
+              </button>
+              <button
+                className={button}
+                disabled={busy || !doc}
+                onClick={() => open(key)}
+              >
+                Reload
+              </button>
+            </div>
+          </div>
+
+          <VisualHomepageBuilder
+            pageTitle={content.title ? String(content.title) : key}
+            sections={sections as unknown as Section[]}
+            onUpdateSections={(next) => updateSections(next as unknown as Section[])}
+            registry={registry}
+            assets={assets}
+            dirty={dirty}
+            busy={busy}
+            doc={doc}
+            onSaveDraft={() => mutate("draft")}
+            onPublish={() => mutate("publish")}
+            editable={editable}
+            publisher={publisher}
+            onNotice={(msg) => setNotice(msg)}
+          />
+
+          {doc && (
+            <details className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 text-xs">
+              <summary className="cursor-pointer font-semibold text-slate-700 dark:text-slate-300">
+                Version History & Audit ({versions.length} versions recorded)
+              </summary>
+              <div className="mt-3 space-y-2">
+                {versions.map((version) => (
+                  <div key={version.id} className="flex items-center justify-between border-b dark:border-slate-800 pb-2">
+                    <span>
+                      Version {version.version} {version.id === doc.publishedVersionId ? "· Live" : ""} — {new Date(version.createdAt).toLocaleString()}
+                    </span>
+                    <div className="flex gap-2">
+                      {editable && (
+                        <button
+                          className="text-indigo-600 hover:underline font-semibold"
+                          disabled={busy}
+                          onClick={() => restore(version.version)}
+                        >
+                          Load version
+                        </button>
+                      )}
+                      {publisher && (
+                        <button
+                          className="text-emerald-600 hover:underline font-semibold"
+                          disabled={busy || dirty}
+                          onClick={() => mutate("rollback", version.version)}
+                        >
+                          Publish version
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
       ) : (
         <div className="grid items-start gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
-          <aside className="space-y-4 rounded-xl border bg-white p-4">
-            <h2 className="font-semibold">Documents</h2>
+          <aside className="space-y-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+            <h2 className="font-semibold text-slate-900 dark:text-slate-100">Documents</h2>
             {documents.map((item) => (
               <button
                 key={item.key}
                 disabled={busy}
                 onClick={() => open(item.key)}
-                className={`w-full rounded-lg border p-3 text-left text-sm ${key === item.key ? "border-indigo-400 bg-indigo-50" : "border-slate-200"}`}
+                className={`w-full rounded-lg border p-3 text-left text-sm ${key === item.key ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-950/40" : "border-slate-200 dark:border-slate-800"}`}
               >
-                <span className="block break-all font-medium">{item.key}</span>
+                <span className="block break-all font-medium text-slate-900 dark:text-slate-100">{item.key}</span>
                 <span className="text-xs text-slate-500">
-                  {item.state.toLowerCase()} Â· revision {item.revision}
+                  {item.state.toLowerCase()} · revision {item.revision}
                 </span>
               </button>
             ))}
@@ -503,8 +601,8 @@ export function CmsWorkspace({
               </p>
             )}
             {editable && (
-              <div className="space-y-2 border-t pt-4">
-                <label className="text-xs font-semibold" htmlFor="cms-new-key">
+              <div className="space-y-2 border-t dark:border-slate-800 pt-4">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300" htmlFor="cms-new-key">
                   New document key
                 </label>
                 <input
@@ -526,79 +624,6 @@ export function CmsWorkspace({
             )}
           </aside>
           {key && registry ? (
-            kind === "PAGE" && builderMode ? (
-              <div className="min-w-0 space-y-4">
-                <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setBuilderMode(false)}
-                    className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
-                  >
-                    ← Switch to Classic Form View
-                  </button>
-                  <button
-                    className={button}
-                    disabled={busy || !doc}
-                    onClick={() => open(key)}
-                  >
-                    Reload
-                  </button>
-                </div>
-
-                <VisualHomepageBuilder
-                  pageTitle={content.title ? String(content.title) : key}
-                  sections={sections as unknown as Section[]}
-                  onUpdateSections={(next) => updateSections(next as unknown as Section[])}
-                  registry={registry}
-                  assets={assets}
-                  dirty={dirty}
-                  busy={busy}
-                  doc={doc}
-                  onSaveDraft={() => mutate("draft")}
-                  onPublish={() => mutate("publish")}
-                  editable={editable}
-                  publisher={publisher}
-                  onNotice={(msg) => setNotice(msg)}
-                />
-
-                {doc && (
-                  <details className="rounded-xl border bg-white p-4 text-xs">
-                    <summary className="cursor-pointer font-semibold text-slate-700">
-                      Version History & Audit ({versions.length} versions recorded)
-                    </summary>
-                    <div className="mt-3 space-y-2">
-                      {versions.map((version) => (
-                        <div key={version.id} className="flex items-center justify-between border-b pb-2">
-                          <span>
-                            Version {version.version} {version.id === doc.publishedVersionId ? "· Live" : ""} — {new Date(version.createdAt).toLocaleString()}
-                          </span>
-                          <div className="flex gap-2">
-                            {editable && (
-                              <button
-                                className="text-indigo-600 hover:underline font-semibold"
-                                disabled={busy}
-                                onClick={() => restore(version.version)}
-                              >
-                                Load version
-                              </button>
-                            )}
-                            {publisher && (
-                              <button
-                                className="text-emerald-600 hover:underline font-semibold"
-                                disabled={busy || dirty}
-                                onClick={() => mutate("rollback", version.version)}
-                              >
-                                Publish version
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                )}
-              </div>
-            ) : (
             <div className="min-w-0 space-y-5">
               <section className="rounded-xl border bg-white p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1051,7 +1076,6 @@ export function CmsWorkspace({
                 </section>
               )}
             </div>
-            )
           ) : (
             <div className="rounded-xl border border-dashed bg-white p-12 text-center text-slate-500">
               Select a document or create one to start editing.
