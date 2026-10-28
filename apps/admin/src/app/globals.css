@@ -66,3 +66,7 @@ html[data-theme=dark] .product-rich-editor,html[data-theme=dark] .product-galler
 :root[data-theme=dark] .cms-area-link{background:#172033;color:#e2e8f0}:root[data-theme=dark] .cms-area-active{background:#4f46e5;color:#fff}:root[data-theme=dark] .cms-task-editor p,:root[data-theme=dark] .cms-look-presets button>span:last-child{color:#94a3b8}
 
 .cms-config-browser{background:#fff!important;color:#172033!important}.cms-config-browser summary{display:list-item;color:inherit;min-height:28px}.cms-brand-controls{display:grid;gap:16px}html[data-theme=dark] .cms-config-browser{background:#162033!important;color:#e2e8f0!important}
+
+.cms-homepage-status{display:grid;gap:12px;padding:16px;border:1px solid #94a3b840;border-radius:12px;font-size:14px;min-width:0}.cms-homepage-status strong{color:#047857}.cms-homepage-status details{min-width:0}.cms-homepage-status summary{cursor:pointer}.cms-homepage-status input{margin-top:8px}html[data-theme=dark] .cms-homepage-status strong{color:#6ee7b7}
+
+.cms-config-browser .cms-page-open{color:#172033!important;background:#fff}.cms-config-browser .cms-page-label{color:inherit!important}.cms-homepage-badge{color:#047857;font-weight:700;margin-top:4px}.cms-page-open:focus-visible{outline:3px solid #6366f1;outline-offset:2px}html[data-theme=dark] .cms-config-browser .cms-page-open{color:#e2e8f0!important;background:#162033}html[data-theme=dark] .cms-homepage-badge{color:#6ee7b7}

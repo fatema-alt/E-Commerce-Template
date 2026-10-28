@@ -17,6 +17,7 @@ import {
 import { button, input, SchemaField } from "./schema-fields";
 import { getStandardEcommerceTemplate } from "./standard-template";
 import { VisualHomepageBuilder } from "./visual-homepage-builder";
+import { pageSlug, validPageSlug } from "./page-address";
 import { StoreLookEditor } from "./store-look-editor";
 import { CMS_AREAS, THEME_PRESETS } from "./cms-task-config";
 import { EngagementPreview, engagementDefaults } from "./engagement-preview";
@@ -43,9 +44,13 @@ export function CmsWorkspace({
   defaultKey,
   scope,
   area,
+  settingsDocumentKey = "default",
+  fallbackHomeKey = "home",
 }: {
   kind: string;
   area?: "homepage" | "pages";
+  settingsDocumentKey?: string;
+  fallbackHomeKey?: string;
   defaultKey?: string;
   scope?: "announcementRibbon" | "contactWidget";
 }) {
@@ -59,6 +64,10 @@ export function CmsWorkspace({
   const [total, setTotal] = useState(0);
   const [key, setKey] = useState("");
   const [newKey, setNewKey] = useState("");
+  const [newTitle,setNewTitle]=useState("");
+  const [customSlug,setCustomSlug]=useState(false);
+  const [homepage,setHomepage]=useState<{settingsKey:string;settingsRevision:number;settingsPublished:boolean;homePageKey:string}|null>(null);
+  const [publishedElsewhere,setPublishedElsewhere]=useState(false);
   const [doc, setDoc] = useState<Document | null>(null);
   const [content, setContent] = useState<Record<string, Value>>({});
   const [versions, setVersions] = useState<Version[]>([]);
@@ -171,6 +180,7 @@ export function CmsWorkspace({
   }
   const open = useCallback(async (documentKey: string) => {
     if (dirty && !window.confirm("Discard unsaved changes?")) return;
+    setPublishedElsewhere(false);
     const current = ++sequence.current;
     setBusy(true);
     setError("");
@@ -213,9 +223,9 @@ export function CmsWorkspace({
         setKey(documentKey); setDoc(null); setContent({...THEME_PRESETS[1].values});
         setVersions([]); setHistoryTotal(0); setDirty(true);
         setNotice("Choose a look, save a draft and publish when ready.");
-      } else if (documentKey === "home" && kind === "PAGE" && e instanceof CmsRequestError && e.status === 404) {
+      } else if (kind === "PAGE" && area === "homepage" && documentKey === homepage?.homePageKey && e instanceof CmsRequestError && e.status === 404) {
         if (current !== sequence.current) return;
-        setKey("home");
+        setKey(documentKey);
         setDoc(null);
         setContent({
           title: "Home",
@@ -233,23 +243,43 @@ export function CmsWorkspace({
     } finally {
       if (current === sequence.current) setBusy(false);
     }
-  }, [dirty, kind, scope, setError, setNotice]);
+  }, [dirty, kind, scope, area, homepage, setError, setNotice]);
 
+  const loadHomepage=useCallback(async()=>{
+    const next=await request<{settingsKey:string;settingsRevision:number;settingsPublished:boolean;homePageKey:string}>("/admin/cms/homepage/context?"+new URLSearchParams({settingsKey:settingsDocumentKey,fallbackHomeKey}));
+    setHomepage(next);return next;
+  },[settingsDocumentKey,fallbackHomeKey]);
+  useEffect(()=>{if(kind==='PAGE')void Promise.resolve().then(loadHomepage).catch(error=>setError(error.message));},[kind,loadHomepage,setError]);
+  async function assignHomepage(target:Document){
+    if(!publisher || !target.publishedVersionId || !homepage || busy || !canLeave())return;
+    if(!window.confirm('Use this published page as your homepage? Only the live homepage selection changes. Unpublished Store info changes remain private.'))return;
+    setBusy(true);setError('');
+    try{
+      await request('/admin/cms/homepage/assign',{method:'POST',body:JSON.stringify({settingsKey:settingsDocumentKey,pageKey:target.key,expectedSettingsRevision:homepage.settingsRevision,expectedPageRevision:target.revision})});
+      await loadHomepage();setPublishedElsewhere(false);setNotice('Homepage updated. Other unpublished Store info changes were not published.');
+    }catch(error){setError((error as Error).message);}finally{setBusy(false);}
+  }
   const initialOpenedRef = useRef(false);
   useEffect(() => {
-    if (initialOpenedRef.current || loading) return;
+    if (initialOpenedRef.current || loading || (kind === "PAGE" && !homepage)) return;
     initialOpenedRef.current = true;
     const urlKey =
       typeof window !== "undefined"
         ? new URLSearchParams(window.location.search).get("key")
         : null;
-    const targetKey = urlKey || defaultKey || (kind === "PAGE" ? "home" : "");
+    const targetKey = area === "homepage" ? homepage!.homePageKey : urlKey || defaultKey || (kind === "PAGE" && area !== "pages" ? "home" : "");
     if (targetKey) {
       void Promise.resolve().then(() => open(targetKey));
     }
-  }, [loading, kind, defaultKey, open]);
-  function create() {
+  }, [loading, kind, defaultKey, open, area, homepage]);
+  async function create() {
     if (!registry || !canLeave()) return;
+    if(kind === 'PAGE') {
+      if(!newTitle.trim() || !validPageSlug(newKey)){setError('Enter a page title and choose an available URL that does not use a store route.');return;}
+      setBusy(true);
+      try{const result=await request<{available:boolean}>('/admin/cms/page-address/'+encodeURIComponent(newKey));if(!result.available){setError('This page URL is already used or reserved. Choose another in Advanced.');return;}}
+      catch(error){setError((error as Error).message);return;}finally{setBusy(false);}
+    }
     if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(newKey)) {
       setError(
         "Use 1â€“64 lowercase letters, numbers, hyphens or underscores for the document key.",
@@ -258,6 +288,7 @@ export function CmsWorkspace({
     }
     setKey(newKey);
     setDoc(null);
+    setPublishedElsewhere(false);
     let initial =
       kind === "THEME"
         ? { ...registry.defaultTheme }
@@ -265,11 +296,8 @@ export function CmsWorkspace({
     if (kind === "PAGE") {
       initial = {
         ...initial,
-        title:
-          newKey === "home"
-            ? "Home"
-            : newKey.charAt(0).toUpperCase() + newKey.slice(1),
-        sections: getStandardEcommerceTemplate() as unknown as Value,
+        title: newTitle.trim(),
+        sections: [] as unknown as Value,
       };
     }
     setContent(initial);
@@ -328,6 +356,9 @@ export function CmsWorkspace({
       });
       const next = await request<Document>(`/admin/cms/${kind}/${key}`);
       setDoc(next);
+      if(kind === 'PAGE' && ['publish','rollback'].includes(action)) {
+        const currentHomepage=await loadHomepage();setPublishedElsewhere(currentHomepage.homePageKey!==key);
+      }
       setDirty(false);
       setNotice(
         action === "draft"
@@ -397,7 +428,6 @@ export function CmsWorkspace({
         <p className="mt-2 text-sm text-slate-500">
           Manage your storefront content. Save drafts and publish when ready.
         </p>
-          {kind === 'PAGE' && <p className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">Each page has its own URL: the key â€œheroâ€ publishes at /hero. To display a page on the storefront homepage, choose its Home Page Key in <Link className="font-semibold underline" href="/cms/settings">Site Settings</Link> and publish those settings. The default homepage key is â€œhomeâ€.</p>}
       </div>
       <nav
         aria-label="CMS navigation"
@@ -409,6 +439,18 @@ export function CmsWorkspace({
         })}
         <Link className="cms-area-link" href="/cms/media" onClick={event=>{if(!canLeave())event.preventDefault();}} aria-current={kind === "MEDIA" ? "page" : undefined}>Media library</Link>
       </nav>
+      {kind === 'PAGE' && <div className="cms-homepage-status" role="status">
+        {!homepage ? <p>Loading homepage selection?</p> : <>
+          <p>Homepage: <Link className="underline" href="/cms/homepage">/{homepage.homePageKey}</Link></p>
+          {!homepage.settingsPublished && <p>Publish <Link href="/cms/settings" className="underline">Store info</Link> before changing the homepage.</p>}
+          {key === homepage.homePageKey ? <strong>Current homepage</strong> : key && <span>Page URL: /{key}</span>}
+          {publishedElsewhere && <p>Published. This page is not your homepage.</p>}
+          {doc?.publishedVersionId && key !== homepage.homePageKey && <button type="button" className={button} disabled={busy || dirty || !publisher} onClick={()=>assignHomepage(doc)}>Use as homepage</button>}
+          {!publisher && doc?.publishedVersionId && key!==homepage.homePageKey && <p>Ask a Super Admin to change the homepage.</p>}
+          {key && <details><summary>Advanced</summary><label htmlFor="cms-page-url">Page URL (read-only after creation)</label><input id="cms-page-url" className={input} value={'/'+key} readOnly /></details>}
+        </>}
+      </div>}
+
 
 
       {loading ? (
@@ -512,15 +554,16 @@ export function CmsWorkspace({
               <div className="flex items-center gap-1.5 text-xs font-medium">
                 <span className="text-slate-500">Page:</span>
                 <select
-                  aria-label="Switch document"
+                  aria-label="Switch page"
                   value={key}
                   disabled={busy}
                   onChange={(e) => open(e.target.value)}
                   className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 >
+                  {!documents.some(item=>item.key===key) && <option value={key}>{String(content.title || key)}</option>}
                   {documents.map((item) => (
                     <option key={item.key} value={item.key}>
-                      {item.key} ({item.state.toLowerCase()} · v{item.revision})
+                      {item.title || item.key} ({item.state.toLowerCase()})
                     </option>
                   ))}
                 </select>
@@ -604,42 +647,42 @@ export function CmsWorkspace({
             <details open={kind === "PAGE" || kind === "NAVIGATION"}>
             <summary className="cursor-pointer font-semibold">{kind === "PAGE" ? "Pages" : kind === "NAVIGATION" ? "Menus" : "Advanced: saved configurations"}</summary>
             {documents.map((item) => (
+              <div key={item.key} className="space-y-2">
               <button
                 key={item.key}
                 disabled={busy}
                 onClick={() => open(item.key)}
-                className={`w-full rounded-lg border p-3 text-left text-sm ${key === item.key ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-950/40" : "border-slate-200 dark:border-slate-800"}`}
+                className={`cms-page-open w-full rounded-lg border p-3 text-left text-sm ${key === item.key ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-950/40" : "border-slate-200 dark:border-slate-800"}`}
               >
-                <span className="block break-all font-medium text-slate-900 dark:text-slate-100">{item.key}</span>
+                <span className="cms-page-label block break-all font-medium">{item.title || item.key}{kind === "PAGE" && item.key === homepage?.homePageKey && <span className="cms-homepage-badge block text-xs">Current homepage</span>}</span>
                 <span className="text-xs text-slate-500">
-                  {item.state.toLowerCase()} · revision {item.revision}
+                  {item.state.toLowerCase()}
                 </span>
               </button>
+              {kind === 'PAGE' && item.publishedVersionId && item.key!==homepage?.homePageKey && <button type="button" className={button} disabled={busy || !publisher || dirty} onClick={()=>assignHomepage(item)} aria-label={'Use '+(item.title || item.key)+' as homepage'}>Use as homepage</button>}
+              </div>
             ))}
             {!documents.length && (
               <p className="text-sm text-slate-500">
-                Create your first document below.
+                Create your first page below.
               </p>
             )}
             {editable && (
               <div className="space-y-2 border-t dark:border-slate-800 pt-4">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300" htmlFor="cms-new-key">
-                  New document key
-                </label>
-                <input
-                  id="cms-new-key"
-                  placeholder={kind === "PAGE" ? "home" : "default"}
-                  value={newKey}
-                  className={input}
-                  disabled={busy}
-                  onChange={(e) => setNewKey(e.target.value)}
-                />
+                {kind === 'PAGE' ? <>
+                  <label className="text-sm font-semibold" htmlFor="cms-new-title">Page title</label>
+                  <input id="cms-new-title" className={input} value={newTitle} disabled={busy} onChange={event=>{setNewTitle(event.target.value);if(!customSlug)setNewKey(pageSlug(event.target.value));}} />
+                  <p className="text-xs">URL: /{newKey || 'your-page'}</p>
+                  <details><summary className="cursor-pointer">Advanced</summary><label htmlFor="cms-new-key">URL slug</label><input id="cms-new-key" className={input} value={newKey} disabled={busy} onChange={event=>{setCustomSlug(true);setNewKey(event.target.value);}} /></details>
+                </> : <>
+                  <label htmlFor="cms-new-key">New configuration</label><input id="cms-new-key" className={input} value={newKey} disabled={busy} onChange={event=>setNewKey(event.target.value)} />
+                </>}
                 <button
                   className={button + " w-full"}
                   disabled={busy || !registry}
                   onClick={create}
                 >
-                  + Create {heading}
+                  + Create {kind === "PAGE" ? "page" : heading}
                 </button>
               </div>
             )}
@@ -989,7 +1032,6 @@ export function CmsWorkspace({
               {publisher && doc && (
                 <section className="space-y-4 rounded-xl border bg-white p-5">
                   <h2 className="font-semibold">Publishing</h2>
-                  {kind === 'PAGE' && <p className="text-sm text-slate-500">Page URL: /{key}. Publishing this page does not automatically replace the homepage.</p>}
                   <div className="flex flex-wrap gap-2">
                     <button
                       disabled={busy || dirty}
@@ -1107,7 +1149,7 @@ export function CmsWorkspace({
             </div>
           ) : (
             <div className="rounded-xl border border-dashed bg-white p-12 text-center text-slate-500">
-              Select a document or create one to start editing.
+              {kind === "PAGE" ? "Choose a page or create one to start editing." : "Select a configuration or create one to start editing."}
             </div>
           )}
         </div>
@@ -1121,7 +1163,7 @@ export function CmsWorkspace({
           Previous
         </button>
         <span className="text-sm text-slate-500">
-          Page {listPage} Â· {total} {kind === "MEDIA" ? "images" : "documents"}
+          Page {listPage} / {Math.max(1,Math.ceil(total/24))} - {total} {kind === "MEDIA" ? "images" : kind === "PAGE" ? "pages" : "configurations"}
         </span>
         <button
           className={button}

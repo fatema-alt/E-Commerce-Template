@@ -31,6 +31,7 @@ export type Registry = {
   defaultTheme: Record<string, Value>;
 };
 export type Document = {
+  title?: string;
   key: string;
   revision: number;
   state: string;

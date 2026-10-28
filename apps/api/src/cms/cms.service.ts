@@ -14,6 +14,7 @@ import {
   validateCmsContent,
   validateCmsKey,
 } from './cms-validation.js';
+import { assertNewPageAddress, validNewPageAddress } from './page-address.js';
 import { CmsQueryDto } from './cms.dto.js';
 
 @Injectable()
@@ -107,6 +108,7 @@ export class CmsService {
       const current = await tx.cmsDocument.findUnique({
         where: { kind_key: { kind, key } },
       });
+      if (kind === 'PAGE' && !current) assertNewPageAddress(key);
       this.assertRevision(current?.revision ?? 0, expectedRevision);
       const document =
         current ??
@@ -152,6 +154,149 @@ export class CmsService {
         versionId: version.id,
         contentHash: version.contentHash,
       };
+    });
+  }
+  async pageAddress(key: string) {
+    if (!validNewPageAddress(key))
+      return { available: false, reason: 'reserved-or-invalid' };
+    const exists = await this.db.cmsDocument.findUnique({
+      where: { kind_key: { kind: 'PAGE', key } },
+      select: { id: true },
+    });
+    return { available: !exists, reason: exists ? 'already-used' : null };
+  }
+  async homepageContext(settingsKey: string, fallbackHomeKey: string) {
+    validateCmsKey(settingsKey);
+    validateCmsKey(fallbackHomeKey);
+    const settings = await this.db.cmsDocument.findUnique({
+      where: { kind_key: { kind: 'SITE_SETTINGS', key: settingsKey } },
+      include: { publication: true },
+    });
+    const live = settings?.state === 'PUBLISHED' ? settings.publication : null;
+    const content = live?.content as Record<string, unknown> | undefined;
+    return {
+      settingsKey,
+      settingsRevision: settings?.revision ?? 0,
+      settingsPublished: !!live,
+      homePageKey:
+        typeof content?.homePageKey === 'string'
+          ? content.homePageKey
+          : fallbackHomeKey,
+    };
+  }
+  async assignHomepage(
+    settingsKey: string,
+    pageKey: string,
+    expectedSettingsRevision: number,
+    expectedPageRevision: number,
+    actorId: string,
+  ) {
+    return this.transaction(async (tx) => {
+      await this.lock(tx, 'PAGE', pageKey);
+      await this.lock(tx, 'SITE_SETTINGS', settingsKey);
+      const page = await tx.cmsDocument.findUnique({
+        where: { kind_key: { kind: 'PAGE', key: pageKey } },
+        include: { publication: true },
+      });
+      if (!page || page.state !== 'PUBLISHED' || !page.publication)
+        throw new BadRequestException(
+          'Publish this page before using it as the homepage.',
+        );
+      this.assertRevision(page.revision, expectedPageRevision);
+      const settings = await tx.cmsDocument.findUnique({
+        where: { kind_key: { kind: 'SITE_SETTINGS', key: settingsKey } },
+        include: { publication: true },
+      });
+      if (!settings || settings.state !== 'PUBLISHED' || !settings.publication)
+        throw new BadRequestException(
+          'Publish Store info first, then choose the homepage.',
+        );
+      this.assertRevision(settings.revision, expectedSettingsRevision);
+      const live = settings.publication.content as Record<
+        string,
+        Prisma.JsonValue
+      >;
+      if (live.homePageKey === pageKey)
+        return { homePageKey: pageKey, revision: settings.revision };
+      const content = validateCmsContent('SITE_SETTINGS', {
+        ...live,
+        homePageKey: pageKey,
+      });
+      const ids = await this.assets(tx, content);
+      const latest = await tx.cmsVersion.findFirst({
+        where: { documentId: settings.id },
+        orderBy: { version: 'desc' },
+      });
+      const published = await tx.cmsVersion.create({
+        data: {
+          documentId: settings.id,
+          version: (latest?.version ?? 0) + 1,
+          content: content as Prisma.InputJsonValue,
+          contentHash: hashContent(content),
+          createdBy: actorId,
+        },
+      });
+      if (ids.length)
+        await tx.cmsAssetReference.createMany({
+          data: ids.map((assetId) => ({ assetId, versionId: published.id })),
+        });
+      // inspect() reads the highest snapshot as the draft. Keep an existing draft
+      // at the head without changing or publishing any of its fields.
+      if (latest && latest.id !== settings.publication.id) {
+        const preserved = await tx.cmsVersion.create({
+          data: {
+            documentId: settings.id,
+            version: published.version + 1,
+            content: latest.content as Prisma.InputJsonValue,
+            contentHash: latest.contentHash,
+            createdBy: actorId,
+          },
+        });
+        const draftAssets = assetIds(latest.content);
+        if (draftAssets.length)
+          await tx.cmsAssetReference.createMany({
+            data: draftAssets.map((assetId) => ({
+              assetId,
+              versionId: preserved.id,
+            })),
+          });
+        await this.event(
+          tx,
+          settings.id,
+          settings.revision + 1,
+          actorId,
+          'DRAFT_PRESERVED',
+          preserved.id,
+          { reason: 'HOMEPAGE_ASSIGNED' },
+        );
+      }
+      const changed = await tx.cmsDocument.updateMany({
+        where: { id: settings.id, revision: expectedSettingsRevision },
+        data: {
+          publishedVersionId: published.id,
+          publishedAt: new Date(),
+          revision: { increment: 1 },
+        },
+      });
+      if (changed.count !== 1)
+        throw new ConflictException(
+          'Settings changed. Reload before assigning the homepage.',
+        );
+      await this.event(
+        tx,
+        settings.id,
+        settings.revision + 1,
+        actorId,
+        'PUBLISHED',
+        published.id,
+        {
+          reason: 'HOMEPAGE_ASSIGNED',
+          before: live.homePageKey ?? null,
+          after: pageKey,
+          pageVersionId: page.publication.id,
+        },
+      );
+      return { homePageKey: pageKey, revision: settings.revision + 1 };
     });
   }
   async publish(
@@ -458,13 +603,29 @@ export class CmsService {
     const [items, total] = await this.db.$transaction([
       this.db.cmsDocument.findMany({
         where,
+        include: {
+          versions: {
+            orderBy: { version: 'desc' },
+            take: 1,
+            select: { content: true },
+          },
+        },
         take: query.limit,
         skip: (query.page - 1) * query.limit,
         orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
       }),
       this.db.cmsDocument.count({ where }),
     ]);
-    return { items, total, page: query.page, limit: query.limit };
+    return {
+      items: items.map(({ versions, ...item }) => ({
+        ...item,
+        title: (versions[0]?.content as Record<string, unknown> | undefined)
+          ?.title,
+      })),
+      total,
+      page: query.page,
+      limit: query.limit,
+    };
   }
   async changes(query: CmsQueryDto) {
     if (BigInt(query.after) > 9223372036854775807n)

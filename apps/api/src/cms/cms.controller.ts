@@ -25,6 +25,8 @@ import type { AdminRequest } from '../auth/auth.guard.js';
 import { CmsService } from './cms.service.js';
 import {
   CmsQueryDto,
+  CmsHomepageQueryDto,
+  AssignHomepageDto,
   PublishCmsDto,
   RollbackCmsDto,
   SaveCmsDraftDto,
@@ -64,6 +66,25 @@ export class CmsAdminController {
   @SetMetadata('roles', ['SUPER_ADMIN'])
   changes(@Query() query: CmsQueryDto) {
     return this.cms.changes(query);
+  }
+  @Get('homepage/context')
+  homepage(@Query() query: CmsHomepageQueryDto) {
+    return this.cms.homepageContext(query.settingsKey, query.fallbackHomeKey);
+  }
+  @Get('page-address/:key')
+  pageAddress(@Param('key') key: string) {
+    return this.cms.pageAddress(key);
+  }
+  @Post('homepage/assign')
+  @SetMetadata('roles', ['SUPER_ADMIN'])
+  assignHomepage(@Body() dto: AssignHomepageDto, @Req() req: AdminRequest) {
+    return this.cms.assignHomepage(
+      dto.settingsKey,
+      dto.pageKey,
+      dto.expectedSettingsRevision,
+      dto.expectedPageRevision,
+      req.admin!.id,
+    );
   }
   @Get(':kind/:key')
   inspect(

@@ -37,3 +37,14 @@ export class CmsQueryDto {
   @IsOptional() @IsEnum(CmsDocumentKind) kind?: CmsDocumentKind;
   @IsOptional() @IsString() @Matches(/^\d{1,20}$/) after = '0';
 }
+
+export class CmsHomepageQueryDto {
+  @IsString() @Matches(/^[a-z0-9][a-z0-9_-]{0,63}$/) settingsKey = 'default';
+  @IsString() @Matches(/^[a-z0-9][a-z0-9_-]{0,63}$/) fallbackHomeKey = 'home';
+}
+export class AssignHomepageDto {
+  @IsString() @Matches(/^[a-z0-9][a-z0-9_-]{0,63}$/) settingsKey!: string;
+  @IsString() @Matches(/^[a-z0-9][a-z0-9_-]{0,63}$/) pageKey!: string;
+  @IsInt() @Min(0) @Max(2147483646) expectedSettingsRevision!: number;
+  @IsInt() @Min(0) @Max(2147483646) expectedPageRevision!: number;
+}
