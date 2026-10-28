@@ -8,7 +8,26 @@
  *   DATABASE_URL="postgresql://..." node scripts/check-db-mojibake.mjs
  */
 
-import { PrismaClient } from '../apps/api/src/generated/prisma/client.js';
+let PrismaClient;
+try {
+  // When running with tsx, client.js resolves to src/generated/prisma/client.ts
+  ({ PrismaClient } = await import('../apps/api/src/generated/prisma/client.js'));
+} catch {
+  try {
+    // When running under plain node, load compiled client from dist
+    ({ PrismaClient } = await import('../apps/api/dist/generated/prisma/client.js'));
+  } catch (err) {
+    console.error(
+      'Error: Could not load PrismaClient.\n' +
+      'Because the generated Prisma client is TypeScript (client.ts), either run with tsx:\n' +
+      '  pnpm --filter api exec tsx ../../scripts/check-db-mojibake.mjs [DATABASE_URL]\n' +
+      'or compile the api package first:\n' +
+      '  pnpm --filter api build\n' +
+      '  node scripts/check-db-mojibake.mjs [DATABASE_URL]'
+    );
+    process.exit(1);
+  }
+}
 
 const connectionUrl = process.argv[2] || process.env.DATABASE_URL;
 
@@ -31,8 +50,13 @@ const prisma = new PrismaClient({
 
 async function run() {
   try {
-    // Unicode-escaped regex pattern to avoid triggering workspace mojibake linter checks
-    const MOJIBAKE_SQL_PATTERN = '\\u00e2\\u20ac|\\u00c2\\u00b7|\\u00e2\\u2020|\\u00c3[\\u00a1-\\u00ff]|\\\\uFFFD';
+    // Postgres ARE regex pattern:
+    // \u00e2\u20ac matches corrupted UTF-8 quote/dash sequences
+    // \u00c2\u00b7 matches corrupted middle dot sequence
+    // \u00e2\u2020 matches corrupted arrow sequence
+    // \u00c3[\u00a1-\u00ff] matches corrupted Latin-1 supplement characters
+    // \uFFFD matches the actual Unicode replacement character U+FFFD (chr(65533))
+    const MOJIBAKE_SQL_PATTERN = '\\u00e2\\u20ac|\\u00c2\\u00b7|\\u00e2\\u2020|\\u00c3[\\u00a1-\\u00ff]|\\uFFFD';
 
     // 1. SELECT query to count total versions and versions with mojibake
     const countResult = await prisma.$queryRawUnsafe(`

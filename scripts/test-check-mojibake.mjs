@@ -49,8 +49,23 @@ try {
   if (existsSync(temp2)) unlinkSync(temp2);
 }
 
-// 5. Positive test: Bengali script & emojis must pass (exit 0)
-console.log('Test 5: Positive test - Bengali Unicode and emojis must pass');
+// 5. Negative test: file with Unicode replacement character U+FFFD must fail (exit 1)
+console.log('Test 5: Negative test - file with Unicode replacement character U+FFFD must fail (exit 1)');
+const tempUfffd = 'test-mojibake-ufffd.tmp.ts';
+writeFileSync(tempUfffd, 'export const broken = "Corrupted text \uFFFD in string";\n', 'utf8');
+try {
+  execSync('node scripts/check-mojibake.mjs', { encoding: 'utf8', stdio: 'pipe' });
+  assert.fail('Should have failed on U+FFFD replacement character');
+} catch (err) {
+  assert.equal(err.status, 1);
+  assert.ok(err.stderr.includes('test-mojibake-ufffd.tmp.ts') || err.stdout.includes('test-mojibake-ufffd.tmp.ts'));
+  console.log('  ✓ Correctly rejected file containing U+FFFD replacement character with exit code 1\n');
+} finally {
+  if (existsSync(tempUfffd)) unlinkSync(tempUfffd);
+}
+
+// 6. Positive test: Bengali script & emojis must pass (exit 0)
+console.log('Test 6: Positive test - Bengali Unicode and emojis must pass');
 const temp3 = 'test-bengali-valid.tmp.ts';
 writeFileSync(temp3, `
 // Valid Bangla text and currency symbol
@@ -66,9 +81,9 @@ try {
   if (existsSync(temp3)) unlinkSync(temp3);
 }
 
-// 6. Check ignored files: pnpm-lock.yaml and node_modules
-console.log('Test 6: Ignores lockfiles and build directories');
+// 7. Check ignored files: pnpm-lock.yaml and node_modules
+console.log('Test 7: Ignores lockfiles and build directories');
 assert.ok(baseOut.includes('PASS'), 'Lockfiles and ignored dirs did not trigger false positives');
 console.log('  ✓ Ignored directories and files confirmed clean\n');
 
-console.log('ALL 6 TEST SUITE CHECKS PASSED SUCCESSFULLY!');
+console.log('ALL 7 TEST SUITE CHECKS PASSED SUCCESSFULLY!');
