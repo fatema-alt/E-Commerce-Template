@@ -44,28 +44,28 @@ export function ProductOverview({ product }: { product: Product }) {
 
   useEffect(() => {
     try {
-      const activeVariant = variants.find((v) => v.id === variantId);
+      const defaultVariant = variants.find((v) => v.isDefault) || variants[0];
       const itemId = getTrackingItemId({
-        sku: activeVariant?.sku || product.sku,
+        sku: defaultVariant?.sku || product.sku,
         productId: product.id,
-        id: activeVariant?.id,
+        id: defaultVariant?.id,
       });
       trackViewItem({
         item: {
           item_id: itemId,
           item_name: product.name,
-          price: activeVariant?.price ?? product.price,
+          price: defaultVariant?.price ?? product.price,
           quantity: 1,
           item_brand: product.brand || "DS Mart",
           item_category: product.category?.name || "General",
-          item_variant: activeVariant?.name || undefined,
+          item_variant: defaultVariant?.name || undefined,
           currency: "BDT",
         },
       });
     } catch {
       // Non-blocking
     }
-  }, [product.id, variantId]);
+  }, [product.id]);
 
   const images = product.images || [];
   const matching = images.filter((image) => image.variantId === variantId);

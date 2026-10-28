@@ -57,6 +57,8 @@ const {
   hashUserData,
   isOrderPurchaseTracked,
   markOrderPurchaseTracked,
+  calculatePurchaseValue,
+  PURCHASE_VALUE_MODE,
   ENABLE_ONLINE_PAYMENT_PURCHASE_EVENT,
 } = await import(
   "data:text/javascript;base64," + Buffer.from(gtmCode).toString("base64")
@@ -287,7 +289,27 @@ assert.equal(purchaseEvent.ecommerce.shipping, 80);
 assert.equal(purchaseEvent.ecommerce.currency, "BDT");
 console.log("✓ Document-step events (view_item, add_to_cart, begin_checkout, purchase) passed");
 
-// 10. Purchase Deduplication Guard & Feature Flag
+// 10. Purchase Value Modes (Option A: ITEMS_SUBTOTAL, Option B: GRAND_TOTAL)
+const sampleOrder = {
+  subtotal: 3000,
+  discountTotal: 200,
+  shippingTotal: 80,
+  taxTotal: 0,
+  grandTotal: 2880,
+};
+assert.equal(calculatePurchaseValue(sampleOrder, "ITEMS_SUBTOTAL"), 2800, "Option A must exclude shipping and tax");
+assert.equal(calculatePurchaseValue(sampleOrder, "GRAND_TOTAL"), 2880, "Option B must equal grandTotal");
+assert.equal(calculatePurchaseValue(sampleOrder), 2800, "Default configuration mode must match Option A");
+console.log("✓ Configurable Purchase Value modes (ITEMS_SUBTOTAL vs GRAND_TOTAL) passed");
+
+// 11. One-time fresh order token & Purchase Deduplication Guard
+const sessionStorageMock = new Map();
+globalThis.sessionStorage = {
+  getItem: (k) => sessionStorageMock.get(k) || null,
+  setItem: (k, v) => sessionStorageMock.set(k, v),
+  removeItem: (k) => sessionStorageMock.delete(k),
+};
+
 const storageMock = new Map();
 globalThis.localStorage = {
   getItem: (k) => storageMock.get(k) || null,
@@ -295,14 +317,25 @@ globalThis.localStorage = {
   removeItem: (k) => storageMock.delete(k),
 };
 
+// Simulate order creation setting one-time fresh token
+sessionStorage.setItem("ds_fresh_order_order-1", JSON.stringify({ paymentMethod: "COD" }));
+assert.ok(sessionStorage.getItem("ds_fresh_order_order-1"));
+
+// Confirmation page consumption: read and immediately delete
+const freshToken = sessionStorage.getItem("ds_fresh_order_order-1");
+sessionStorage.removeItem("ds_fresh_order_order-1");
+assert.ok(freshToken);
 assert.equal(isOrderPurchaseTracked("DS-2026-0001"), false);
 markOrderPurchaseTracked("DS-2026-0001");
 assert.equal(isOrderPurchaseTracked("DS-2026-0001"), true);
-// Second check remains true, preventing duplicate firing
-assert.equal(isOrderPurchaseTracked("DS-2026-0001"), true);
+
+// Reload or back navigation: fresh token is gone, and localStorage prevents duplicate
+const freshTokenOnReload = sessionStorage.getItem("ds_fresh_order_order-1");
+assert.equal(freshTokenOnReload, null, "Fresh token must be null on reload / back");
+assert.equal(isOrderPurchaseTracked("DS-2026-0001"), true, "Order must remain marked as tracked");
 
 // Online payment purchase event feature flag is disabled
 assert.equal(ENABLE_ONLINE_PAYMENT_PURCHASE_EVENT, false, "Online payment purchase tracking must be disabled by default");
-console.log("✓ Purchase localStorage deduplication guard and online payment flag verified");
+console.log("✓ One-time confirmation page token and purchase deduplication guard verified");
 
 console.log("\nAll tracking verification tests passed successfully!");

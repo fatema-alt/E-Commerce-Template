@@ -436,62 +436,22 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
         /* Optional draft storage. */
       }
 
-      // Purchase tracking: exactly once per order, guarded by localStorage.
-      // COD orders fire immediately upon order creation.
-      // Online payment orders are held behind ENABLE_ONLINE_PAYMENT_PURCHASE_EVENT until server verification is complete.
-      const orderIdentifier = order.orderNumber || order.id;
-      const isCod = paymentMethod === "COD";
-
-      if (isCod || ENABLE_ONLINE_PAYMENT_PURCHASE_EVENT) {
-        if (!isOrderPurchaseTracked(orderIdentifier)) {
-          try {
-            const customerEmail = value("email");
-            const customerPhone = value("phone");
-            const customerName = value("name");
-            const customerCity = value("city");
-
-            const consentState =
-              typeof window !== "undefined" && (window as any).__dsConsentDefault
-                ? (window as any).__dsConsentDefault
-                : "denied";
-
-            const userData = await hashUserData(
-              {
-                email: customerEmail,
-                phone: customerPhone,
-                firstName: customerName.split(" ")[0] || customerName,
-                lastName: customerName.split(" ").slice(1).join(" ") || undefined,
-                city: customerCity,
-              },
-              consentState,
-            );
-
-            const items: TrackingEcommerceItem[] = (order.items || []).map((it) => ({
-              item_id: it.skuSnapshot?.trim() || it.nameSnapshot,
-              item_name: it.nameSnapshot,
-              price: Number(it.unitPrice) || 0,
-              quantity: it.quantity,
-              currency: "BDT",
-            }));
-
-            trackPurchase({
-              order: {
-                orderId: order.id,
-                orderNumber: order.orderNumber,
-                value: Number(order.grandTotal) || 0,
-                tax: Number(order.taxTotal) || 0,
-                shipping: Number(order.shippingTotal) || 0,
-                coupon: order.couponCode,
-                items,
-              },
-              userData,
-            });
-
-            markOrderPurchaseTracked(orderIdentifier);
-          } catch {
-            // Non-blocking: tracking failure must never interrupt order success
-          }
-        }
+      // Set a one-time "fresh order" token so the confirmation page (/orders/[id])
+      // fires the purchase event reliably after landing, avoiding drop-off on redirect.
+      try {
+        sessionStorage.setItem(
+          `ds_fresh_order_${order.id}`,
+          JSON.stringify({
+            paymentMethod,
+            customerEmail: value("email"),
+            customerPhone: value("phone"),
+            customerName: value("name"),
+            customerCity: value("city"),
+            createdAt: Date.now(),
+          }),
+        );
+      } catch {
+        /* Storage non-fatal */
       }
       if (paymentMethod === "BKASH" || paymentMethod === "SSLCOMMERZ") {
         try {

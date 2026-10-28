@@ -23,6 +23,28 @@ declare global {
  */
 export const ENABLE_ONLINE_PAYMENT_PURCHASE_EVENT = false;
 
+/**
+ * Purchase Value Mode Configuration:
+ * - 'ITEMS_SUBTOTAL' (Option A, GA4 recommended): value = items subtotal after discounts (excluding tax and shipping).
+ * - 'GRAND_TOTAL' (Option B): value = grandTotal including shipping and tax.
+ *
+ * In both modes, shipping and tax are sent in their own respective parameters.
+ * The chosen mode applies consistently across GA4, Meta Pixel, and Server CAPI.
+ */
+export type PurchaseValueMode = "ITEMS_SUBTOTAL" | "GRAND_TOTAL";
+export const PURCHASE_VALUE_MODE: PurchaseValueMode = "ITEMS_SUBTOTAL";
+
+export function calculatePurchaseValue(
+  order: { grandTotal: number; subtotal: number; discountTotal?: number },
+  mode: PurchaseValueMode = PURCHASE_VALUE_MODE,
+): number {
+  if (mode === "ITEMS_SUBTOTAL") {
+    const discount = order.discountTotal || 0;
+    return Math.max(0, order.subtotal - discount);
+  }
+  return order.grandTotal;
+}
+
 export interface TrackingEcommerceItem {
   item_id: string;
   item_name: string;

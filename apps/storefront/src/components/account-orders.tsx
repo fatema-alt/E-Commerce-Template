@@ -12,6 +12,15 @@ import {
   type Order,
   type Shopper,
 } from "../lib/shop-client";
+import {
+  calculatePurchaseValue,
+  hashUserData,
+  isOrderPurchaseTracked,
+  markOrderPurchaseTracked,
+  trackPurchase,
+  ENABLE_ONLINE_PAYMENT_PURCHASE_EVENT,
+  type TrackingEcommerceItem,
+} from "../lib/gtm";
 export function Account() {
   const [user, setUser] = useState<Shopper | null>(null);
   const [loading, setLoading] = useState(true);
@@ -337,6 +346,100 @@ export function OrderHistory({ id }: { id?: string }) {
       live = false;
     };
   }, [id, page]);
+
+  // Confirmation page purchase event: fires once for fresh orders, guarded by localStorage
+  useEffect(() => {
+    if (!order || !id) return;
+
+    const freshKey = `ds_fresh_order_${order.id}`;
+    let freshDataRaw: string | null = null;
+    try {
+      freshDataRaw = sessionStorage.getItem(freshKey);
+      if (freshDataRaw) {
+        // Immediately consume so it can never fire again on reload or back navigation
+        sessionStorage.removeItem(freshKey);
+      }
+    } catch {
+      // Storage unavailable
+    }
+
+    if (!freshDataRaw) {
+      // Historical views, reloads, or direct links from order history must NEVER fire purchase
+      return;
+    }
+
+    const orderIdentifier = order.orderNumber || order.id;
+    if (isOrderPurchaseTracked(orderIdentifier)) {
+      return;
+    }
+
+    let freshData: any = {};
+    try {
+      freshData = JSON.parse(freshDataRaw);
+    } catch {}
+
+    const isCod =
+      order.paymentMethod === "COD" || freshData.paymentMethod === "COD";
+    if (!isCod && !ENABLE_ONLINE_PAYMENT_PURCHASE_EVENT) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        const consentState =
+          typeof window !== "undefined" && (window as any).__dsConsentDefault
+            ? (window as any).__dsConsentDefault
+            : "denied";
+
+        const customerName =
+          freshData.customerName || order.customerName || "";
+        const userData = await hashUserData(
+          {
+            email: freshData.customerEmail,
+            phone: freshData.customerPhone || order.customerPhone,
+            firstName: customerName.split(" ")[0] || customerName,
+            lastName:
+              customerName.split(" ").slice(1).join(" ") || undefined,
+            city: freshData.customerCity,
+          },
+          consentState,
+        );
+
+        const items: TrackingEcommerceItem[] = (order.items || []).map(
+          (it) => ({
+            item_id: it.skuSnapshot?.trim() || it.nameSnapshot,
+            item_name: it.nameSnapshot,
+            price: Number(it.unitPrice) || 0,
+            quantity: it.quantity,
+            currency: "BDT",
+          }),
+        );
+
+        const orderValue = calculatePurchaseValue({
+          grandTotal: Number(order.grandTotal) || 0,
+          subtotal: Number(order.subtotal) || 0,
+          discountTotal: Number(order.discountTotal) || 0,
+        });
+
+        trackPurchase({
+          order: {
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            value: orderValue,
+            tax: Number(order.taxTotal) || 0,
+            shipping: Number(order.shippingTotal) || 0,
+            coupon: order.couponCode,
+            items,
+          },
+          userData,
+        });
+
+        markOrderPurchaseTracked(orderIdentifier);
+      } catch {
+        // Non-blocking: tracking failure must never interrupt order display
+      }
+    })();
+  }, [order, id]);
   return (
     <main id="main" className="container main-content shopping-page">
       <p>
