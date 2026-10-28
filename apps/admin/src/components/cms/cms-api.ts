@@ -37,7 +37,7 @@ export type Document = {
   state: string;
   publishedVersionId: string | null;
   scheduledAt: string | null;
-  latestVersion: { version: number; content: Record<string, Value> } | null;
+  latestVersion: { id?:string; version: number; content: Record<string, Value> } | null;
 };
 export class CmsRequestError extends Error {
   constructor(message: string, public readonly status: number) {

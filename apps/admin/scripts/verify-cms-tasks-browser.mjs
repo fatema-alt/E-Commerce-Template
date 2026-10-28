@@ -463,7 +463,7 @@ try {
   );
   assert.equal(
     await evaluate(
-      '[...document.querySelectorAll("button")].some(b=>b.textContent.trim()==="Publish latest saved version")',
+      '[...document.querySelectorAll("button")].some(b=>b.textContent.trim()==="Publish" && !b.disabled)',
     ),
     false,
   );

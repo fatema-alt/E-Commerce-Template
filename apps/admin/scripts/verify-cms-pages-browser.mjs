@@ -366,7 +366,7 @@ try {
     "save new page",
   );
   assert.equal(pageDocs.get("about-us").publishedVersionId, null);
-  await click("Publish latest saved version");
+  await click("Publish");
   await until(
     'document.body.textContent.includes("Published. This page is not your homepage.")',
     "non-homepage notice",

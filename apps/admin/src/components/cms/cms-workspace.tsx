@@ -4,6 +4,7 @@ import { useToastState } from "@/components/admin/toast-provider";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  API,
   type Asset,
   type Document,
   type Registry,
@@ -17,6 +18,8 @@ import {
 import { button, input, SchemaField } from "./schema-fields";
 import { getStandardEcommerceTemplate } from "./standard-template";
 import { VisualHomepageBuilder } from "./visual-homepage-builder";
+import { PublicationControls } from "./publication-controls";
+import { localDraftKey,readLocalDraft,writeLocalDraft,clearLocalDraft,editorStatus,publicationMessage,type LocalDraft } from "./local-draft";
 import { pageSlug, validPageSlug } from "./page-address";
 import { StoreLookEditor } from "./store-look-editor";
 import { CMS_AREAS, THEME_PRESETS } from "./cms-task-config";
@@ -56,6 +59,12 @@ export function CmsWorkspace({
 }) {
   const [registry, setRegistry] = useState<Registry | null>(null);
   const [role, setRole] = useState("STAFF");
+  const [owner,setOwner]=useState<string|null>(null);
+  const [editRevision,setEditRevision]=useState(0);
+  const [pendingRecovery,setPendingRecovery]=useState<LocalDraft|null>(null);
+  const [localWarning,setLocalWarning]=useState("");
+  const [conflict,setConflict]=useState(false);
+  const mutationInFlight=useRef(false);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetPage, setAssetPage] = useState(1);
   const [assetTotal, setAssetTotal] = useState(0);
@@ -112,13 +121,14 @@ export function CmsWorkspace({
     let live = true;
     Promise.all([
       request<Registry>("/admin/cms/schema"),
-      request<{ user: { role: string } }>("/auth/me"),
+      request<{ user: { role: string; id:string } }>("/auth/me"),
       request<{ items: Asset[]; total: number }>("/admin/cms/media?limit=100"),
     ])
       .then(([schema, auth, media]) => {
         if (live) {
           setRegistry(schema);
           setRole(auth.user.role);
+          setOwner(auth.user.id);
           if (kind !== "MEDIA") {
             setAssets(media.items);
             setAssetTotal(media.total);
@@ -150,10 +160,12 @@ export function CmsWorkspace({
     if (!dirty) return;
     const prevent = (event: BeforeUnloadEvent) => {
       event.preventDefault();
+      event.returnValue="";
     };
     window.addEventListener("beforeunload", prevent);
     const navigate = (event: MouseEvent) => {
       const anchor = (event.target as HTMLElement).closest("a");
+      if(anchor){const target=new URL(anchor.href);const current=new URL(window.location.href);if(anchor.target==='_blank'||target.origin===current.origin&&target.pathname===current.pathname&&target.search===current.search)return;}
       if (
         anchor &&
         !anchor.closest('[aria-label="CMS navigation"]') &&
@@ -173,10 +185,32 @@ export function CmsWorkspace({
   function canLeave() {
     return !dirty || window.confirm("Discard unsaved changes?");
   }
-  function change(value: Value) {
-    setContent(value as Record<string, Value>);
-    setDirty(true);
-    setNotice("");
+  const recoveryFor=useCallback((documentKey:string)=>{
+    if(!owner)return null;
+    try{return readLocalDraft(window.localStorage,localDraftKey(API,owner,kind,documentKey));}
+    catch{setLocalWarning('Local safety copy unavailable or damaged. Keep this tab open and save your work explicitly.');return null;}
+  },[owner,kind]);
+  const beginEditing=useCallback((documentKey:string,revision:number)=>{
+    setEditRevision(revision);setConflict(false);setPendingRecovery(recoveryFor(documentKey));
+  },[recoveryFor]);
+  function preserveLocal(value:Record<string,Value>,documentKey=key,revision=editRevision){
+    if(!owner||!documentKey||!editable)return;
+    try{writeLocalDraft(window.localStorage,localDraftKey(API,owner,kind,documentKey),{format:1,baseRevision:revision,content:value,savedAt:Date.now()});setLocalWarning('');}
+    catch{setLocalWarning('Browser storage is unavailable or full. Your changes are only in this tab until you save.');}
+  }
+  function clearSafetyCopy(){
+    if(!owner)return;
+    try{clearLocalDraft(window.localStorage,localDraftKey(API,owner,kind,key));setLocalWarning('');}
+    catch{setLocalWarning('Saved to the server, but the old browser safety copy could not be removed.');}
+  }
+  function restoreLocal(){
+    if(!pendingRecovery || !editable)return;
+    setContent(pendingRecovery.content);setEditRevision(pendingRecovery.baseRevision);setDirty(true);
+    setConflict(pendingRecovery.baseRevision!==(doc?.revision??0));setPendingRecovery(null);
+  }
+  function change(value:Value){
+    if(!editable||pendingRecovery)return;
+    setContent(value as Record<string,Value>);setDirty(true);setNotice('');preserveLocal(value as Record<string,Value>);
   }
   const open = useCallback(async (documentKey: string) => {
     if (dirty && !window.confirm("Discard unsaved changes?")) return;
@@ -195,6 +229,7 @@ export function CmsWorkspace({
       if (current !== sequence.current) return;
       setKey(documentKey);
       setDoc(next);
+      beginEditing(documentKey,next.revision);
       const loadedContent = { ...(next.latestVersion?.content ?? {}) };
       if (
         kind === "PAGE" &&
@@ -214,19 +249,19 @@ export function CmsWorkspace({
     } catch (e) {
       if (kind === "SITE_SETTINGS" && e instanceof CmsRequestError && e.status === 404) {
         if (current !== sequence.current) return;
-        setKey(documentKey); setDoc(null);
+        setKey(documentKey); setDoc(null); beginEditing(documentKey,0);
         setContent({ storeName: "DS Mart", locale: "en", currency: "BDT", ...(scope ? { [scope]: engagementDefaults[scope] } : {}) });
         setVersions([]); setHistoryTotal(0); setDirty(true);
         setNotice("New Site Settings draft. Configure, save and publish when ready.");
       } else if (kind === "THEME" && e instanceof CmsRequestError && e.status === 404) {
         if (current !== sequence.current) return;
-        setKey(documentKey); setDoc(null); setContent({...THEME_PRESETS[1].values});
+        setKey(documentKey); setDoc(null); beginEditing(documentKey,0);setContent({...THEME_PRESETS[1].values});
         setVersions([]); setHistoryTotal(0); setDirty(true);
         setNotice("Choose a look, save a draft and publish when ready.");
-      } else if (kind === "PAGE" && area === "homepage" && documentKey === homepage?.homePageKey && e instanceof CmsRequestError && e.status === 404) {
+      } else if (kind === "PAGE" && (area === "homepage" && documentKey === homepage?.homePageKey || !!recoveryFor(documentKey)) && e instanceof CmsRequestError && e.status === 404) {
         if (current !== sequence.current) return;
         setKey(documentKey);
-        setDoc(null);
+        setDoc(null);beginEditing(documentKey,0);
         setContent({
           title: "Home",
           sections: getStandardEcommerceTemplate() as unknown as Value,
@@ -243,7 +278,7 @@ export function CmsWorkspace({
     } finally {
       if (current === sequence.current) setBusy(false);
     }
-  }, [dirty, kind, scope, area, homepage, setError, setNotice]);
+  }, [dirty, kind, scope, area, homepage, beginEditing, recoveryFor, setError, setNotice]);
 
   const loadHomepage=useCallback(async()=>{
     const next=await request<{settingsKey:string;settingsRevision:number;settingsPublished:boolean;homePageKey:string}>("/admin/cms/homepage/context?"+new URLSearchParams({settingsKey:settingsDocumentKey,fallbackHomeKey}));
@@ -261,7 +296,7 @@ export function CmsWorkspace({
   }
   const initialOpenedRef = useRef(false);
   useEffect(() => {
-    if (initialOpenedRef.current || loading || (kind === "PAGE" && !homepage)) return;
+    if (initialOpenedRef.current || loading || !owner || (kind === "PAGE" && !homepage)) return;
     initialOpenedRef.current = true;
     const urlKey =
       typeof window !== "undefined"
@@ -271,7 +306,7 @@ export function CmsWorkspace({
     if (targetKey) {
       void Promise.resolve().then(() => open(targetKey));
     }
-  }, [loading, kind, defaultKey, open, area, homepage]);
+  }, [loading, kind, defaultKey, open, area, homepage,owner]);
   async function create() {
     if (!registry || !canLeave()) return;
     if(kind === 'PAGE') {
@@ -301,6 +336,8 @@ export function CmsWorkspace({
       };
     }
     setContent(initial);
+    beginEditing(newKey,0);if(!recoveryFor(newKey))preserveLocal(initial,newKey,0);
+    if(kind==='PAGE'){const url=new URL(window.location.href);url.searchParams.set('key',newKey);window.history.replaceState(null,'',url);}
     setVersions([]);
     setHistoryTotal(0);
     setDirty(true);
@@ -308,19 +345,16 @@ export function CmsWorkspace({
     setNotice("");
   }
   async function mutate(action: string, version?: number) {
+    if(mutationInFlight.current || conflict || pendingRecovery)return;
+    if(action==='draft'&&!editable || action!=='draft'&&!publisher)return;
     if (action !== "draft" && dirty) {
       setError(
         "Save your draft before publishing or changing publication status.",
       );
       return;
     }
-    if (
-      ["archive", "unpublish", "rollback"].includes(action) &&
-      !window.confirm(
-        `${label(action)} ${key}${version ? ` to version ${version}` : ""}?`,
-      )
-    )
-      return;
+    const confirmation=publicationMessage(action,String(content.title || heading || 'this content'),version);
+    if(confirmation&&!window.confirm(confirmation))return;
     if (
       action === "schedule" &&
       (!scheduledAt || !Number.isFinite(new Date(scheduledAt).getTime()))
@@ -328,25 +362,17 @@ export function CmsWorkspace({
       setError("Choose a valid future publication time.");
       return;
     }
+    mutationInFlight.current=true;
     setBusy(true);
     setError("");
     setNotice("");
     const payloadContent = { ...content };
-    if (kind === "PAGE") {
-      const currentTitle = (payloadContent.title as string)?.trim();
-      if (!currentTitle) {
-        payloadContent.title =
-          key === "home"
-            ? "Home"
-            : key.charAt(0).toUpperCase() + key.slice(1);
-        setContent(payloadContent);
-      }
-    }
+    let committed=false;
     try {
-      await request(`/admin/cms/${kind}/${key}/${action}`, {
+      const saved=await request<{revision:number}>(`/admin/cms/${kind}/${key}/${action}`, {
         method: action === "draft" ? "PATCH" : "POST",
         body: JSON.stringify({
-          expectedRevision: doc?.revision ?? 0,
+          expectedRevision: action==='draft'?editRevision:(doc?.revision??0),
           ...(action === "draft" ? { content: payloadContent } : {}),
           ...(version ? { version } : {}),
           ...(action === "schedule"
@@ -354,8 +380,10 @@ export function CmsWorkspace({
             : {}),
         }),
       });
+      committed=true;
+      if(action==='draft'){clearSafetyCopy();setDirty(false);setEditRevision(saved.revision);}
       const next = await request<Document>(`/admin/cms/${kind}/${key}`);
-      setDoc(next);
+      setDoc(next);setEditRevision(next.revision);
       if(kind === 'PAGE' && ['publish','rollback'].includes(action)) {
         const currentHomepage=await loadHomepage();setPublishedElsewhere(currentHomepage.homePageKey!==key);
       }
@@ -373,8 +401,11 @@ export function CmsWorkspace({
       setHistoryPage(1);
       await refreshList();
     } catch (e) {
-      setError((e as Error).message);
+      if(committed){setConflict(true);setError('The server saved your action, but refreshing failed. Reload saved content before making another change.');}
+      else if(e instanceof CmsRequestError && e.status===409){setConflict(true);setError('Content changed on the server. Your local changes are retained. Reload and review before saving or publishing.');}
+      else setError((e as Error).message);
     } finally {
+      mutationInFlight.current=false;
       setBusy(false);
     }
   }
@@ -402,8 +433,7 @@ export function CmsWorkspace({
       const result = await request<{ content: Record<string, Value> }>(
         `/admin/cms/${kind}/${key}/versions/${version}`,
       );
-      setContent(result.content);
-      setDirty(true);
+      change(result.content);
       setNotice(
         `Version ${version} loaded into the editor. Save to create a new draft.`,
       );
@@ -453,6 +483,12 @@ export function CmsWorkspace({
 
 
 
+      {key && kind!=='MEDIA' && <>
+        {localWarning&&<p role="alert" className="cms-recovery-warning">{localWarning}</p>}
+        {pendingRecovery&&<section className="cms-recovery" aria-label="Local recovery"><p>Unsaved changes found, restore?</p><p>These changes are stored only in this browser and have not been saved to the server.</p>{editable&&<div><button type="button" className={button} onClick={restoreLocal}>Restore unsaved changes</button><button type="button" className={button} onClick={()=>{clearSafetyCopy();setPendingRecovery(null);}}>Discard local copy</button></div>}</section>}
+        {conflict&&<section role="alert" className="cms-recovery-warning"><p>Content changed on the server. Saving and publishing are stopped. Your local changes are retained; reload and review before continuing.</p><button type="button" className={button} disabled={busy} onClick={()=>open(key)}>Reload saved content</button></section>}
+        <PublicationControls doc={doc} status={editorStatus(doc,dirty,doc?.latestVersion?.id || versions.find(v=>v.version===doc?.latestVersion?.version)?.id)} dirty={dirty} busy={busy} conflict={conflict||!!pendingRecovery} editable={editable} publisher={publisher} versions={versions} historyPage={historyPage} historyTotal={historyTotal} scheduledAt={scheduledAt} onDate={setScheduledAt} onAction={mutate} onHistory={history} onRestore={restore} />
+      </>}
       {loading ? (
         <p role="status">Loading CMSâ€¦</p>
       ) : kind === "MEDIA" ? (
@@ -594,52 +630,12 @@ export function CmsWorkspace({
             onUpdateSections={(next) => updateSections(next as unknown as Section[])}
             registry={registry}
             assets={assets}
-            dirty={dirty}
             busy={busy}
-            doc={doc}
-            onSaveDraft={() => mutate("draft")}
-            onPublish={() => mutate("publish")}
-            editable={editable}
-            publisher={publisher}
+            editable={editable&&!pendingRecovery}
             onNotice={(msg) => setNotice(msg)}
           />
 
-          {doc && (
-            <details className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 text-xs">
-              <summary className="cursor-pointer font-semibold text-slate-700 dark:text-slate-300">
-                Version History & Audit ({versions.length} versions recorded)
-              </summary>
-              <div className="mt-3 space-y-2">
-                {versions.map((version) => (
-                  <div key={version.id} className="flex items-center justify-between border-b dark:border-slate-800 pb-2">
-                    <span>
-                      Version {version.version} {version.id === doc.publishedVersionId ? "· Live" : ""} — {new Date(version.createdAt).toLocaleString()}
-                    </span>
-                    <div className="flex gap-2">
-                      {editable && (
-                        <button
-                          className="text-indigo-600 hover:underline font-semibold"
-                          disabled={busy}
-                          onClick={() => restore(version.version)}
-                        >
-                          Load version
-                        </button>
-                      )}
-                      {publisher && (
-                        <button
-                          className="text-emerald-600 hover:underline font-semibold"
-                          disabled={busy || dirty}
-                          onClick={() => mutate("rollback", version.version)}
-                        >
-                          Publish version
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
+
         </div>
       ) : (
         <div className={kind === "SITE_SETTINGS" || kind === "THEME" ? "grid items-start gap-6" : "grid items-start gap-6 xl:grid-cols-[240px_minmax(0,1fr)]"}>
@@ -694,13 +690,7 @@ export function CmsWorkspace({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="break-all text-xl font-semibold">{kind === "SITE_SETTINGS" || kind === "THEME" ? heading : String(content.title || content.label || key)}</h2>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {doc?.state ?? "NEW"} Â· revision {doc?.revision ?? 0} Â·{" "}
-                      {dirty ? "Unsaved changes" : "Saved"}
-                      {doc?.scheduledAt
-                        ? ` Â· Scheduled ${new Date(doc.scheduledAt).toLocaleString()}`
-                        : ""}
-                    </p>
+
                   </div>
                   <div className="flex gap-2">
                     {kind === "PAGE" && (
@@ -750,7 +740,7 @@ export function CmsWorkspace({
                   </button>
                 )}
                 <fieldset
-                  disabled={!editable || busy}
+                  disabled={!editable || busy || !!pendingRecovery}
                   className="mt-6 min-w-0 space-y-5"
                 >
                   {scope ? (
@@ -1014,138 +1004,13 @@ export function CmsWorkspace({
                     />
                   )}
                 </fieldset>
-                {editable && (
-                  <button
-                    disabled={busy || !dirty}
-                    onClick={() => mutate("draft")}
-                    className="mt-6 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-                  >
-                    {busy ? "Workingâ€¦" : "Save draft"}
-                  </button>
-                )}
                 {!editable && (
                   <p className="mt-4 text-sm text-slate-500">
                     Read-only access. An administrator can edit this content.
                   </p>
                 )}
               </section>
-              {publisher && doc && (
-                <section className="space-y-4 rounded-xl border bg-white p-5">
-                  <h2 className="font-semibold">Publishing</h2>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      disabled={busy || dirty}
-                      className={button}
-                      onClick={() => mutate("publish")}
-                    >
-                      Publish latest saved version
-                    </button>
-                    <button
-                      disabled={busy || dirty || !doc.publishedVersionId}
-                      className={button}
-                      onClick={() => mutate("unpublish")}
-                    >
-                      Unpublish
-                    </button>
-                    <button
-                      disabled={busy || dirty}
-                      className={button}
-                      onClick={() => mutate("archive")}
-                    >
-                      Archive
-                    </button>
-                  </div>
-                  <label
-                    className="block text-sm font-medium"
-                    htmlFor="cms-schedule"
-                  >
-                    Schedule publication (your local time)
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    <input
-                      id="cms-schedule"
-                      type="datetime-local"
-                      className={input + " max-w-xs"}
-                      value={scheduledAt}
-                      onChange={(e) => setScheduledAt(e.target.value)}
-                    />
-                    <button
-                      className={button}
-                      disabled={busy || dirty || !scheduledAt}
-                      onClick={() => mutate("schedule")}
-                    >
-                      Schedule saved version
-                    </button>
-                    {doc.scheduledAt && (
-                      <button
-                        className={button}
-                        disabled={busy || dirty}
-                        onClick={() => mutate("cancel-schedule")}
-                      >
-                        Cancel schedule
-                      </button>
-                    )}
-                  </div>
-                </section>
-              )}
-              {doc && (
-                <section className="rounded-xl border bg-white p-5">
-                  <h2 className="mb-4 font-semibold">Version history</h2>
-                  <div className="space-y-3">
-                    {versions.map((version) => (
-                      <div
-                        key={version.id}
-                        className="flex flex-wrap items-center gap-2 border-b pb-3 text-sm"
-                      >
-                        <div className="mr-auto">
-                          Version {version.version}
-                          {version.id === doc.publishedVersionId
-                            ? " Â· Live"
-                            : ""}
-                          <p className="text-xs text-slate-500">
-                            {new Date(version.createdAt).toLocaleString()}
-                          </p>
-                        </div>
-                        {editable && (
-                          <button
-                            className={button}
-                            disabled={busy}
-                            onClick={() => restore(version.version)}
-                          >
-                            Load into editor
-                          </button>
-                        )}
-                        {publisher && (
-                          <button
-                            className={button}
-                            disabled={busy || dirty}
-                            onClick={() => mutate("rollback", version.version)}
-                          >
-                            Publish this version
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 flex gap-2">
-                    <button
-                      className={button}
-                      disabled={busy || historyPage === 1}
-                      onClick={() => history(historyPage - 1)}
-                    >
-                      Previous
-                    </button>
-                    <span className="p-2 text-sm">Page {historyPage}</span>
-                    <button
-                      className={button}
-                      disabled={busy || historyPage * 10 >= historyTotal}
-                      onClick={() => history(historyPage + 1)}
-                    >
-                      Next
-                    </button>
-                  </div>
-                </section>
-              )}
+
             </div>
           ) : (
             <div className="rounded-xl border border-dashed bg-white p-12 text-center text-slate-500">
