@@ -148,7 +148,7 @@ export const fallbackConfig: StorefrontConfig = {
       eyebrow: "YOUR EVERYDAY, UPGRADED",
       title: "Shop smart. Live smart.",
       description:
-        "From your next favourite gadget to the little things for home. Discover more of what you love, all at DS Mart with nationwide Cash on Delivery.",
+        "Explore the catalogue and check available payment and delivery options at checkout.",
       ctaHref: "/shop",
       ctaLabel: "Start shopping",
     },
@@ -156,16 +156,16 @@ export const fallbackConfig: StorefrontConfig = {
     {
       type: "products",
       id: "featured",
-      title: "Trending & Best Sellers",
-      subtitle: "Handpicked top sellers chosen by our customers.",
+      title: "Explore products",
+      subtitle: "Browse the current catalogue.",
     },
     {
       type: "promoBanner",
       id: "promo",
-      title: "Save More With Checkout Coupons",
+      title: "Explore the catalogue",
       description:
-        "Enjoy up to 25% extra discount using verified promo codes. Fast 24-48h delivery inside Dhaka.",
-      ctaLabel: "View All Deals",
+        "Review product details, prices and available options before ordering.",
+      ctaLabel: "Browse products",
       ctaHref: "/shop",
     },
     {
@@ -174,27 +174,27 @@ export const fallbackConfig: StorefrontConfig = {
       title: "Why Choose DS Mart?",
       items: [
         {
-          title: "Cash on Delivery",
+          title: "Payment options",
           description:
-            "Pay upon parcel inspection at your doorstep all across Bangladesh.",
+            "Check available payment methods at checkout.",
           icon: "truck",
         },
         {
-          title: "100% Genuine",
+          title: "Product information",
           description:
-            "Directly sourced authentic brand products with full warranty.",
+            "Review product details before ordering.",
           icon: "shield",
         },
         {
-          title: "Easy 7-Day Returns",
+          title: "Returns questions",
           description:
-            "Hassle-free replacement or quick refund if not fully satisfied.",
+            "Questions about returns? Contact our team.",
           icon: "return",
         },
         {
-          title: "Dedicated Support",
+          title: "Contact our team",
           description:
-            "Expert customer assistance ready 24/7 via call or WhatsApp.",
+            "Ask about products or an existing order.",
           icon: "support",
         },
       ],
@@ -207,29 +207,29 @@ export const fallbackConfig: StorefrontConfig = {
         {
           question: "How does Cash on Delivery (COD) work?",
           answer:
-            "Select Cash on Delivery during checkout. Our delivery agent collects the payment in cash or via bKash upon delivering your package.",
+            "If Cash on Delivery is available for your order, select it at checkout and pay when your order arrives.",
         },
         {
           question: "What are the shipping charges and delivery timelines?",
           answer:
-            "Delivery inside Dhaka takes 24 to 48 hours (৳60). Outside Dhaka takes 2 to 4 business days (৳120). Free delivery on orders over ৳2,500.",
+            "Review delivery charges at checkout. Contact our team with your location for delivery questions.",
         },
         {
           question: "How can I apply a discount coupon?",
           answer:
-            "Enter your coupon code in the cart summary or checkout coupon field and click 'Apply' for instant savings.",
+            "If you have a coupon, enter it in your cart or at checkout. Any eligible discount is shown in your order total.",
         },
       ],
     },
     {
       type: "newsletter",
       id: "newsletter",
-      title: "Get 10% Off Your First Order",
+      title: "Stay in the loop with DS Mart",
       description:
-        "Subscribe to our newsletter for exclusive vouchers, weekly sales, and member-only specials.",
+        "Subscribe to receive news and product updates from DS Mart.",
       buttonLabel: "Subscribe Now",
       consentText:
-        "I agree to receive discount updates and promotional emails from DS Mart.",
+        "I agree to receive news and product updates from DS Mart.",
     },
   ],
 };

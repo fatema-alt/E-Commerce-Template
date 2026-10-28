@@ -90,11 +90,11 @@ export function Newsletter({
   return (
     <div className="newsletter-panel" aria-labelledby={`${id}-heading`}>
       <div className="newsletter-copy">
-        <span className="newsletter-eyebrow">EXCLUSIVE MEMBER OFFERS</span>
+        <span className="newsletter-eyebrow">DS MART UPDATES</span>
         <h2 id={`${id}-heading`}>{heading}</h2>
         <p>
           {claimsDiscount || !description
-            ? "Discover new arrivals, product updates and member offers when available. Subscribe to hear what’s next."
+            ? "Subscribe to receive news and product updates from DS Mart."
             : description}
         </p>
         <span className="newsletter-benefit">

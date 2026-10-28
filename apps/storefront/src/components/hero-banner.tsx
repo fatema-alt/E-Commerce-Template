@@ -99,12 +99,12 @@ export function HeroBanner({ config, assets = [], block }: {
         </div>}
         <span className="sr-only" aria-live={stopped ? "polite" : "off"} aria-atomic="true">Slide {current + 1} of {count}</span>
       </div>
-      <div className="hero-trust-strip" aria-label="Customer service promises">
+      <div className="hero-trust-strip" aria-label="Shopping information">
         {[
-          ["🛡️", "100% Authentic Guarantee", "Directly sourced from authorized brand distributors"],
-          ["💵", "Cash on Delivery (COD)", "Pay safely at doorstep anywhere across Bangladesh"],
-          ["🔄", "7-Day Easy Returns", "Simple replacements or hassle-free full refunds"],
-          ["☎", "24/7 Dedicated Care", "Friendly customer assistance via hotline & chat"],
+          ["🛡️", "Product information", "Review product details before ordering."],
+          ["💵", "Payment options", "Check available payment methods at checkout."],
+          ["🔄", "Returns questions", "Questions about returns? Contact our team."],
+          ["☎", "Contact our team", "Ask about products or an existing order."],
         ].map(([icon, title, text]) => <div key={title} className="trust-strip-item"><div className="trust-icon-box" aria-hidden="true">{icon}</div><div className="trust-text"><strong>{title}</strong><span>{text}</span></div></div>)}
       </div>
     </section>
