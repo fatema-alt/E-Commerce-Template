@@ -36,6 +36,8 @@ export type Document = {
   state: string;
   publishedVersionId: string | null;
   scheduledAt: string | null;
+  publishedAt?: string | null;
+  publishedContent?: Record<string, Value> | null;
   latestVersion: { version: number; content: Record<string, Value> } | null;
 };
 export class CmsRequestError extends Error {

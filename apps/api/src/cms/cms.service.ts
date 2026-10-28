@@ -390,12 +390,17 @@ export class CmsService {
     validateCmsKey(key);
     const doc = await this.db.cmsDocument.findUnique({
       where: { kind_key: { kind, key } },
-      include: { versions: { orderBy: { version: 'desc' }, take: 1 } },
+      include: {
+        publication: true,
+        versions: { orderBy: { version: 'desc' }, take: 1 },
+      },
     });
     if (!doc) throw new NotFoundException('CMS document not found');
     return {
       ...doc,
       latestVersion: doc.versions[0] ?? null,
+      publishedContent: (doc.publication?.content as any) ?? null,
+      publishedAt: doc.publishedAt?.toISOString() ?? null,
       versions: undefined,
     };
   }

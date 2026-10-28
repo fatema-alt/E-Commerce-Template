@@ -21,6 +21,7 @@ import {
   Sparkles,
   Palette,
   Image as ImageIcon,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 
@@ -74,6 +75,7 @@ const navigation: NavItem[] = [
       { label: "Site Settings", href: "/cms/settings", icon: Settings },
       { label: "Announcement Bar", href: "/cms/announcements", icon: Sparkles },
       { label: "Floating Contact Widget", href: "/cms/contact-widget", icon: Users },
+      { label: "Tracking & Pixels", href: "/cms/tracking", icon: Activity },
     ],
   },
   {
@@ -83,6 +85,7 @@ const navigation: NavItem[] = [
     children: [
       { label: "Payment Gateways", href: "/settings/payments", icon: CreditCard },
       { label: "Site Settings", href: "/cms/settings", icon: Settings },
+      { label: "Tracking & Pixels", href: "/cms/tracking", icon: Activity },
     ],
   },
 ];

@@ -34,6 +34,15 @@ export const engagementDefaults: Record<string, Record<string, Value>> = {
     rememberDismissal: false,
     excludedRoutes: [],
   },
+  tracking: {
+    enabled: false,
+    gtmId: "",
+    serverUrl: "",
+    ga4MeasurementId: "",
+    metaPixelId: "",
+    consentDefault: "denied",
+    debugMode: false,
+  },
 };
 type Row = Record<string, Value>;
 export function EngagementPreview({

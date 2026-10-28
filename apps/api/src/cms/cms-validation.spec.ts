@@ -152,6 +152,61 @@ describe('CMS content validation', () => {
       }),
     ).toThrow('unknown');
   });
+  it('validates tracking settings with strict allowlists and rejects secret tokens', () => {
+    const valid = {
+      storeName: 'DS Mart',
+      locale: 'en',
+      currency: 'BDT',
+      tracking: {
+        enabled: true,
+        gtmId: 'GTM-W8XYZ12',
+        serverUrl: 'https://ss.dsmart.digislashagency.com',
+        ga4MeasurementId: 'G-XYZ1234567',
+        metaPixelId: '123456789012345',
+        consentDefault: 'denied',
+        debugMode: true,
+      },
+    };
+    expect(validateCmsContent('SITE_SETTINGS', valid)).toEqual(valid);
+
+    // Rejects invalid GTM ID
+    expect(() =>
+      validateCmsContent('SITE_SETTINGS', {
+        ...valid,
+        tracking: { ...valid.tracking, gtmId: '<script>' },
+      }),
+    ).toThrow('invalid format');
+
+    // Rejects invalid server URL (e.g. http or containing paths)
+    expect(() =>
+      validateCmsContent('SITE_SETTINGS', {
+        ...valid,
+        tracking: { ...valid.tracking, serverUrl: 'http://insecure.test' },
+      }),
+    ).toThrow('invalid format');
+    expect(() =>
+      validateCmsContent('SITE_SETTINGS', {
+        ...valid,
+        tracking: { ...valid.tracking, serverUrl: 'https://ss.test/path' },
+      }),
+    ).toThrow('invalid format');
+
+    // Rejects secret tokens and credentials as unknown fields
+    expect(() =>
+      validateCmsContent('SITE_SETTINGS', {
+        ...valid,
+        tracking: { ...valid.tracking, metaAccessToken: 'secret-token-123' },
+      }),
+    ).toThrow('unknown field');
+
+    // Rejects invalid consent choice
+    expect(() =>
+      validateCmsContent('SITE_SETTINGS', {
+        ...valid,
+        tracking: { ...valid.tracking, consentDefault: 'auto' },
+      }),
+    ).toThrow('unsupported value');
+  });
   it.each([
     'javascript:alert(1)',
     'data:text/html,x',

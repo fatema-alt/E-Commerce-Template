@@ -351,6 +351,18 @@ export const SETTINGS_SCHEMA = object(
       },
       [],
     ),
+    tracking: object(
+      {
+        enabled: bool,
+        gtmId: { ...text(20, 0), pattern: '^$|^GTM-[A-Z0-9]{4,10}$' },
+        serverUrl: { ...text(200, 0), pattern: '^$|^https://[a-zA-Z0-9.-]+(?::[0-9]+)?$' },
+        ga4MeasurementId: { ...text(20, 0), pattern: '^$|^G-[A-Z0-9]{6,12}$' },
+        metaPixelId: { ...text(30, 0), pattern: '^$|^[0-9]{8,20}$' },
+        consentDefault: choice('granted', 'denied'),
+        debugMode: bool,
+      },
+      [],
+    ),
     socialLinks: array(button, 15),
     legalLinks: array(button, 20),
   },

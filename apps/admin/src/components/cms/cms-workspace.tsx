@@ -18,6 +18,7 @@ import { button, input, SchemaField } from "./schema-fields";
 import { getStandardEcommerceTemplate } from "./standard-template";
 import { VisualHomepageBuilder } from "./visual-homepage-builder";
 import { EngagementPreview, engagementDefaults } from "./engagement-preview";
+import { TrackingEditor } from "./tracking-editor";
 
 const tabs = [
   ["SITE_SETTINGS", "Site Settings", "settings"],
@@ -27,6 +28,7 @@ const tabs = [
   ["MEDIA", "Media Library", "media"],
   ["ANNOUNCEMENTS", "Announcement Bar", "announcements"],
   ["CONTACT_WIDGET", "Floating Contact Widget", "contact-widget"],
+  ["TRACKING", "Tracking & Pixels", "tracking"],
 ];
 type Version = { id: string; version: number; createdAt: string };
 type Section = {
@@ -43,7 +45,7 @@ export function CmsWorkspace({
 }: {
   kind: string;
   defaultKey?: string;
-  scope?: "announcementRibbon" | "contactWidget";
+  scope?: "announcementRibbon" | "contactWidget" | "tracking";
 }) {
   const [registry, setRegistry] = useState<Registry | null>(null);
   const [role, setRole] = useState("STAFF");
@@ -277,6 +279,52 @@ export function CmsWorkspace({
       );
       return;
     }
+    if (action === "publish") {
+      if (scope === "tracking" || (kind === "SITE_SETTINGS" && content.tracking)) {
+        const draftTracking = ((content.tracking as Record<string, Value>) || {}) as Record<string, Value>;
+        const pubTracking = (((doc?.publishedContent?.tracking as Record<string, Value>) || {}) as Record<string, Value>);
+
+        const trackingLabels: Record<string, string> = {
+          enabled: "Tracking Active",
+          gtmId: "GTM Web Container ID",
+          serverUrl: "Server Tagging URL",
+          ga4MeasurementId: "GA4 Measurement ID",
+          metaPixelId: "Meta Pixel ID",
+          consentDefault: "Consent Mode Default",
+          debugMode: "Debug Mode",
+        };
+
+        const changes: string[] = [];
+        for (const [k, lbl] of Object.entries(trackingLabels)) {
+          const draftVal = draftTracking[k] ?? (k === "enabled" || k === "debugMode" ? false : k === "consentDefault" ? "denied" : "");
+          const pubVal = pubTracking[k] ?? (k === "enabled" || k === "debugMode" ? false : k === "consentDefault" ? "denied" : "");
+          if (draftVal !== pubVal) {
+            changes.push(`${lbl}: "${String(pubVal)}" → "${String(draftVal)}"`);
+          }
+        }
+
+        let hasOtherChanges = false;
+        if (doc?.publishedContent) {
+          for (const k of Object.keys(content)) {
+            if (k === "tracking") continue;
+            if (JSON.stringify(content[k]) !== JSON.stringify(doc.publishedContent[k])) {
+              hasOtherChanges = true;
+              break;
+            }
+          }
+        }
+
+        const changesText = changes.length > 0 ? changes.map((c) => `• ${c}`).join("\n") : "• No tracking changes (republishing live version)";
+        const otherWarning = hasOtherChanges
+          ? "\n\n⚠️ WARNING: This Site Settings document contains other unpublished changes (e.g. store info, announcements) that will also be published to the live store."
+          : "";
+
+        const confirmed = window.confirm(
+          `This changes tracking on the live store.\n\nChanged fields:\n${changesText}${otherWarning}\n\nDo you want to proceed?`
+        );
+        if (!confirmed) return;
+      }
+    }
     if (
       ["archive", "unpublish", "rollback"].includes(action) &&
       !window.confirm(
@@ -377,7 +425,22 @@ export function CmsWorkspace({
   function updateSections(next: Section[]) {
     change({ ...content, sections: next as unknown as Value });
   }
-  const heading = scope === "announcementRibbon" ? "Announcement Bar" : scope === "contactWidget" ? "Floating Contact Widget" : tabs.find((tab) => tab[0] === kind)?.[1];
+  const heading =
+    scope === "announcementRibbon"
+      ? "Announcement Bar"
+      : scope === "contactWidget"
+        ? "Floating Contact Widget"
+        : scope === "tracking"
+          ? "Tracking & Pixels"
+          : tabs.find((tab) => tab[0] === kind)?.[1];
+  const isTabActive = (id: string) => {
+    if (scope) {
+      if (scope === "announcementRibbon") return id === "ANNOUNCEMENTS";
+      if (scope === "contactWidget") return id === "CONTACT_WIDGET";
+      if (scope === "tracking") return id === "TRACKING";
+    }
+    return kind === id;
+  };
   return (
     <div className="space-y-6">
       <div>
@@ -401,8 +464,8 @@ export function CmsWorkspace({
             onClick={(e) => {
               if (!canLeave()) e.preventDefault();
             }}
-            aria-current={(scope ? (scope === "announcementRibbon" ? id === "ANNOUNCEMENTS" : id === "CONTACT_WIDGET") : kind === id) ? "page" : undefined}
-            className={`rounded-lg px-4 py-2 text-sm font-medium ${(scope ? (scope === "announcementRibbon" ? id === "ANNOUNCEMENTS" : id === "CONTACT_WIDGET") : kind === id) ? "bg-indigo-600 text-white" : "bg-white text-slate-600"}`}
+            aria-current={isTabActive(id) ? "page" : undefined}
+            className={`rounded-lg px-4 py-2 text-sm font-medium ${isTabActive(id) ? "bg-indigo-600 text-white" : "bg-white text-slate-600"}`}
           >
             {title}
           </Link>
@@ -708,10 +771,20 @@ export function CmsWorkspace({
                   className="mt-6 min-w-0 space-y-5"
                 >
                   {scope ? (
-                    <div className="engagement-editor">
-                      <div><p className="mb-4 text-sm text-slate-500">Settings are part of the selected Site Settings document. Publishing also publishes its other saved changes. Times use your local timezone and are saved in UTC. Array order controls display order.</p><SchemaField name={heading || scope} schema={registry.documents.SITE_SETTINGS.properties![scope]} value={content[scope] ?? engagementDefaults[scope]} assets={assets} onChange={value => change({ ...content, [scope]: value })} /></div>
-                      <EngagementPreview scope={scope} value={content[scope] ?? engagementDefaults[scope]} />
-                    </div>
+                    scope === "tracking" ? (
+                      <TrackingEditor
+                        value={((content.tracking as Record<string, Value>) || engagementDefaults.tracking)}
+                        publishedValue={((doc?.publishedContent?.tracking as Record<string, Value>) || null)}
+                        publishedAt={doc?.publishedAt || null}
+                        disabled={!editable || busy}
+                        onChange={(val) => change({ ...content, tracking: val })}
+                      />
+                    ) : (
+                      <div className="engagement-editor">
+                        <div><p className="mb-4 text-sm text-slate-500">Settings are part of the selected Site Settings document. Publishing also publishes its other saved changes. Times use your local timezone and are saved in UTC. Array order controls display order.</p><SchemaField name={heading || scope} schema={registry.documents.SITE_SETTINGS.properties![scope]} value={content[scope] ?? engagementDefaults[scope]} assets={assets} onChange={value => change({ ...content, [scope]: value })} /></div>
+                        <EngagementPreview scope={scope} value={content[scope] ?? engagementDefaults[scope]} />
+                      </div>
+                    )
                   ) : preview ? (
                     <DraftPreview
                       kind={kind}

@@ -17,6 +17,10 @@ const trackingCode = ts.transpileModule(
 ).outputText;
 
 const {
+  GTM_ID_REGEX,
+  SERVER_URL_REGEX,
+  GA4_ID_REGEX,
+  PIXEL_ID_REGEX,
   isValidGtmId,
   isValidServerUrl,
   isValidGa4Id,

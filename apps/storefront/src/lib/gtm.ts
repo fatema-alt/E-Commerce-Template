@@ -19,9 +19,8 @@ declare global {
  * Format: evt_<timestamp>_<random>
  */
 export function generateEventId(): string {
-  const rand = typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID().replace(/-/g, '').slice(0, 10)
-    : Math.random().toString(36).slice(2, 12);
+  // Use cryptographically secure random UUID without hyphens
+  const rand = crypto.randomUUID().replace(/-/g, '');
   return `evt_${Date.now()}_${rand}`;
 }
 

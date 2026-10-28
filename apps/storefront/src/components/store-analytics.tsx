@@ -11,6 +11,7 @@ export function StoreAnalytics({
   tracking?: ResolvedTrackingConfig;
 }) {
   const pathname = usePathname();
+  const isFirstNavigation = useRef(true);
   const lastTrackedPath = useRef<string | null>(null);
 
   useEffect(() => {
@@ -28,8 +29,20 @@ export function StoreAnalytics({
           typeof window !== "undefined" ? window.location.search : "";
         const fullPath = pathname + search;
 
-        // Prevent duplicate trigger on the exact same full path
-        if (lastTrackedPath.current !== fullPath) {
+        if (isFirstNavigation.current) {
+          // Initial page load: GTM Google Tag fires automatically via send_page_view: true.
+          // We mark the initial path to prevent double firing on first load.
+          isFirstNavigation.current = false;
+          lastTrackedPath.current = fullPath;
+          if (tracking.debugMode) {
+            // eslint-disable-next-line no-console
+            console.log(
+              "[DS Mart GTM] Initial page view handled by Google Tag (send_page_view: true):",
+              fullPath,
+            );
+          }
+        } else if (lastTrackedPath.current !== fullPath) {
+          // Client-side SPA route transition: Push virtual page_view event to dataLayer
           lastTrackedPath.current = fullPath;
           trackPageView({
             page_path: fullPath,
