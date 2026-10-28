@@ -27,9 +27,10 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
       },
       config: {
         bannerType: "with_button",
+        showTrustStrip: false,
         title: "Shop Smart. Live Smart.",
         subtitle:
-          "Discover top-tier electronics, fashion, lifestyle, and daily essentials with lightning-fast delivery and Cash on Delivery all across Bangladesh.",
+          "Explore the catalogue and check available payment and delivery options at checkout.",
         button: {
           label: "Start Shopping ↗",
           href: "/shop",
@@ -57,8 +58,8 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
     },
     {
       id: "flash-sale-deals",
-      type: "flashSale",
-      visible: true,
+      type: "productGrid",
+      visible: false,
       responsive: {
         desktop: true,
         tablet: true,
@@ -67,11 +68,10 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
         padding: 4,
       },
       config: {
-        title: "⚡ Limited Time Flash Deals",
+        title: "Featured products",
         source: "featured",
         limit: 8,
         columns: 4,
-        endsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
       },
     },
     {
@@ -86,7 +86,7 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
         padding: 4,
       },
       config: {
-        title: "🔥 Best Sellers & Trending Now",
+        title: "Latest products",
         source: "latest",
         limit: 8,
         columns: 4,
@@ -104,11 +104,11 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
         padding: 4,
       },
       config: {
-        title: "Mega Savings & Exclusive Discounts",
+        title: "Explore the catalogue",
         description:
-          "Apply verified coupon codes during checkout for instant savings. Free delivery available on qualifying cart orders.",
+          "Review product details, prices and available options before ordering.",
         button: {
-          label: "Explore Discounted Deals ↗",
+          label: "Browse products ↗",
           href: "/shop",
         },
       },
@@ -116,7 +116,7 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
     {
       id: "trust-features-bd",
       type: "trustFeatures",
-      visible: true,
+      visible: false,
       responsive: {
         desktop: true,
         tablet: true,
@@ -128,27 +128,27 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
         title: "Why Shop With DS Mart?",
         items: [
           {
-            title: "Cash on Delivery",
+            title: "Payment options",
             description:
-              "Pay safely in cash or mobile banking right at your doorstep anywhere in Bangladesh.",
+              "Check available payment methods at checkout.",
             icon: "truck",
           },
           {
-            title: "100% Authentic Products",
+            title: "Product information",
             description:
-              "Directly sourced genuine products from authorized distributors with full warranty support.",
+              "Review product details before ordering.",
             icon: "shield",
           },
           {
-            title: "Easy 7-Day Returns",
+            title: "Returns questions",
             description:
-              "Simple and hassle-free replacements or full refunds if an item is not as expected.",
+              "Questions about returns? Contact our team.",
             icon: "return",
           },
           {
-            title: "24/7 Dedicated Care",
+            title: "Contact our team",
             description:
-              "Prompt customer assistance via hotline, email, and live messaging whenever you need help.",
+              "Ask about products or an existing order.",
             icon: "support",
           },
         ],
@@ -167,7 +167,7 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
       },
       config: {
         title: "What Our Customers Are Saying",
-        subtitle: "Genuine feedback and verified purchases from shoppers all across Bangladesh.",
+        subtitle: "Customer feedback.",
         limit: 6,
       },
     },
@@ -186,24 +186,24 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
         title: "Frequently Asked Questions",
         items: [
           {
-            question: "How do I place an order with Cash on Delivery (COD)?",
+            question: "Which payment methods are available?",
             answer:
-              "Simply add products to your cart, proceed to checkout, enter your delivery address, and select 'Cash on Delivery'. You only pay when your parcel is delivered.",
+              "Check available payment methods at checkout.",
           },
           {
-            question: "What is the standard delivery timeline across Bangladesh?",
+            question: "Where can I check delivery information?",
             answer:
-              "Deliveries inside Dhaka typically arrive within 24 to 48 hours. For destinations outside Dhaka, delivery takes 2 to 4 business days.",
+              "Review delivery charges at checkout. Contact our team with your location for delivery questions.",
           },
           {
             question: "Can I use discount coupons on discounted items?",
             answer:
-              "Yes! You can apply eligible promotional coupon codes in your cart or checkout to enjoy additional savings on your total.",
+              "If you have a coupon, enter it in your cart or at checkout. Any eligible discount is shown in your order total.",
           },
           {
-            question: "How do I initiate a return or replacement?",
+            question: "Who do I contact about a return?",
             answer:
-              "Contact our support team within 7 days of delivery with your order ID, and we will arrange courier pickup or exchange.",
+              "Questions about returns? Contact our team.",
           },
         ],
       },
@@ -220,12 +220,12 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
         padding: 4,
       },
       config: {
-        title: "Get 10% Off Your First Order",
+        title: "Stay in the loop with DS Mart",
         description:
-          "Subscribe to our weekly newsletter for exclusive voucher drops, new releases, and secret weekend sales.",
+          "Subscribe to receive news and product updates from DS Mart.",
         buttonLabel: "Subscribe Now",
         consentText:
-          "I agree to receive promotional emails and discount codes from DS Mart.",
+          "I agree to receive news and product updates from DS Mart.",
         privacyHref: "/help",
       },
     },

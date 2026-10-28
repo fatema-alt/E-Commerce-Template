@@ -109,7 +109,7 @@ const promises = [
   { icon: "truck", title: "Delivery at checkout", text: "See charges before you pay." },
   { icon: "lock", title: "Pay your way", text: "Enabled payment methods show at checkout." },
   { icon: "chat", title: "Ask before ordering", text: "Our team can answer product questions." },
-  { icon: "pin", title: "Track every order", text: "Updates in your account or browser." },
+  { icon: "pin", title: "Order tracking", text: "Updates in your account or checkout browser." },
 ] as const;
 
 async function Content({ params }: Props) {
@@ -213,7 +213,7 @@ async function Content({ params }: Props) {
                   <Icon name="chev" className="pp-chev" />
                 </summary>
                 <div className="pp-body">
-                  <p>Contact the store to confirm return eligibility for this product. Include your order number when requesting support.</p>
+                  <p>Questions about returns? Contact our team.</p>
                   <Link href="/contact">Contact DS Mart support</Link>
                 </div>
               </details>

@@ -13,6 +13,7 @@ import {
   type Shopper,
 } from "../lib/shop-client";
 import { SectionCard, PriceSummary, ProductThumbnail } from "./shopping-ui";
+import { shippingSummary } from "../lib/shipping-copy";
 import {
   getTrackingItemId,
   trackAddToCart,
@@ -801,7 +802,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                     <p role="status">Loading available payment methods…</p>
                   )}
                   <div className="payment-options">
-                    {payments?.methods.map((method) => (
+                    {payments?.methods.filter((method) => method.id !== "COD" || method.enabled).map((method) => (
                       <label
                         key={method.id}
                         className={!method.enabled ? "payment-disabled" : ""}
@@ -821,7 +822,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                               ? "Currently unavailable"
                               : method.id === "COD"
                                 ? "Pay the courier when your order arrives."
-                                : "Complete payment using the store’s verified payment flow."}
+                                : "Follow the instructions for your selected payment method."}
                           </small>
                         </span>
                       </label>
@@ -883,7 +884,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                     {busy ? "Processing your order…" : "Place Order"}
                   </button>
                   <p className="muted small">
-                    Your final price and stock are verified securely before the
+                    Your final price and stock are checked before the
                     order is created.
                   </p>
                 </SectionCard>
@@ -992,15 +993,12 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                   )}
                 </div>
                 <p className="muted small">
-                  Delivery within Bangladesh. Your final total is verified again
-                  when placing the order.
+                  Review delivery charges and available payment methods at checkout.
+                  Your final total is checked when placing the order.
                 </p>
                 {validQuote && quote.shippingRates && (
                   <p className="muted small" style={{ marginTop: "4px" }}>
-                    {quote.shippingRates.freeAbove > 0
-                      ? `Free delivery on orders over ৳${quote.shippingRates.freeAbove.toLocaleString()}. `
-                      : ""}
-                    Delivery: ৳{quote.shippingRates.insideDhaka} inside Dhaka · ৳{quote.shippingRates.outsideDhaka} elsewhere.
+                    {shippingSummary(quote.shippingRates)}
                   </p>
                 )}
                 {!checkout && (
