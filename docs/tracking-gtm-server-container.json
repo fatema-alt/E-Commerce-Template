@@ -1,0 +1,71 @@
+{
+  "exportFormatVersion": 2,
+  "exportTime": "2026-10-28T08:00:00Z",
+  "containerVersion": {
+    "container": {
+      "name": "DS Mart Server Container (Stape / Cloud Run)",
+      "publicId": "GTM-SERVER01",
+      "usageContext": ["SERVER"]
+    },
+    "client": [
+      {
+        "name": "GA4 Client",
+        "type": "ga4_client",
+        "priority": 100,
+        "parameter": [
+          { "type": "BOOLEAN", "key": "autoEventMapping", "value": "true" }
+        ]
+      }
+    ],
+    "variable": [
+      {
+        "name": "Event Name",
+        "type": "e",
+        "parameter": []
+      },
+      {
+        "name": "Event ID",
+        "type": "ed",
+        "parameter": [{ "type": "TEMPLATE", "key": "keyPath", "value": "event_id" }]
+      },
+      {
+        "name": "User Data",
+        "type": "ed",
+        "parameter": [{ "type": "TEMPLATE", "key": "keyPath", "value": "user_data" }]
+      },
+      {
+        "name": "Const - Meta CAPI Dataset ID",
+        "type": "c",
+        "parameter": [{ "type": "TEMPLATE", "key": "value", "value": "123456789012345" }]
+      }
+    ],
+    "trigger": [
+      {
+        "name": "All GA4 Events",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [
+          {
+            "type": "EQUALS",
+            "parameter": [
+              { "type": "TEMPLATE", "key": "arg0", "value": "{{Client Name}}" },
+              { "type": "TEMPLATE", "key": "arg1", "value": "GA4" }
+            ]
+          }
+        ]
+      }
+    ],
+    "tag": [
+      {
+        "name": "Meta Conversions API (CAPI)",
+        "type": "sgtm_meta_capi",
+        "parameter": [
+          { "type": "TEMPLATE", "key": "pixelId", "value": "{{Const - Meta CAPI Dataset ID}}" },
+          { "type": "TEMPLATE", "key": "eventId", "value": "{{Event ID}}" },
+          { "type": "BOOLEAN", "key": "useEventData", "value": "true" },
+          { "type": "TEMPLATE", "key": "apiToken", "value": "[CONFIGURE_IN_STAPE_OR_SERVER_ENV]" }
+        ],
+        "firingTriggerId": ["All GA4 Events"]
+      }
+    ]
+  }
+}

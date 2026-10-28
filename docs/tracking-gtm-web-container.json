@@ -1,0 +1,339 @@
+{
+  "exportFormatVersion": 2,
+  "exportTime": "2026-10-28T08:00:00Z",
+  "containerVersion": {
+    "container": {
+      "name": "DS Mart Web Container - Pixel & GA4 CAPI Stack",
+      "publicId": "GTM-M65SGRXX",
+      "usageContext": ["WEB"]
+    },
+    "variable": [
+      {
+        "name": "DLV - event_id",
+        "type": "v",
+        "parameter": [{ "type": "INTEGER", "key": "dataLayerVersion", "value": "2" }, { "type": "TEMPLATE", "key": "name", "value": "event_id" }]
+      },
+      {
+        "name": "DLV - ecommerce.items",
+        "type": "v",
+        "parameter": [{ "type": "INTEGER", "key": "dataLayerVersion", "value": "2" }, { "type": "TEMPLATE", "key": "name", "value": "ecommerce.items" }]
+      },
+      {
+        "name": "DLV - ecommerce.value",
+        "type": "v",
+        "parameter": [{ "type": "INTEGER", "key": "dataLayerVersion", "value": "2" }, { "type": "TEMPLATE", "key": "name", "value": "ecommerce.value" }]
+      },
+      {
+        "name": "DLV - ecommerce.currency",
+        "type": "v",
+        "parameter": [{ "type": "INTEGER", "key": "dataLayerVersion", "value": "2" }, { "type": "TEMPLATE", "key": "name", "value": "ecommerce.currency" }]
+      },
+      {
+        "name": "DLV - ecommerce.transaction_id",
+        "type": "v",
+        "parameter": [{ "type": "INTEGER", "key": "dataLayerVersion", "value": "2" }, { "type": "TEMPLATE", "key": "name", "value": "ecommerce.transaction_id" }]
+      },
+      {
+        "name": "DLV - ecommerce.shipping",
+        "type": "v",
+        "parameter": [{ "type": "INTEGER", "key": "dataLayerVersion", "value": "2" }, { "type": "TEMPLATE", "key": "name", "value": "ecommerce.shipping" }]
+      },
+      {
+        "name": "DLV - ecommerce.tax",
+        "type": "v",
+        "parameter": [{ "type": "INTEGER", "key": "dataLayerVersion", "value": "2" }, { "type": "TEMPLATE", "key": "name", "value": "ecommerce.tax" }]
+      },
+      {
+        "name": "DLV - ecommerce.coupon",
+        "type": "v",
+        "parameter": [{ "type": "INTEGER", "key": "dataLayerVersion", "value": "2" }, { "type": "TEMPLATE", "key": "name", "value": "ecommerce.coupon" }]
+      },
+      {
+        "name": "DLV - user_data",
+        "type": "v",
+        "parameter": [{ "type": "INTEGER", "key": "dataLayerVersion", "value": "2" }, { "type": "TEMPLATE", "key": "name", "value": "user_data" }]
+      },
+      {
+        "name": "DLV - server_container_url",
+        "type": "v",
+        "parameter": [{ "type": "INTEGER", "key": "dataLayerVersion", "value": "2" }, { "type": "TEMPLATE", "key": "name", "value": "server_container_url" }]
+      },
+      {
+        "name": "Const - GA4 Measurement ID",
+        "type": "c",
+        "parameter": [{ "type": "TEMPLATE", "key": "value", "value": "G-XXXXXXXXXX" }]
+      },
+      {
+        "name": "Const - Meta Pixel ID",
+        "type": "c",
+        "parameter": [{ "type": "TEMPLATE", "key": "value", "value": "123456789012345" }]
+      }
+    ],
+    "trigger": [
+      {
+        "name": "Event - page_view (Client Navigation)",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [{ "type": "EQUALS", "parameter": [{ "type": "TEMPLATE", "key": "arg0", "value": "{{_event}}" }, { "type": "TEMPLATE", "key": "arg1", "value": "page_view" }] }]
+      },
+      {
+        "name": "Event - view_item",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [{ "type": "EQUALS", "parameter": [{ "type": "TEMPLATE", "key": "arg0", "value": "{{_event}}" }, { "type": "TEMPLATE", "key": "arg1", "value": "view_item" }] }]
+      },
+      {
+        "name": "Event - add_to_cart",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [{ "type": "EQUALS", "parameter": [{ "type": "TEMPLATE", "key": "arg0", "value": "{{_event}}" }, { "type": "TEMPLATE", "key": "arg1", "value": "add_to_cart" }] }]
+      },
+      {
+        "name": "Event - begin_checkout",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [{ "type": "EQUALS", "parameter": [{ "type": "TEMPLATE", "key": "arg0", "value": "{{_event}}" }, { "type": "TEMPLATE", "key": "arg1", "value": "begin_checkout" }] }]
+      },
+      {
+        "name": "Event - purchase",
+        "type": "CUSTOM_EVENT",
+        "customEventFilter": [{ "type": "EQUALS", "parameter": [{ "type": "TEMPLATE", "key": "arg0", "value": "{{_event}}" }, { "type": "TEMPLATE", "key": "arg1", "value": "purchase" }] }]
+      }
+    ],
+    "tag": [
+      {
+        "name": "Google Tag - GA4 Config & Server Tagging URL",
+        "type": "googtag",
+        "parameter": [
+          { "type": "TEMPLATE", "key": "tagId", "value": "{{Const - GA4 Measurement ID}}" },
+          {
+            "type": "LIST",
+            "key": "configSettingsTable",
+            "list": [
+              {
+                "type": "MAP",
+                "map": [
+                  { "type": "TEMPLATE", "key": "parameter", "value": "server_container_url" },
+                  { "type": "TEMPLATE", "key": "value", "value": "{{DLV - server_container_url}}" }
+                ]
+              },
+              {
+                "type": "MAP",
+                "map": [
+                  { "type": "TEMPLATE", "key": "parameter", "value": "send_page_view" },
+                  { "type": "TEMPLATE", "key": "value", "value": "true" }
+                ]
+              }
+            ]
+          }
+        ],
+        "firingTriggerId": ["2147479553"]
+      },
+      {
+        "name": "GA4 Event - page_view (Client Navigation)",
+        "type": "gaawe",
+        "parameter": [
+          { "type": "TEMPLATE", "key": "measurementId", "value": "{{Const - GA4 Measurement ID}}" },
+          { "type": "TEMPLATE", "key": "eventName", "value": "page_view" },
+          {
+            "type": "LIST",
+            "key": "eventParameters",
+            "list": [
+              {
+                "type": "MAP",
+                "map": [
+                  { "type": "TEMPLATE", "key": "name", "value": "event_id" },
+                  { "type": "TEMPLATE", "key": "value", "value": "{{DLV - event_id}}" }
+                ]
+              }
+            ]
+          }
+        ],
+        "firingTriggerId": ["Event - page_view (Client Navigation)"]
+      },
+      {
+        "name": "GA4 Event - view_item",
+        "type": "gaawe",
+        "parameter": [
+          { "type": "TEMPLATE", "key": "measurementId", "value": "{{Const - GA4 Measurement ID}}" },
+          { "type": "TEMPLATE", "key": "eventName", "value": "view_item" },
+          { "type": "BOOLEAN", "key": "sendEcommerceData", "value": "true" },
+          {
+            "type": "LIST",
+            "key": "eventParameters",
+            "list": [
+              {
+                "type": "MAP",
+                "map": [
+                  { "type": "TEMPLATE", "key": "name", "value": "event_id" },
+                  { "type": "TEMPLATE", "key": "value", "value": "{{DLV - event_id}}" }
+                ]
+              }
+            ]
+          }
+        ],
+        "firingTriggerId": ["Event - view_item"]
+      },
+      {
+        "name": "GA4 Event - add_to_cart",
+        "type": "gaawe",
+        "parameter": [
+          { "type": "TEMPLATE", "key": "measurementId", "value": "{{Const - GA4 Measurement ID}}" },
+          { "type": "TEMPLATE", "key": "eventName", "value": "add_to_cart" },
+          { "type": "BOOLEAN", "key": "sendEcommerceData", "value": "true" },
+          {
+            "type": "LIST",
+            "key": "eventParameters",
+            "list": [
+              {
+                "type": "MAP",
+                "map": [
+                  { "type": "TEMPLATE", "key": "name", "value": "event_id" },
+                  { "type": "TEMPLATE", "key": "value", "value": "{{DLV - event_id}}" }
+                ]
+              }
+            ]
+          }
+        ],
+        "firingTriggerId": ["Event - add_to_cart"]
+      },
+      {
+        "name": "GA4 Event - begin_checkout",
+        "type": "gaawe",
+        "parameter": [
+          { "type": "TEMPLATE", "key": "measurementId", "value": "{{Const - GA4 Measurement ID}}" },
+          { "type": "TEMPLATE", "key": "eventName", "value": "begin_checkout" },
+          { "type": "BOOLEAN", "key": "sendEcommerceData", "value": "true" },
+          {
+            "type": "LIST",
+            "key": "eventParameters",
+            "list": [
+              {
+                "type": "MAP",
+                "map": [
+                  { "type": "TEMPLATE", "key": "name", "value": "event_id" },
+                  { "type": "TEMPLATE", "key": "value", "value": "{{DLV - event_id}}" }
+                ]
+              }
+            ]
+          }
+        ],
+        "firingTriggerId": ["Event - begin_checkout"]
+      },
+      {
+        "name": "GA4 Event - purchase",
+        "type": "gaawe",
+        "parameter": [
+          { "type": "TEMPLATE", "key": "measurementId", "value": "{{Const - GA4 Measurement ID}}" },
+          { "type": "TEMPLATE", "key": "eventName", "value": "purchase" },
+          { "type": "BOOLEAN", "key": "sendEcommerceData", "value": "true" },
+          {
+            "type": "LIST",
+            "key": "eventParameters",
+            "list": [
+              {
+                "type": "MAP",
+                "map": [
+                  { "type": "TEMPLATE", "key": "name", "value": "event_id" },
+                  { "type": "TEMPLATE", "key": "value", "value": "{{DLV - event_id}}" }
+                ]
+              }
+            ]
+          }
+        ],
+        "firingTriggerId": ["Event - purchase"]
+      },
+      {
+        "name": "Meta Pixel - Base Code & PageView",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>\n!function(f,b,e,v,n,t,s)\n{if(f.fbq)return;n=f.fbq=function(){n.callMethod?\nn.callMethod.apply(n,arguments):n.queue.push(arguments)};\nif(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';\nn.queue=[];t=b.createElement(e);t.async=!0;\nt.src=v;s=b.getElementsByTagName(e)[0];\ns.parentNode.insertBefore(t,s)}(window, document,'script',\n'https://connect.facebook.net/en_US/fbevents.js');\nfbq('init', '{{Const - Meta Pixel ID}}');\nfbq('track', 'PageView', {}, { eventID: '{{DLV - event_id}}' });\n</script>"
+          }
+        ],
+        "consentSettings": {
+          "consentStatus": "NEEDED",
+          "consentType": {
+            "type": "LIST",
+            "list": [{ "type": "TEMPLATE", "value": "ad_storage" }]
+          }
+        },
+        "firingTriggerId": ["2147479553", "Event - page_view (Client Navigation)"]
+      },
+      {
+        "name": "Meta Pixel - ViewContent",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>\nfbq('track', 'ViewContent', {\n  content_ids: [{{DLV - ecommerce.items}}[0].item_id],\n  content_name: {{DLV - ecommerce.items}}[0].item_name,\n  content_type: 'product',\n  value: {{DLV - ecommerce.value}},\n  currency: '{{DLV - ecommerce.currency}}'\n}, { eventID: '{{DLV - event_id}}' });\n</script>"
+          }
+        ],
+        "consentSettings": {
+          "consentStatus": "NEEDED",
+          "consentType": {
+            "type": "LIST",
+            "list": [{ "type": "TEMPLATE", "value": "ad_storage" }]
+          }
+        },
+        "firingTriggerId": ["Event - view_item"]
+      },
+      {
+        "name": "Meta Pixel - AddToCart",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>\nfbq('track', 'AddToCart', {\n  content_ids: {{DLV - ecommerce.items}}.map(function(i){ return i.item_id; }),\n  content_type: 'product',\n  value: {{DLV - ecommerce.value}},\n  currency: '{{DLV - ecommerce.currency}}'\n}, { eventID: '{{DLV - event_id}}' });\n</script>"
+          }
+        ],
+        "consentSettings": {
+          "consentStatus": "NEEDED",
+          "consentType": {
+            "type": "LIST",
+            "list": [{ "type": "TEMPLATE", "value": "ad_storage" }]
+          }
+        },
+        "firingTriggerId": ["Event - add_to_cart"]
+      },
+      {
+        "name": "Meta Pixel - InitiateCheckout",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>\nfbq('track', 'InitiateCheckout', {\n  content_ids: {{DLV - ecommerce.items}}.map(function(i){ return i.item_id; }),\n  content_type: 'product',\n  value: {{DLV - ecommerce.value}},\n  currency: '{{DLV - ecommerce.currency}}',\n  num_items: {{DLV - ecommerce.items}}.reduce(function(sum, i){ return sum + (i.quantity || 1); }, 0)\n}, { eventID: '{{DLV - event_id}}' });\n</script>"
+          }
+        ],
+        "consentSettings": {
+          "consentStatus": "NEEDED",
+          "consentType": {
+            "type": "LIST",
+            "list": [{ "type": "TEMPLATE", "value": "ad_storage" }]
+          }
+        },
+        "firingTriggerId": ["Event - begin_checkout"]
+      },
+      {
+        "name": "Meta Pixel - Purchase",
+        "type": "html",
+        "parameter": [
+          {
+            "type": "TEMPLATE",
+            "key": "html",
+            "value": "<script>\nfbq('track', 'Purchase', {\n  content_ids: {{DLV - ecommerce.items}}.map(function(i){ return i.item_id; }),\n  content_type: 'product',\n  value: {{DLV - ecommerce.value}},\n  currency: '{{DLV - ecommerce.currency}}',\n  num_items: {{DLV - ecommerce.items}}.reduce(function(sum, i){ return sum + (i.quantity || 1); }, 0)\n}, { eventID: '{{DLV - event_id}}' });\n</script>"
+          }
+        ],
+        "consentSettings": {
+          "consentStatus": "NEEDED",
+          "consentType": {
+            "type": "LIST",
+            "list": [{ "type": "TEMPLATE", "value": "ad_storage" }]
+          }
+        },
+        "firingTriggerId": ["Event - purchase"]
+      }
+    ]
+  }
+}
