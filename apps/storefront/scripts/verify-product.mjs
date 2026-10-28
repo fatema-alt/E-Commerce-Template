@@ -419,7 +419,7 @@ try {
   ).text();
   assert.ok(html.includes("Cotton T-Shirt collection"));
   assert.ok(html.includes("application/ld+json"));
-  assert.ok(html.includes("You might also like"));
+  assert.ok(html.includes('id="related-title"') && html.includes("More from"));
   pass("product metadata, structured data and related products");
   const escaped = await (
     await fetch("http://localhost:3015/product/escaped")
@@ -646,6 +646,7 @@ try {
   await evaluate(
     'document.querySelectorAll(".gallery-thumbnails button")[0].click()',
   );
+  assert.ok(await evaluate(`(()=>{const hero=document.querySelector('.pp-hero');const stage=hero.querySelector('.pp-stage').getBoundingClientRect();const info=hero.querySelector('.pp-info').getBoundingClientRect();const header=document.querySelector('.site-header').getBoundingClientRect();return info.left>=stage.right && parseFloat(getComputedStyle(hero).getPropertyValue('--pp-top'))>=header.height;})()`), "desktop split layout and measured header offset");
   const desktop = await command("Page.captureScreenshot", {
     format: "png",
     captureBeyondViewport: true,

@@ -15,6 +15,7 @@ import { ProductCard } from "../../../components/home-sections";
 import { ProductSkeleton } from "../../../components/product-skeleton";
 import { ProductReviewsSection } from "../../../components/product-reviews";
 import { productStructuredData, productUrl } from "../../../lib/product-seo";
+import "./product-page.css";
 
 type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -70,24 +71,47 @@ async function RelatedProducts({ product }: { product: Product }) {
     .slice(0, 4);
   if (!related.length) return null;
   return (
-    <section className="section pdp-related" aria-labelledby="related-title">
-      <div className="section-head">
-        <div>
-          <p className="eyebrow">Keep exploring</p>
-          <h2 id="related-title">You might also like</h2>
-        </div>
+    <section className="pp-related" aria-labelledby="related-title">
+      <div className="pp-related-head">
+        <h2 id="related-title">More from {product.category.name}</h2>
         <Link href={`/category/${encodeURIComponent(product.category.slug)}`}>
           View collection
         </Link>
       </div>
-      <div className="products-grid">
+      <div className="pp-rail" role="list" tabIndex={0} aria-label="Related products">
         {related.map((item) => (
-          <ProductCard key={item.id} product={item} />
+          <div role="listitem" key={item.id}>
+            <ProductCard product={item} />
+          </div>
         ))}
       </div>
     </section>
   );
 }
+
+const paths = {
+  truck: "M3 7h11v9H3zM14 10h4l3 3v3h-7M7 19a2 2 0 100-4 2 2 0 000 4zM17 19a2 2 0 100-4 2 2 0 000 4z",
+  lock: "M6 11h12v9H6zM8 11V8a4 4 0 018 0v3",
+  chat: "M4 5h16v11H9l-5 4z",
+  pin: "M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11zM12 12a2 2 0 100-4 2 2 0 000 4z",
+  swap: "M4 8h14l-3-3M20 16H6l3 3",
+  chev: "M6 9l6 6 6-6",
+};
+function Icon({ name, className }: { name: keyof typeof paths; className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={paths[name]} />
+    </svg>
+  );
+}
+
+const promises = [
+  { icon: "truck", title: "Delivery at checkout", text: "See charges before you pay." },
+  { icon: "lock", title: "Pay your way", text: "Enabled payment methods show at checkout." },
+  { icon: "chat", title: "Ask before ordering", text: "Our team can answer product questions." },
+  { icon: "pin", title: "Track every order", text: "Updates in your account or browser." },
+] as const;
+
 async function Content({ params }: Props) {
   const { slug } = await params;
   const product = await getProduct(slug);
@@ -101,29 +125,20 @@ async function Content({ params }: Props) {
     ["Category", product.category?.name],
   ].filter((row): row is [string, string] => Boolean(row[1]));
   return (
-    <main id="main" className="container main-content pdp-page">
+    <main id="main" className="container main-content pdp-page pp">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(productStructuredData(product)).replace(
-            /</g,
-            "\\u003c",
-          ),
+          __html: JSON.stringify(productStructuredData(product)).replace(/</g, "\\u003c"),
         }}
       />
-      <nav className="breadcrumbs pdp-breadcrumbs" aria-label="Breadcrumb">
+      <nav className="pp-crumbs" aria-label="Breadcrumb">
         <ol>
-          <li>
-            <Link href="/">Home</Link>
-          </li>
-          <li>
-            <Link href="/shop">Shop</Link>
-          </li>
+          <li><Link href="/">Home</Link></li>
+          <li><Link href="/shop">Shop</Link></li>
           {product.category && (
             <li>
-              <Link
-                href={`/category/${encodeURIComponent(product.category.slug)}`}
-              >
+              <Link href={`/category/${encodeURIComponent(product.category.slug)}`}>
                 {product.category.name}
               </Link>
             </li>
@@ -131,103 +146,97 @@ async function Content({ params }: Props) {
           <li aria-current="page">{product.name}</li>
         </ol>
       </nav>
-      <ProductFeedbackProvider key={product.id}>
-      <ProductOverview key={product.id} product={product} />
-      <div className="pdp-details-layout grid grid-cols-1 lg:grid-cols-[1.25fr_0.75fr] gap-8 mt-10">
-        {/* Left: About & Specifications */}
-        <div className="space-y-6">
-          <section
-            id="product-details"
-            className="shop-panel pdp-details p-6 sm:p-8 rounded-2xl bg-[var(--glass-solid)] border border-[var(--c-line)] shadow-xs"
-            aria-labelledby="details-title"
-          >
-            <p className="eyebrow text-xs font-bold uppercase tracking-wider text-[var(--c-muted)] mb-2">The details</p>
-            <h2 id="details-title" className="text-xl sm:text-2xl font-bold text-[var(--c-ink)] mb-4">About this product</h2>
-            <ProductRichTextRenderer content={product.description || product.shortDescription || "Have a question about this product? Contact our team before ordering."} />
 
+      <ProductFeedbackProvider key={product.id}>
+        <ProductOverview key={product.id} product={product} />
+
+        <ul className="pp-promises" aria-label="Shopping at DS Mart">
+          {promises.map((p) => (
+            <li className="pp-promise" key={p.title}>
+              <Icon name={p.icon} />
+              <div><b>{p.title}</b><span>{p.text}</span></div>
+            </li>
+          ))}
+        </ul>
+
+        <nav className="pp-jump" aria-label="Product sections">
+          <a href="#product-details">About</a>
+          {specifications.length > 0 && <a href="#product-specs">Specs</a>}
+          <a href="#delivery-title">Delivery & support</a>
+          <a href="#customer-reviews">Reviews</a>
+        </nav>
+
+        <div className="pp-layout">
+          <section id="product-details" className="pp-about" aria-labelledby="details-title">
+            <h2 id="details-title">About this product</h2>
+            <ProductRichTextRenderer
+              content={
+                product.description ||
+                product.shortDescription ||
+                "Have a question about this product? Contact our team before ordering."
+              }
+            />
+          </section>
+
+          <aside className="pp-side">
             {specifications.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-[var(--c-line)]">
-                <h3 className="text-base font-bold text-[var(--c-ink)] mb-3">Product specifications</h3>
-                <dl className="pdp-specifications divide-y divide-[var(--c-line)] border border-[var(--c-line)] rounded-xl overflow-hidden text-xs sm:text-sm">
+              <section id="product-specs" className="pp-ticket" aria-labelledby="specs-title">
+                <div className="pp-ticket-head">
+                  <h2 id="specs-title">Product facts</h2>
+                  <span>{product.name.slice(0, 22)}{product.name.length > 22 ? "…" : ""}</span>
+                </div>
+                <dl>
                   {specifications.map(([label, value]) => (
-                    <div key={label} className="flex justify-between py-3 px-4 odd:bg-black/[0.02] dark:odd:bg-white/[0.02]">
-                      <dt className="text-[var(--c-muted)] font-medium">{label}</dt>
-                      <dd className="font-semibold text-[var(--c-ink)] m-0 text-right">{value}</dd>
+                    <div key={label}>
+                      <dt>{label}</dt>
+                      <dd>{value}</dd>
                     </div>
                   ))}
                 </dl>
-              </div>
+              </section>
             )}
-          </section>
+
+            <section className="pp-help" aria-labelledby="delivery-title">
+              <h2 id="delivery-title">Delivery & support</h2>
+              <details name="pp-help" open>
+                <summary>
+                  <Icon name="truck" />Delivery and payment
+                  <Icon name="chev" className="pp-chev" />
+                </summary>
+                <div className="pp-body">
+                  <p>Review delivery charges and enabled payment methods at checkout before placing your order.</p>
+                </div>
+              </details>
+              <details name="pp-help">
+                <summary>
+                  <Icon name="swap" />Returns and questions
+                  <Icon name="chev" className="pp-chev" />
+                </summary>
+                <div className="pp-body">
+                  <p>Contact the store to confirm return eligibility for this product. Include your order number when requesting support.</p>
+                  <Link href="/contact">Contact DS Mart support</Link>
+                </div>
+              </details>
+              <details name="pp-help">
+                <summary>
+                  <Icon name="pin" />Tracking your order
+                  <Icon name="chev" className="pp-chev" />
+                </summary>
+                <div className="pp-body">
+                  <p>View order updates from your account or the same browser used for guest checkout.</p>
+                  <Link href="/orders">Track order status</Link>
+                </div>
+              </details>
+              <Link className="pp-help-foot" href="/help">More shopping help and FAQs</Link>
+            </section>
+          </aside>
         </div>
 
-        {/* Right: Delivery & Support Accordions */}
-        <section
-          className="shop-panel pdp-help p-6 sm:p-7 rounded-2xl bg-[var(--glass-solid)] border border-[var(--c-line)] shadow-xs h-fit space-y-4"
-          aria-labelledby="delivery-title"
-        >
-          <div>
-            <p className="eyebrow text-xs font-bold uppercase tracking-wider text-[var(--c-muted)] mb-1">Good to know</p>
-            <h2 id="delivery-title" className="text-xl font-bold text-[var(--c-ink)] m-0">Delivery & support</h2>
-          </div>
-
-          <div className="space-y-3 pt-2">
-            <details open className="group border border-[var(--c-line)] rounded-xl p-3.5 bg-[var(--glass)] transition-all">
-              <summary className="cursor-pointer font-bold text-xs sm:text-sm text-[var(--c-ink)] flex items-center justify-between select-none list-none">
-                <span className="flex items-center gap-2">🚚 Delivery and payment</span>
-                <span className="text-xs transition-transform group-open:rotate-180">▼</span>
-              </summary>
-              <p className="text-xs text-[var(--c-ink-2)] mt-2.5 mb-0 leading-relaxed">
-                Review delivery charges and enabled payment methods at checkout before placing your order.
-              </p>
-            </details>
-
-            <details className="group border border-[var(--c-line)] rounded-xl p-3.5 bg-[var(--glass)] transition-all">
-              <summary className="cursor-pointer font-bold text-xs sm:text-sm text-[var(--c-ink)] flex items-center justify-between select-none list-none">
-                <span className="flex items-center gap-2">🔄 Returns and product questions</span>
-                <span className="text-xs transition-transform group-open:rotate-180">▼</span>
-              </summary>
-              <div className="text-xs text-[var(--c-ink-2)] mt-2.5 space-y-2 leading-relaxed">
-                <p className="m-0">
-                  Contact the store to confirm return eligibility for this product. Include your order number when requesting support.
-                </p>
-                <Link href="/contact" className="inline-block text-xs font-bold underline hover:text-emerald-600">
-                  Contact DS Mart support →
-                </Link>
-              </div>
-            </details>
-
-            <details className="group border border-[var(--c-line)] rounded-xl p-3.5 bg-[var(--glass)] transition-all">
-              <summary className="cursor-pointer font-bold text-xs sm:text-sm text-[var(--c-ink)] flex items-center justify-between select-none list-none">
-                <span className="flex items-center gap-2">📦 Tracking your order</span>
-                <span className="text-xs transition-transform group-open:rotate-180">▼</span>
-              </summary>
-              <div className="text-xs text-[var(--c-ink-2)] mt-2.5 space-y-2 leading-relaxed">
-                <p className="m-0">
-                  View order updates from your account or the same browser used for guest checkout.
-                </p>
-                <Link href="/orders" className="inline-block text-xs font-bold underline hover:text-emerald-600">
-                  Track order status →
-                </Link>
-              </div>
-            </details>
-          </div>
-
-          <div className="pt-2">
-            <Link className="pdp-help-link text-xs font-bold text-[var(--c-ink)] hover:underline inline-flex items-center gap-1" href="/help">
-              More shopping help & FAQs ↗
-            </Link>
-          </div>
-        </section>
-      </div>
-
-      <div id="customer-reviews" className="scroll-mt-24 pt-6">
-        <ProductReviewsSection
-          productId={product.id}
-          productName={product.name}
-        />
-      </div>
+        <div id="customer-reviews" className="pp-reviews">
+          <ProductReviewsSection productId={product.id} productName={product.name} />
+        </div>
       </ProductFeedbackProvider>
+
       <Suspense fallback={null}>
         <RelatedProducts product={product} />
       </Suspense>

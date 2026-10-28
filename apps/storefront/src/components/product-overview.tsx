@@ -9,6 +9,22 @@ import { ProductPurchase } from "./product-purchase";
 
 export function ProductOverview({ product }: { product: Product }) {
   useEffect(() => {
+    const header = document.querySelector<HTMLElement>(".site-header");
+    const page = document.querySelector<HTMLElement>("main.pp");
+    if (!header || !page) return;
+    const update = () => {
+      page.style.setProperty("--pp-top", `${Math.ceil(header.getBoundingClientRect().height) + 12}px`);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(header);
+    return () => {
+      observer.disconnect();
+      page.style.removeProperty("--pp-top");
+    };
+  }, []);
+
+  useEffect(() => {
     try {
       repairSimpleCart(product);
     } catch {
@@ -32,44 +48,22 @@ export function ProductOverview({ product }: { product: Product }) {
     : images;
 
   return (
-    <div className="product-detail-grid pdp-overview w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[52%_48%] gap-8 xl:gap-12 items-start pt-2 pb-8">
-      {/* 1. Left Column: 52% — Product Image Gallery */}
-      <div className="pdp-gallery-column w-full lg:sticky lg:top-24">
+    <div className="pp-hero">
+      <div className="pp-stage">
         <ProductGallery key={variantId} images={gallery} name={product.name} />
       </div>
 
-      {/* 2. Right Column: 48% — Product Information Hierarchy */}
-      <section
-        className="pdp-information w-full flex flex-col gap-3.5"
-        aria-labelledby="product-title"
-      >
-        {/* Step 1: Brand name — small, elegant label */}
-        <div className="pdp-brand-row">
-          <span className="pdp-brand-badge inline-flex items-center px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[var(--c-muted)] text-[11px] font-bold uppercase tracking-wider border border-[var(--c-line)]">
-            {product.brand || "DS Mart"}
-          </span>
-
-          {product.category && (
-            <span className="text-xs text-[var(--c-muted)]">
-              • {product.category.name}
-            </span>
-          )}
-        </div>
-
-        {/* Step 2: Product title — bold but not disproportionately large */}
-        <h1
-          id="product-title"
-          className="text-2xl sm:text-3xl lg:text-[32px] font-extrabold text-[var(--c-ink)] leading-snug tracking-tight m-0"
-        >
-          {product.name}
-        </h1>
-
+      <section className="pp-info" aria-labelledby="product-title">
+        <p className="pp-kicker">
+          <span className="pp-dot" aria-hidden="true" />
+          {product.brand || "DS Mart"}
+          {product.category && <span>in {product.category.name}</span>}
+        </p>
+        <h1 id="product-title">{product.name}</h1>
         <ProductReviewRating />
         {product.shortDescription && (
           <p className="pdp-intro">{product.shortDescription}</p>
         )}
-
-        {/* Step 4-10: Price, Short Description, Stock, Variants, Stepper, CTAs, Benefits */}
         <ProductPurchase
           product={product}
           variantId={variantId}
