@@ -14,6 +14,12 @@ const ignoreDirs = new Set([
   '.worktrees',
 ]);
 
+const ignoreFiles = new Set([
+  'pnpm-lock.yaml',
+  'package-lock.json',
+  'yarn.lock',
+]);
+
 const textExtensions = new Set([
   '.ts',
   '.tsx',
@@ -41,6 +47,7 @@ function scan(dir) {
         scan(path.join(dir, entry.name));
       }
     } else if (entry.isFile()) {
+      if (ignoreFiles.has(entry.name)) continue;
       const ext = path.extname(entry.name).toLowerCase();
       if (textExtensions.has(ext)) {
         const fullPath = path.join(dir, entry.name);
