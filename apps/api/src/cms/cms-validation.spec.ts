@@ -207,6 +207,27 @@ describe('CMS content validation', () => {
       }),
     ).toThrow('unsupported value');
   });
+  it('enforces RBAC permissions: ADMIN cannot publish, only SUPER_ADMIN can', async () => {
+    const { CmsAdminController } = await import('./cms.controller.js');
+    const draftRoles = Reflect.getMetadata(
+      'roles',
+      CmsAdminController.prototype.draft,
+    );
+    const publishRoles = Reflect.getMetadata(
+      'roles',
+      CmsAdminController.prototype.publish,
+    );
+    const rollbackRoles = Reflect.getMetadata(
+      'roles',
+      CmsAdminController.prototype.rollback,
+    );
+
+    expect(draftRoles).toContain('ADMIN');
+    expect(draftRoles).toContain('SUPER_ADMIN');
+    expect(publishRoles).toEqual(['SUPER_ADMIN']);
+    expect(publishRoles).not.toContain('ADMIN');
+    expect(rollbackRoles).toEqual(['SUPER_ADMIN']);
+  });
   it.each([
     'javascript:alert(1)',
     'data:text/html,x',

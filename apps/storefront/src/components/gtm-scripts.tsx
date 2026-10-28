@@ -21,6 +21,7 @@ export function GtmHeadScript({ config }: { config: ResolvedTrackingConfig }) {
   const consent = config.consentDefault === 'granted' ? 'granted' : 'denied';
   const serverUrl = config.serverUrl;
   const debugMode = config.debugMode ? 'true' : 'false';
+  const origin = serverUrl ? serverUrl.replace(/\/$/, '') : 'https://www.googletagmanager.com';
 
   // Inline script: Consent Mode v2 Default + GTM Loader
   const inlineScript = `
@@ -40,7 +41,7 @@ dataLayer.push({
 });
 (function(w,d,s,l,i){w[l]=w[l]||[];var f=d.getElementsByTagName(s)[0],
 j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+'${origin}/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
 })(window,document,'script','dataLayer','${gtmId}');
 `.trim();
 
@@ -61,11 +62,12 @@ export function GtmNoScript({ config }: { config: ResolvedTrackingConfig }) {
   }
 
   const gtmId = config.gtmId;
+  const origin = config.serverUrl ? config.serverUrl.replace(/\/$/, '') : 'https://www.googletagmanager.com';
 
   return (
     <noscript>
       <iframe
-        src={`https://www.googletagmanager.com/ns.html?id=${gtmId}`}
+        src={`${origin}/ns.html?id=${gtmId}`}
         height="0"
         width="0"
         style={{ display: 'none', visibility: 'hidden' }}

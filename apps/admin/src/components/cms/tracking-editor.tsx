@@ -353,16 +353,19 @@ export function TrackingEditor({
                 <option value="denied">denied (Recommended for strict privacy)</option>
                 <option value="granted">granted (Standard Bangladeshi e-commerce)</option>
               </select>
-              <div className="mt-2 rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600 space-y-1">
+              <div className="mt-2 rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600 space-y-1.5">
                 <p className="font-semibold text-slate-800 flex items-center gap-1.5">
                   <Info className="h-3.5 w-3.5 text-indigo-600" />
-                  Consent Default Behaviour Notice:
+                  Consent Default & Multi-Platform Tag Behaviour:
                 </p>
                 <p>
-                  Sets initial defaults for <code>analytics_storage</code>, <code>ad_storage</code>, <code>ad_user_data</code>, and <code>ad_personalization</code>.
+                  <strong>Google Tags:</strong> Google Consent Mode v2 natively controls Google services (GA4, Google Ads) via <code>ad_storage</code>, <code>analytics_storage</code>, <code>ad_user_data</code>, and <code>ad_personalization</code>. Setting this to <code>denied</code> causes Google tags to run in cookieless ping mode.
+                </p>
+                <p>
+                  <strong>Meta Pixel & CAPI:</strong> Meta tags do not natively inspect Google Consent Mode unless configured in GTM. In your GTM Web Container, configure Additional Consent Checks on your Meta Pixel tag to require <code>ad_storage</code> consent if you wish to block Meta tracking when consent is denied.
                 </p>
                 <p className="text-amber-700 font-medium">
-                  ⚠️ Note: DS Mart storefront does not currently display an interactive cookie consent banner. Setting this to <strong>denied</strong> means tags run in cookieless ping mode without setting browser cookies until consent is explicitly granted.
+                  ⚠️ Note: DS Mart storefront does not currently display an interactive cookie consent banner. Setting default to <strong>denied</strong> restricts Google tags to cookieless pings until user consent is wired.
                 </p>
               </div>
             </div>
