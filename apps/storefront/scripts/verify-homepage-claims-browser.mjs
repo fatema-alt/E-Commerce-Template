@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import { checkHeroContrast } from './hero-contrast-check.mjs';
 
 const app = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const root = resolve(app, '../..');
@@ -21,6 +22,14 @@ const source = readFileSync(join(root, 'apps/admin/src/components/cms/standard-t
 const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext } });
 const { getStandardEcommerceTemplate } = await import('data:text/javascript;base64,' + Buffer.from(outputText).toString('base64'));
 const template = getStandardEcommerceTemplate();
+if (process.env.CHECK_HERO_CONTRAST === '1') {
+  const hero = template.find(section => section.type === 'hero');
+  hero.config.slides = ['amber', 'emerald', 'purple'].map((badgeColor, index) => ({
+    slideType: 'split_content', title: hero.config.title, subtitle: hero.config.subtitle,
+    button: hero.config.button, secondaryButton: { label: 'Browse products', href: '/shop' },
+    badge: 'Explore products', badgeColor, theme: ['lime', 'blue', 'pink'][index],
+  }));
+}
 const artifacts = mkdtempSync(join(tmpdir(), 'ds-wp1-b-'));
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 let mode = 'template';
@@ -97,6 +106,23 @@ try {
       for (const rule of policy.rules) assert.doesNotMatch(page.text, new RegExp(rule.pattern, 'i'), rule.name);
       assert.doesNotMatch(page.text, /2,400|What Our Customers Are Saying/);
       assert.equal(page.overflow, false, 'No page horizontal overflow');
+      if (process.env.CHECK_HERO_CONTRAST === '1') {
+        await evaluate('document.documentElement.dataset.theme="dark"');
+        await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 0, y: 0 });
+        await pause(200);
+        const samples = await evaluate(`(${checkHeroContrast.toString()})()`);
+        for (const selector of ['.hero-primary-btn', '.hero-secondary-btn']) {
+          const bounds = await evaluate(`(()=>{const element=document.querySelector('.is-active .ds-hero-copy ${selector}');if(!element)return null;const r=element.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
+          if (bounds) {
+            await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...bounds });
+            await pause(300);
+            samples.push(...await evaluate(`(${checkHeroContrast.toString()})()`));
+          }
+        }
+        const normal = Math.min(...samples.filter(item => item.required === 4.5).map(item => item.ratio));
+        const large = Math.min(...samples.filter(item => item.required === 3).map(item => item.ratio));
+        console.log(`PASS AA ${mode} ${width}px: normal minimum ${normal.toFixed(2)}:1, large minimum ${large.toFixed(2)}:1 (including CTA hover)`);
+      }
       const screenshot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
       writeFileSync(join(artifacts, `${mode}-${width}.png`), Buffer.from(screenshot.data, 'base64'));
       console.log(`PASS ${mode} ${width}px: neutral copy, no testimonials or invented sale, no horizontal overflow`);
