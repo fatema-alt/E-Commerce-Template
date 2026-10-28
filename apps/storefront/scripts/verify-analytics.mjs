@@ -179,9 +179,17 @@ try {
     "sessionId",
     "source",
   ]);
+  const privateFields = {
+    email: 'private@example.invalid', phone: 'PRIVATE_PHONE',
+    ip: '198.51.100.10', address: 'PRIVATE_ADDRESS',
+    referrer: 'https://example.invalid/?email=private@example.invalid',
+  };
+  assert.equal((await event(origin, { ...payload, id: randomUUID(), ...privateFields })).status, 200);
+  assert.deepEqual(Object.keys(events.at(-1).body).sort(), ['id', 'kind', 'sessionId', 'source']);
+  for (const value of Object.values(privateFields)) assert.ok(!JSON.stringify(events.at(-1).body).includes(value));
   assert.equal((await first.text()).includes(secret), false);
   console.log(
-    "PASS: traffic classification, serialized initial events, Do Not Track, same-origin validation, allowed event types, opaque HttpOnly sessions, server-only secret, bounded analytics payload.",
+    "PASS: traffic classification, serialized initial events, Do Not Track, same-origin validation, allowed event types, opaque HttpOnly sessions, server-only secret, bounded analytics payload; email/phone/IP/address/referrer fields are not forwarded.",
   );
 } finally {
   server.kill();
