@@ -31,8 +31,8 @@ const productsData = [
     price: 16500,
     salePrice: 14990,
     stock: 10,
-    categoryName: "Camera Accessories & Power",
-    categorySlug: "camera-accessories",
+    categoryName: "Electronics",
+    categorySlug: "electronics",
     shortDescription:
       "Ultra-compact 99Wh Mini V-Mount Battery with USB-C 65W PD fast charging, D-Tap, and OLED status display.",
     description: `<h3>SmallRig VB99 Mini V-Mount Battery (99Wh)</h3>
@@ -55,8 +55,8 @@ const productsData = [
     price: 23500,
     salePrice: 21500,
     stock: 25,
-    categoryName: "Studio Lighting & Video Lights",
-    categorySlug: "studio-lighting",
+    categoryName: "Electronics",
+    categorySlug: "electronics",
     shortDescription:
       "Heavy-duty 500W Bi-Color COB LED continuous video light with Bowens mount, silent cooling, and wireless control.",
     description: `<h3>ZSYB Y500S 500W Bi-Color COB LED Video Light</h3>
@@ -79,8 +79,8 @@ const productsData = [
     price: 285000,
     salePrice: 275500,
     stock: 5,
-    categoryName: "Cameras & Photography",
-    categorySlug: "cameras-photography",
+    categoryName: "Electronics",
+    categorySlug: "electronics",
     shortDescription:
       "Full-frame professional mirrorless camera with Dual Pixel AF, up to 8-stop IBIS, 4K 60p video, and 18-month official warranty.",
     description: `<h3>Canon EOS R6 Mark III Mirrorless Camera</h3>
@@ -104,8 +104,8 @@ const productsData = [
     price: 2600,
     salePrice: 2250,
     stock: 10,
-    categoryName: "Studio Lighting & Video Lights",
-    categorySlug: "studio-lighting",
+    categoryName: "Electronics",
+    categorySlug: "electronics",
     shortDescription:
       "Original Godox AC power adapter and fast charger for Godox LC500 and LC500R handheld LED light wands.",
     description: `<h3>Godox Charger for LC500 / LC500R LED Light Sticks</h3>
@@ -127,8 +127,8 @@ const productsData = [
     price: 4000,
     salePrice: 3500,
     stock: 15,
-    categoryName: "Microphones & Audio",
-    categorySlug: "microphones-audio",
+    categoryName: "Electronics",
+    categorySlug: "electronics",
     shortDescription:
       "360° Omnidirectional dual wireless lapel microphone system with smart DSP noise reduction and charging case.",
     description: `<h3>QY33 Wireless Microphone 360° Omnidirectional Lavalier Mic</h3>
@@ -150,8 +150,8 @@ const productsData = [
     price: 18500,
     salePrice: 16500,
     stock: 20,
-    categoryName: "Studio Lighting & Video Lights",
-    categorySlug: "studio-lighting",
+    categoryName: "Electronics",
+    categorySlug: "electronics",
     shortDescription:
       "200W Bi-Color COB continuous LED video light with Bowens mount, silent fan, CRI 97+, and wireless app control.",
     description: `<h3>ZSYB Y200S 200W Bi-Color COB LED Video Light</h3>
@@ -174,8 +174,8 @@ const productsData = [
     price: 19500,
     salePrice: 17500,
     stock: 15,
-    categoryName: "Studio Lighting & Video Lights",
-    categorySlug: "studio-lighting",
+    categoryName: "Electronics",
+    categorySlug: "electronics",
     shortDescription:
       "300W Bi-Color COB LED studio video light with Bowens mount, built-in FX effects, and wireless control.",
     description: `<h3>ZSYB Y300S 300W Bi-Color COB LED Video Light</h3>
