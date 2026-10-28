@@ -11,6 +11,6 @@ export default defineConfig({
   },
   engine: "classic",
   datasource: {
-    url: env("DATABASE_URL"),
+    url: process.env.DATABASE_URL || "postgresql://commerce:commerce_dev_password@localhost:5434/commerce_db?schema=public",
   },
 });
