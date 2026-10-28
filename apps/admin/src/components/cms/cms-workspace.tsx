@@ -245,7 +245,7 @@ export function CmsWorkspace({
     if (!registry || !canLeave()) return;
     if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(newKey)) {
       setError(
-        "Use 1â€“64 lowercase letters, numbers, hyphens or underscores for the document key.",
+        "Use 1–64 lowercase letters, numbers, hyphens or underscores for the document key.",
       );
       return;
     }
@@ -451,7 +451,7 @@ export function CmsWorkspace({
         <p className="mt-2 text-sm text-slate-500">
           Manage your storefront content. Save drafts and publish when ready.
         </p>
-          {kind === 'PAGE' && <p className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">Each page has its own URL: the key â€œheroâ€ publishes at /hero. To display a page on the storefront homepage, choose its Home Page Key in <Link className="font-semibold underline" href="/cms/settings">Site Settings</Link> and publish those settings. The default homepage key is â€œhomeâ€.</p>}
+          {kind === 'PAGE' && <p className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">Each page has its own URL: the key “hero” publishes at /hero. To display a page on the storefront homepage, choose its Home Page Key in <Link className="font-semibold underline" href="/cms/settings">Site Settings</Link> and publish those settings. The default homepage key is “home”.</p>}
       </div>
       <nav
         aria-label="CMS navigation"
@@ -474,7 +474,7 @@ export function CmsWorkspace({
 
 
       {loading ? (
-        <p role="status">Loading CMSâ€¦</p>
+        <p role="status">Loading CMS…</p>
       ) : kind === "MEDIA" ? (
         <>
           <div className="rounded-xl border bg-white p-5">
@@ -712,10 +712,10 @@ export function CmsWorkspace({
                   <div>
                     <h2 className="break-all text-xl font-semibold">{key}</h2>
                     <p className="mt-1 text-xs text-slate-500">
-                      {doc?.state ?? "NEW"} Â· revision {doc?.revision ?? 0} Â·{" "}
+                      {doc?.state ?? "NEW"} · revision {doc?.revision ?? 0} ·{" "}
                       {dirty ? "Unsaved changes" : "Saved"}
                       {doc?.scheduledAt
-                        ? ` Â· Scheduled ${new Date(doc.scheduledAt).toLocaleString()}`
+                        ? ` · Scheduled ${new Date(doc.scheduledAt).toLocaleString()}`
                         : ""}
                     </p>
                   </div>
@@ -946,7 +946,7 @@ export function CmsWorkspace({
                                   updateSections(next);
                                 }}
                               >
-                                {delta < 0 ? "â†‘" : "â†“"}
+                                {delta < 0 ? "↑" : "↓"}
                               </button>
                             ))}
                             <button
@@ -1045,7 +1045,7 @@ export function CmsWorkspace({
                     onClick={() => mutate("draft")}
                     className="mt-6 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                   >
-                    {busy ? "Workingâ€¦" : "Save draft"}
+                    {busy ? "Working…" : "Save draft"}
                   </button>
                 )}
                 {!editable && (
@@ -1126,7 +1126,7 @@ export function CmsWorkspace({
                         <div className="mr-auto">
                           Version {version.version}
                           {version.id === doc.publishedVersionId
-                            ? " Â· Live"
+                            ? " · Live"
                             : ""}
                           <p className="text-xs text-slate-500">
                             {new Date(version.createdAt).toLocaleString()}
@@ -1189,7 +1189,7 @@ export function CmsWorkspace({
           Previous
         </button>
         <span className="text-sm text-slate-500">
-          Page {listPage} Â· {total} {kind === "MEDIA" ? "images" : "documents"}
+          Page {listPage} · {total} {kind === "MEDIA" ? "images" : "documents"}
         </span>
         <button
           className={button}
@@ -1310,7 +1310,7 @@ function DraftPreview({
   return (
     <div className="space-y-4 rounded-lg bg-slate-50 p-5">
       <p className="text-xs font-semibold uppercase text-slate-500">
-        Draft content preview Â· layout is illustrative
+        Draft content preview · layout is illustrative
       </p>
       {render(content)}
     </div>

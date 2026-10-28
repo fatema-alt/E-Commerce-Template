@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
-    "lint": "turbo lint",
+    "lint": "node scripts/check-mojibake.mjs && turbo lint",
+    "check:mojibake": "node scripts/check-mojibake.mjs",
     "typecheck": "turbo typecheck"
   },
   "devDependencies": {
