@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PaymentOptionsNote } from "../../components/payment-options-note";
 export const metadata = { title: "Shopping help" };
 export default function Page() {
   return (
@@ -31,11 +32,7 @@ export default function Page() {
         </details>
         <details>
           <summary>Which payment methods are available?</summary>
-          <p>
-            Checkout displays the currently available payment methods. Cash on
-            Delivery is supported. Other payment methods are available only when
-            enabled by the store.
-          </p>
+          <PaymentOptionsNote />
         </details>
         <details>
           <summary>Why did a cart price change?</summary>
@@ -44,6 +41,14 @@ export default function Page() {
             or availability changes, review the updated cart before placing your
             order.
           </p>
+        </details>
+        <details>
+          <summary>Where can I check delivery information?</summary>
+          <p>Review delivery charges at checkout. Contact our team with your location for delivery questions.</p>
+        </details>
+        <details>
+          <summary>Who do I contact about a return?</summary>
+          <p>Questions about returns? <Link href="/contact">Contact our team.</Link></p>
         </details>
         <details>
           <summary>How do I get account or order help?</summary>

@@ -72,6 +72,7 @@ export const BLOCK_SCHEMAS: Record<string, Schema> = {
       button,
       align: choice('left', 'center', 'right'),
       intervalSeconds: number(3, 30),
+      showTrustStrip: bool,
       slides: array(object({
         slideType: choice('full_banner', 'split_content'),
         enabled: bool,

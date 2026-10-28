@@ -51,6 +51,7 @@ export type Product = {
 };
 export type HeroBlock = {
   type: "hero";
+  showTrustStrip?: boolean;
   id: string;
   eyebrow?: string;
   title: string;
@@ -76,6 +77,7 @@ export type PromoBannerBlock = {
 };
 export type TrustBadgesBlock = {
   type: "trustBadges";
+  visible?: boolean;
   id: string;
   title?: string;
   items?: { title: string; description: string; icon: string }[];
@@ -145,6 +147,7 @@ export const fallbackConfig: StorefrontConfig = {
     {
       type: "hero",
       id: "hero",
+      showTrustStrip: false,
       eyebrow: "YOUR EVERYDAY, UPGRADED",
       title: "Shop smart. Live smart.",
       description:
@@ -156,6 +159,7 @@ export const fallbackConfig: StorefrontConfig = {
     {
       type: "products",
       id: "featured",
+      source: "featured",
       title: "Explore products",
       subtitle: "Browse the current catalogue.",
     },
@@ -171,6 +175,7 @@ export const fallbackConfig: StorefrontConfig = {
     {
       type: "trustBadges",
       id: "trust",
+      visible: false,
       title: "Why Choose DS Mart?",
       items: [
         {
@@ -205,9 +210,9 @@ export const fallbackConfig: StorefrontConfig = {
       title: "Frequently Asked Questions",
       items: [
         {
-          question: "How does Cash on Delivery (COD) work?",
+          question: "Which payment methods are available?",
           answer:
-            "If Cash on Delivery is available for your order, select it at checkout and pay when your order arrives.",
+            "Check available payment methods at checkout.",
         },
         {
           question: "What are the shipping charges and delivery timelines?",
@@ -218,6 +223,10 @@ export const fallbackConfig: StorefrontConfig = {
           question: "How can I apply a discount coupon?",
           answer:
             "If you have a coupon, enter it in your cart or at checkout. Any eligible discount is shown in your order total.",
+        },
+        {
+          question: "Who do I contact about a return?",
+          answer: "Questions about returns? Contact our team.",
         },
       ],
     },
@@ -399,6 +408,7 @@ export async function getProductPage(
     page?: number;
     pageSize?: number;
     search?: string;
+    source?: "featured" | "latest";
     categoryId?: string;
     sort?: string;
     min?: string;
@@ -410,6 +420,7 @@ export async function getProductPage(
     pageSize: String(opts.pageSize ?? 24),
   });
   if (opts.search) qs.set("search", opts.search);
+  if (opts.source) qs.set("source", opts.source);
   if (opts.categoryId) qs.set("categoryId", opts.categoryId);
   if (opts.sort === "price-asc" || opts.sort === "price-desc") {
     qs.set("sortBy", "price");
@@ -431,7 +442,7 @@ export async function getProductPage(
   };
 }
 export async function getFeaturedProducts(): Promise<Product[]> {
-  return (await getProductPage({ pageSize: 20 })).items;
+  return (await getProductPage({ pageSize: 20, source: "featured" })).items;
 }
 export const getProduct = cache(
   async (slug: string): Promise<Product | null> => {

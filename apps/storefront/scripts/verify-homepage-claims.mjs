@@ -29,8 +29,33 @@ function load(relative) {
   return module.exports;
 }
 
-const forbidden = /100\s*%\s*(?:authentic|genuine)|authentic guarantee|authorized (?:brand )?distributors?|full warranty|24\s*\/\s*7|lightning[ -]fast|\b\d+\s*(?:-|to)\s*\d+\s*(?:hours?|h|days?)\b|\b\d+[ -]*(?:day|hour)s?\b|hassle[ -]free|\b(?:full|quick) refunds?\b|best sellers|top sellers|inspect(?:ion)?|cashback|\bEMI\b|\d+(?:[.,]\d+)?\s*%|[৳]|\bBDT\s*\d|anywhere (?:across|in)|(?:all across|nationwide)|exclusive (?:member|voucher)|weekly (?:newsletter|sales)|secret weekend|limited time flash/i;
-function neutral(text) { assert.doesNotMatch(text, forbidden); }
+const policy = JSON.parse(readFileSync(new URL('./claims-policy.json', import.meta.url), 'utf8'));
+function neutral(text, context = 'Rendered copy') {
+  for (const rule of policy.rules) assert.doesNotMatch(text, new RegExp(rule.pattern, 'i'), `${context}: ${rule.name}`);
+}
+function scanSource(source, path) {
+  const tree = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true);
+  const copy = [];
+  function visit(node) {
+    if (ts.isPropertyAssignment(node) && /^(freeAbove|insideDhaka|outsideDhaka)$/.test(node.name.getText(tree).replace(/["']/g, '')) && ts.isNumericLiteral(node.initializer)) {
+      assert.fail(`${path}: hardcoded shipping configuration in storefront copy`);
+    }
+    if (ts.isJsxElement(node) || ts.isJsxFragment(node)) {
+      const inline = node.children.map(child => ts.isJsxText(child) ? child.text : ts.isJsxExpression(child) && child.expression && (ts.isNumericLiteral(child.expression) || ts.isStringLiteral(child.expression)) ? child.expression.text : '${dynamic}').join('');
+      neutral(inline.replace(/\s+/g, ' '), path);
+    }
+    if (ts.isTemplateExpression(node)) {
+      copy.push(node.head.text + node.templateSpans.map(span => '${dynamic}' + span.literal.text).join(''));
+      return;
+    }
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isJsxText(node)) copy.push(node.text.replace(/\s+/g, ' ').trim());
+    if (ts.isJsxExpression(node) && node.expression && ts.isNumericLiteral(node.expression)) copy.push(node.expression.text);
+    ts.forEachChild(node, visit);
+  }
+  visit(tree);
+  neutral(copy.join('\n'), path);
+}
+for (const path of policy.files) scanSource(readFileSync(resolve(root, path), 'utf8'), path);
 function textValues(value) {
   if (typeof value === 'string') return [value];
   if (!value || typeof value !== 'object') return [];
@@ -41,6 +66,19 @@ const { fallbackConfig } = load('apps/storefront/src/lib/storefront.ts');
 const { getStandardEcommerceTemplate } = load('apps/admin/src/components/cms/standard-template.ts');
 const template = getStandardEcommerceTemplate();
 const { BLOCK_SCHEMAS } = load('apps/api/src/cms/cms-schema.ts');
+const savedFetch = globalThis.fetch;
+const productQueries = [];
+try {
+  globalThis.fetch = async url => {
+    productQueries.push(new URL(url).searchParams.get('source'));
+    return new Response(JSON.stringify({ items: [], total: 0 }), { status: 200 });
+  };
+  await load('apps/storefront/src/lib/storefront.ts').getFeaturedProducts();
+  const { sectionProducts } = load('apps/storefront/src/lib/cms.ts');
+  await sectionProducts({ source: 'featured' });
+  await sectionProducts({ source: 'latest' });
+  assert.deepEqual(productQueries, ['featured', 'featured', 'latest']);
+} finally { globalThis.fetch = savedFetch; }
 for (const section of template) {
   assert.ok(BLOCK_SCHEMAS[section.type], `Known section type: ${section.type}`);
   for (const key of BLOCK_SCHEMAS[section.type].required || []) {
@@ -48,17 +86,34 @@ for (const section of template) {
   }
 }
 for (const text of [...textValues(fallbackConfig.home), ...textValues(template)]) neutral(text);
+function noFillerDuplicates(text) {
+  for (const phrase of policy.duplicatePhrases) {
+    assert.ok(text.split('\n').filter(line => line.trim().toLowerCase() === phrase.toLowerCase()).length <= policy.maxVisibleOccurrencesPerPage, `Repeated filler: ${phrase}`);
+  }
+}
+for (const sections of [template, fallbackConfig.home]) {
+  noFillerDuplicates(textValues(sections.filter(section => section.visible !== false)).join('\n'));
+}
+assert.equal(template.find(section => section.type === 'trustFeatures').visible, false);
+assert.equal(fallbackConfig.home.find(section => section.type === 'trustBadges').visible, false);
+assert.equal(template.find(section => section.type === 'hero').config.showTrustStrip, false);
+assert.equal(fallbackConfig.home.find(section => section.type === 'hero').showTrustStrip, false);
 const sale = template.find(section => section.id === 'flash-sale-deals');
 assert.equal(sale.type, 'productGrid', 'The dormant section is a normal grid, not an invented sale');
 assert.ok(template.every(section => section.type !== 'flashSale'));
 assert.equal(sale.visible, false, 'No invented flash sale on new installs/resets');
 assert.equal(sale.config.endsAt, undefined, 'No automatically generated campaign deadline');
+assert.equal(sale.config.source, 'featured');
+assert.equal(fallbackConfig.home.find(section => section.type === 'products').source, 'featured');
 assert.equal(template.find(section => section.id === 'best-sellers').config.source, 'latest');
 assert.equal(template.find(section => section.id === 'best-sellers').config.title, 'Latest products');
 
 const { HeroBanner } = load('apps/storefront/src/components/hero-banner.tsx');
 const hero = renderToStaticMarkup(React.createElement(HeroBanner, { config: { title: 'Explore products' } }));
-const strip = hero.slice(hero.indexOf('class="hero-trust-strip"'));
+assert.ok(!hero.includes('class="hero-trust-strip"'), 'Hero strip hidden by default');
+const enabledHero = renderToStaticMarkup(React.createElement(HeroBanner, { config: { title: 'Explore products', showTrustStrip: true } }));
+const strip = enabledHero.slice(enabledHero.indexOf('class="hero-trust-strip"'));
+assert.ok(strip.includes('class="hero-trust-strip"'), 'Hero strip can be explicitly enabled');
 neutral(strip.replace(/<[^>]*>/g, ' '));
 assert.ok(strip.includes('Questions about returns? Contact our team.'));
 assert.ok(strip.includes('Check available payment methods at checkout.'));
@@ -72,7 +127,14 @@ for (const props of [{}, { title: 'Get 10% Off Your First Order', description: '
 }
 
 // Prove the guard rejects representative reintroductions, rather than merely matching today's copy.
-for (const claim of ['100% authentic', 'full warranty', '24/7', 'lightning-fast', '24 to 48 hours', '7-Day Returns', 'hassle-free refunds', 'Best Sellers', 'inspect before paying', 'bKash cashback', '0% EMI', '60% OFF', '৳80', 'BDT 2000', 'anywhere in Bangladesh', 'EXCLUSIVE MEMBER OFFERS']) {
-  assert.throws(() => neutral(claim), undefined, `Reject: ${claim}`);
+for (const rule of policy.rules) {
+  for (const claim of rule.examples) {
+    assert.match(claim, new RegExp(rule.pattern, 'i'), `Policy example matches ${rule.name}`);
+    assert.throws(() => scanSource(`const copy = ${JSON.stringify(claim)}`, 'regression.ts'), undefined, `Reject: ${claim}`);
+  }
 }
-console.log('PASS: neutral homepage defaults, rendered hero strip and newsletter; unsupported-claim regression guard');
+neutral('Free delivery on orders of at least ৳${dynamic} after discounts.');
+for (const phrase of policy.duplicatePhrases) assert.throws(() => noFillerDuplicates(`${phrase}\n${phrase}`));
+assert.throws(() => scanSource('const C = () => <p>Free delivery over {2000}</p>', 'regression.tsx'));
+assert.throws(() => scanSource('const rates = {freeAbove: 2000}', 'regression.ts'));
+console.log(`PASS: ${policy.files.length} CMS/default/product/cart/checkout/help sources scanned; rendered copy and editable policy mutation checks`);

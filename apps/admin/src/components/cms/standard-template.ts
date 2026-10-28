@@ -27,6 +27,7 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
       },
       config: {
         bannerType: "with_button",
+        showTrustStrip: false,
         title: "Shop Smart. Live Smart.",
         subtitle:
           "Explore the catalogue and check available payment and delivery options at checkout.",
@@ -115,7 +116,7 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
     {
       id: "trust-features-bd",
       type: "trustFeatures",
-      visible: true,
+      visible: false,
       responsive: {
         desktop: true,
         tablet: true,
@@ -185,9 +186,9 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
         title: "Frequently Asked Questions",
         items: [
           {
-            question: "How do I place an order with Cash on Delivery (COD)?",
+            question: "Which payment methods are available?",
             answer:
-              "If Cash on Delivery is available for your order, select it at checkout and pay when your order arrives.",
+              "Check available payment methods at checkout.",
           },
           {
             question: "Where can I check delivery information?",
@@ -200,7 +201,7 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
               "If you have a coupon, enter it in your cart or at checkout. Any eligible discount is shown in your order total.",
           },
           {
-            question: "How do I initiate a return or replacement?",
+            question: "Who do I contact about a return?",
             answer:
               "Questions about returns? Contact our team.",
           },

@@ -7,6 +7,12 @@ import {
 } from './cms-validation.js';
 import { BLOCK_SCHEMAS } from './cms-schema.js';
 describe('CMS content validation', () => {
+  it('allows owners to explicitly enable or hide the optional hero trust strip', () => {
+    for (const showTrustStrip of [false, true]) {
+      const content = { title: 'Home', sections: [{ id: 'hero', type: 'hero', visible: true, config: { showTrustStrip } }] };
+      expect(validateCmsContent('PAGE', content)).toEqual(content);
+    }
+  });
   it('accepts full banners, split content, mobile images and disabled slides', () => {
     const image = { assetId: '12345678-1234-1234-1234-123456789abc', alt: 'Shopping campaign' };
     const content = { title: 'Home', sections: [{ id: 'hero', type: 'hero', visible: true, config: {
@@ -247,7 +253,7 @@ describe('CMS content validation', () => {
       },
       $executeRaw: vi.fn(async () => 1),
     };
-    const cmsService = new CmsService({} as any, {} as any, {} as any);
+    const cmsService = new CmsService({} as any);
     await (cmsService as any).event(
       mockTx,
       'doc-settings-1',

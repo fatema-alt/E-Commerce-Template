@@ -10,6 +10,7 @@ import ts from 'typescript';
 
 const app = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const root = resolve(app, '../..');
+const policy = JSON.parse(readFileSync(new URL('./claims-policy.json', import.meta.url), 'utf8'));
 const browser = process.env.PRODUCT_TEST_BROWSER || [
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
@@ -85,13 +86,16 @@ try {
       let page;
       for (let i = 0; i < 100; i++) {
         await pause(200);
-        page = await evaluate(`({text:document.body?.innerText || '',overflow:(document.documentElement?.scrollWidth || 0)>innerWidth,newsletter:!!document.querySelector('.newsletter-panel')})`);
-        if (page.text.includes('Questions about returns? Contact our team.') && page.newsletter) break;
+        page = await evaluate(`({text:document.body?.innerText || '',hasReturns:document.body?.textContent.includes('Questions about returns? Contact our team.'),overflow:(document.documentElement?.scrollWidth || 0)>innerWidth,newsletter:!!document.querySelector('.newsletter-panel')})`);
+        if (page.hasReturns && page.newsletter && page.text.includes('DS MART UPDATES')) break;
       }
-      assert.ok(page.text.includes('Questions about returns? Contact our team.'));
+      assert.ok(page.hasReturns);
       assert.ok(page.text.includes('DS MART UPDATES'));
-      assert.ok(page.text.includes('Check available payment methods at checkout.'));
-      assert.doesNotMatch(page.text, /100%|24\/7|7-Day|Best Sellers|lightning-fast|hassle-free|৳|EXCLUSIVE MEMBER|2,400|What Our Customers Are Saying|Limited Time Flash/i);
+      assert.ok(await evaluate('document.body.textContent.includes("Check available payment methods at checkout.")'));
+      assert.equal(await evaluate('document.querySelectorAll(".hero-trust-strip").length'), 0);
+      for (const phrase of policy.duplicatePhrases) assert.ok(page.text.split('\n').filter(line => line.trim().toLowerCase() === phrase.toLowerCase()).length <= policy.maxVisibleOccurrencesPerPage, `Repeated filler: ${phrase}`);
+      for (const rule of policy.rules) assert.doesNotMatch(page.text, new RegExp(rule.pattern, 'i'), rule.name);
+      assert.doesNotMatch(page.text, /2,400|What Our Customers Are Saying/);
       assert.equal(page.overflow, false, 'No page horizontal overflow');
       const screenshot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
       writeFileSync(join(artifacts, `${mode}-${width}.png`), Buffer.from(screenshot.data, 'base64'));

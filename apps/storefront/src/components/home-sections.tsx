@@ -87,6 +87,7 @@ export function HomeSections({
         }
 
         if (block.type === "trustBadges") {
+          if (block.visible === false) return null;
           return (
             <section
               key={block.id}

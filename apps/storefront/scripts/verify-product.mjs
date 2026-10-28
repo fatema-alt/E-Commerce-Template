@@ -16,6 +16,8 @@ import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 
 const app = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+let codEnabled = true;
+let paymentSettingsReads = 0;
 const browser =
   process.env.PRODUCT_TEST_BROWSER ||
   [
@@ -157,9 +159,10 @@ const api = http.createServer(async (req, res) => {
     return;
   }
   if (path.endsWith("/shop/payment-methods")) {
+    paymentSettingsReads++;
     res.end(
       JSON.stringify({
-        methods: [{ id: "COD", label: "Cash on delivery", enabled: true }, { id: 'BKASH', label: 'bKash', enabled: false }],
+        methods: [{ id: "COD", label: "Cash on delivery", enabled: codEnabled }, { id: 'BKASH', label: 'bKash', enabled: false }],
       }),
     );
     return;
@@ -204,6 +207,7 @@ const api = http.createServer(async (req, res) => {
       JSON.stringify({
         items: quoted,
         subtotal: total,
+        shippingRates: { freeAbove: 3456, insideDhaka: 42, outsideDhaka: 60 },
         shipping: "60.00",
         tax: "0.00",
         total: (Number(total) + 60 - (couponCode ? 50 : 0)).toFixed(2),
@@ -406,20 +410,24 @@ try {
   let logs = "";
   server.stdout.on("data", (d) => (logs += d));
   server.stderr.on("data", (d) => (logs += d));
+  let serverReady = false;
   for (let i = 0; i < 80; i++) {
     try {
       await fetch("http://localhost:3015/icon.svg");
+      serverReady = true;
       break;
     } catch {
       await pause(250);
     }
   }
+  assert.ok(serverReady, `Production server failed to start: ${logs}`);
   const html = await (
     await fetch("http://localhost:3015/product/cotton-t-shirt")
   ).text();
   assert.ok(html.includes("Cotton T-Shirt collection"));
   assert.ok(html.includes("application/ld+json"));
   assert.ok(html.includes('id="related-title"') && html.includes("More from"));
+  assert.ok(html.includes('Questions about returns? Contact our team.'));
   pass("product metadata, structured data and related products");
   const escaped = await (
     await fetch("http://localhost:3015/product/escaped")
@@ -847,6 +855,7 @@ try {
   await evaluate(`localStorage.setItem('commerce-cart-v1',${JSON.stringify(JSON.stringify([shoppingLine]))})`);
   await navigate('/cart');
   await until('!!document.querySelector(".summary-total")', 'cart quote');
+  assert.ok((await evaluate('document.body.innerText')).includes('at least ৳3,456 after discounts'));
   await evaluate('document.querySelector(".quantity-stepper button:last-child").click()');
   await until('document.querySelector(".quantity-stepper output").textContent === "2" && !document.querySelector(".quantity-stepper button:last-child").disabled', 'quantity updated');
   await evaluate('document.querySelector(".quantity-stepper button:last-child").click()');
@@ -875,6 +884,7 @@ try {
   await navigate('/cart'); await navigate('/checkout');
   await until('document.querySelector("[name=address]")?.value === "Test address"', 'address draft restored');
   await until('!!document.querySelector(".summary-total") && !!document.querySelector(".payment-options input[value=COD]")', 'checkout ready');
+  assert.ok((await evaluate('document.body.innerText')).includes('at least ৳3,456 after discounts'));
   await evaluate('document.querySelector(".consent-row input").click();document.querySelector(".checkout-form").requestSubmit();document.querySelector(".checkout-form").dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}))');
   await until('document.querySelector(".checkout-form .shop-error")?.textContent.includes("Prices changed")', 'order price conflict');
   assert.equal(orderAttempts, 1);
@@ -1029,6 +1039,34 @@ try {
   pass('admin-saved rich content renders safely with Bengali, marks and lists; benefits have distinct rows and empty reviews hide invented ratings');
   assert.ok(!logs.includes("blocking-prerender-metadata-dynamic"), logs);
   pass("no metadata prerender errors");
+  await navigate('/help');
+  await until('document.querySelector("h1")?.textContent === "Shopping help"', 'help page loaded');
+  await evaluate('document.querySelectorAll(".cms-faq details").forEach(item => item.open = true)');
+  await until('document.body.innerText.includes("Questions about returns?")', 'neutral returns help');
+  assert.ok(await evaluate(`!!document.querySelector('a[href="/contact"]')`));
+  await until('document.body.innerText.includes("Cash on Delivery is available at checkout.")', 'enabled COD help');
+  for (const width of [390, 1366]) {
+    await command('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width === 390 });
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
+  }
+  pass('help uses conditional payments and links returns questions to contact');
+  codEnabled = false;
+  await navigate('/contact');
+  const beforeDisabledRead = paymentSettingsReads;
+  await navigate('/help');
+  await until('document.querySelector("h1")?.textContent === "Shopping help"', 'disabled COD help page loaded');
+  await evaluate('document.querySelectorAll(".cms-faq details").forEach(item => item.open = true)');
+  for (let i = 0; i < 40 && paymentSettingsReads === beforeDisabledRead; i++) await pause(100);
+  assert.ok(paymentSettingsReads > beforeDisabledRead);
+  await pause(200);
+  assert.ok(!(await evaluate('document.body.innerText')).includes('Cash on Delivery'));
+  const disabledCodLine = { productId: simpleId, slug: 'simple', name: 'Cotton T-Shirt', quantity: 1, price: 500 };
+  await evaluate(`localStorage.setItem('commerce-cart-v1',${JSON.stringify(JSON.stringify([disabledCodLine]))})`);
+  await navigate('/checkout');
+  await until('!!document.querySelector(".payment-options input[value=BKASH]")', 'disabled payment settings loaded');
+  assert.equal(await evaluate('document.querySelectorAll(".payment-options input[value=COD]").length'), 0);
+  codEnabled = true;
+  pass('disabled COD is absent from help availability and checkout choices');
   console.log("Screenshots: " + artifacts);
 } finally {
   if (ws) ws.close();
