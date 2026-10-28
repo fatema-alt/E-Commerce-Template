@@ -1,6 +1,6 @@
 import "dotenv/config";
-import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { PrismaClient } from "../src/generated/prisma/client.js";
 
 const prisma = new PrismaClient({
@@ -9,21 +9,24 @@ const prisma = new PrismaClient({
     "postgresql://commerce:commerce_dev_password@localhost:5434/commerce_db?schema=public",
 });
 
-const extractedRoot =
-  "C:\\Users\\Lenovo\\.gemini\\antigravity\\brain\\0f7c7fc3-8344-407f-96d1-c92c7191faeb\\scratch\\products_extracted\\Products_Image";
+// Relative directory paths that work across any environment (Linux/Docker/Windows)
+const projectRoot = resolve(process.cwd());
+const apiUploads = join(projectRoot, "uploads", "products");
+const storefrontUploads = join(
+  projectRoot,
+  "..",
+  "storefront",
+  "public",
+  "uploads",
+  "products",
+);
 
-const targetApiUploads =
-  "d:\\Office - Projects\\commerce-suite\\apps\\api\\uploads\\products";
-const targetStorefrontUploads =
-  "d:\\Office - Projects\\commerce-suite\\apps\\storefront\\public\\uploads\\products";
-
-if (!existsSync(targetApiUploads)) mkdirSync(targetApiUploads, { recursive: true });
-if (!existsSync(targetStorefrontUploads))
-  mkdirSync(targetStorefrontUploads, { recursive: true });
+try {
+  if (!existsSync(apiUploads)) mkdirSync(apiUploads, { recursive: true });
+} catch {}
 
 const productsData = [
   {
-    folder: "p1",
     sku: "DS-SMRG-VB99",
     slug: "smallrig-vb99-mini-v-mount-battery-99wh",
     name: "SmallRig VB99 Mini V-Mount Battery (99Wh)",
@@ -45,9 +48,15 @@ const productsData = [
   <li><strong>Smart OLED Display:</strong> Shows real-time battery percentage, voltage, and remaining runtime.</li>
   <li><strong>Premium Safety Architecture:</strong> Built-in multi-protection against over-charge, over-discharge, short-circuit, and high temperature.</li>
 </ul>`,
+    images: [
+      "/uploads/products/smallrig-vb99-mini-v-mount-battery-99wh-1.png",
+      "/uploads/products/smallrig-vb99-mini-v-mount-battery-99wh-2.png",
+      "/uploads/products/smallrig-vb99-mini-v-mount-battery-99wh-3.png",
+      "/uploads/products/smallrig-vb99-mini-v-mount-battery-99wh-4.png",
+      "/uploads/products/smallrig-vb99-mini-v-mount-battery-99wh-5.png",
+    ],
   },
   {
-    folder: "p2",
     sku: "DS-ZSYB-Y500S",
     slug: "zsyb-y500s-500w-bi-color-cob-led-video-light",
     name: "ZSYB Y500S 500W Bi-Color COB LED Video Light",
@@ -69,9 +78,14 @@ const productsData = [
   <li><strong>Standard Bowens Mount:</strong> Compatible with a vast range of softboxes, reflectors, and light modifiers.</li>
   <li><strong>Intelligent Silent Cooling:</strong> Advanced heat dissipation with whisper-quiet fan mode prevents audio disruption on set.</li>
 </ul>`,
+    images: [
+      "/uploads/products/zsyb-y500s-500w-bi-color-cob-led-video-light-1.png",
+      "/uploads/products/zsyb-y500s-500w-bi-color-cob-led-video-light-2.png",
+      "/uploads/products/zsyb-y500s-500w-bi-color-cob-led-video-light-3.png",
+      "/uploads/products/zsyb-y500s-500w-bi-color-cob-led-video-light-4.png",
+    ],
   },
   {
-    folder: "p3",
     sku: "DS-CANON-R6M3",
     slug: "canon-eos-r6-mark-iii-mirrorless-camera",
     name: "Canon EOS R6 Mark III Mirrorless Camera",
@@ -94,9 +108,17 @@ const productsData = [
   <li><strong>Dual Card Slots & Weather-Sealed Body:</strong> Dual SD UHS-II slots and rugged magnesium alloy chassis.</li>
   <li><strong>Warranty:</strong> 18 Months Canon Official Warranty.</li>
 </ul>`,
+    images: [
+      "/uploads/products/canon-eos-r6-mark-iii-mirrorless-camera-1.jpg",
+      "/uploads/products/canon-eos-r6-mark-iii-mirrorless-camera-2.jpg",
+      "/uploads/products/canon-eos-r6-mark-iii-mirrorless-camera-3.jpg",
+      "/uploads/products/canon-eos-r6-mark-iii-mirrorless-camera-4.jpg",
+      "/uploads/products/canon-eos-r6-mark-iii-mirrorless-camera-5.jpg",
+      "/uploads/products/canon-eos-r6-mark-iii-mirrorless-camera-6.jpg",
+      "/uploads/products/canon-eos-r6-mark-iii-mirrorless-camera-7.jpg",
+    ],
   },
   {
-    folder: "p4",
     sku: "DS-GDX-LC500-CHG",
     slug: "godox-charger-for-lc500-lc500r-led-light-sticks",
     name: "Godox Charger for LC500 / LC500R LED Light Sticks",
@@ -117,9 +139,12 @@ const productsData = [
   <li><strong>Durable Cable Construction:</strong> Heavy-duty reinforced strain-relief cable for studio and on-location reliability.</li>
   <li><strong>Universal Input:</strong> 100V-240V AC 50/60Hz worldwide voltage compatibility.</li>
 </ul>`,
+    images: [
+      "/uploads/products/godox-charger-for-lc500-lc500r-led-light-sticks-1.jpg",
+      "/uploads/products/godox-charger-for-lc500-lc500r-led-light-sticks-2.jpg",
+    ],
   },
   {
-    folder: "p5",
     sku: "DS-QY33-WLMIC",
     slug: "qy33-wireless-microphone-360-omni-lavalier-mic",
     name: "QY33 Wireless Microphone 360° Omnidirectional Lavalier Mic",
@@ -140,9 +165,14 @@ const productsData = [
   <li><strong>Plug & Play Zero Latency:</strong> Instant pairing with smartphones (iOS/Android), cameras, and PCs without extra apps.</li>
   <li><strong>Long Battery Life & Charging Case:</strong> Up to 8 hours continuous recording per charge, extended to 36 hours with the charging case.</li>
 </ul>`,
+    images: [
+      "/uploads/products/qy33-wireless-microphone-360-omni-lavalier-mic-1.jpg",
+      "/uploads/products/qy33-wireless-microphone-360-omni-lavalier-mic-2.jpg",
+      "/uploads/products/qy33-wireless-microphone-360-omni-lavalier-mic-3.jpg",
+      "/uploads/products/qy33-wireless-microphone-360-omni-lavalier-mic-4.jpg",
+    ],
   },
   {
-    folder: "p6",
     sku: "DS-ZSYB-Y200S",
     slug: "zsyb-y200s-200w-bi-color-cob-led-video-light",
     name: "ZSYB Y200S 200W Bi-Color COB LED Video Light",
@@ -164,9 +194,13 @@ const productsData = [
   <li><strong>Bowens Standard Bayonet:</strong> Seamlessly accommodates beauty dishes, softboxes, and snoots.</li>
   <li><strong>Ultra-Quiet Operation:</strong> Low-decibel active fan prevents microphone audio interference.</li>
 </ul>`,
+    images: [
+      "/uploads/products/zsyb-y200s-200w-bi-color-cob-led-video-light-1.png",
+      "/uploads/products/zsyb-y200s-200w-bi-color-cob-led-video-light-2.png",
+      "/uploads/products/zsyb-y200s-200w-bi-color-cob-led-video-light-3.png",
+    ],
   },
   {
-    folder: "p7",
     sku: "DS-ZSYB-Y300S",
     slug: "zsyb-y300s-300w-bi-color-cob-led-video-light",
     name: "ZSYB Y300S 300W Bi-Color COB LED Video Light",
@@ -188,58 +222,42 @@ const productsData = [
   <li><strong>Full Bowens Mount Ecosystem:</strong> Works with all standard Bowens light modifiers and softboxes.</li>
   <li><strong>Rugged Aluminum Build:</strong> Durable alloy housing built to withstand heavy daily studio usage.</li>
 </ul>`,
+    images: [
+      "/uploads/products/zsyb-y300s-300w-bi-color-cob-led-video-light-1.png",
+      "/uploads/products/zsyb-y300s-300w-bi-color-cob-led-video-light-2.png",
+      "/uploads/products/zsyb-y300s-300w-bi-color-cob-led-video-light-3.png",
+      "/uploads/products/zsyb-y300s-300w-bi-color-cob-led-video-light-4.png",
+    ],
   },
 ];
 
 async function main() {
   console.log("Seeding 7 new products into DS Mart database...");
 
+  // 1. Ensure Electronics category exists
+  let category = await prisma.category.findUnique({
+    where: { slug: "electronics" },
+  });
+  if (!category) {
+    category = await prisma.category.create({
+      data: {
+        name: "Electronics",
+        slug: "electronics",
+        description: "Explore the latest electronics, cameras, and audio gear at DS Mart.",
+        isActive: true,
+        isVisible: true,
+      },
+    });
+    console.log(`✓ Created Category: ${category.name}`);
+  } else {
+    console.log(`✓ Category verified: ${category.name}`);
+  }
+
+  // 2. Process all products
   for (const item of productsData) {
     console.log(`\nProcessing: ${item.name} (${item.sku})`);
 
-    // 1. Ensure category exists
-    let category = await prisma.category.findUnique({
-      where: { slug: item.categorySlug },
-    });
-    if (!category) {
-      category = await prisma.category.create({
-        data: {
-          name: item.categoryName,
-          slug: item.categorySlug,
-          description: `Shop high quality ${item.categoryName} at DS Mart.`,
-          isActive: true,
-          isVisible: true,
-        },
-      });
-      console.log(`  ✓ Created Category: ${category.name}`);
-    }
-
-    // 2. Find product images (filter out screenshot files with GUID pattern {...})
-    const productDir = join(extractedRoot, item.folder);
-    const files = readdirSync(productDir);
-    const imageFiles = files.filter(
-      (f) =>
-        !f.startsWith("{") &&
-        (f.endsWith(".png") || f.endsWith(".jpg") || f.endsWith(".jpeg") || f.endsWith(".webp")),
-    );
-
-    console.log(`  Found ${imageFiles.length} real product images (screenshots excluded).`);
-
-    // 3. Copy images to uploads directory
-    const uploadedUrls: string[] = [];
-    for (let i = 0; i < imageFiles.length; i++) {
-      const srcFile = imageFiles[i];
-      const ext = srcFile.substring(srcFile.lastIndexOf("."));
-      const targetFilename = `${item.slug}-${i + 1}${ext}`;
-      const srcPath = join(productDir, srcFile);
-
-      copyFileSync(srcPath, join(targetApiUploads, targetFilename));
-      copyFileSync(srcPath, join(targetStorefrontUploads, targetFilename));
-
-      uploadedUrls.push(`/uploads/products/${targetFilename}`);
-    }
-
-    // 4. Create or Upsert Product in PostgreSQL
+    // Create or Upsert Product in PostgreSQL
     const existing = await prisma.product.findUnique({
       where: { sku: item.sku },
     });
@@ -289,25 +307,25 @@ async function main() {
       console.log(`  ✓ Created Product: ${product.name}`);
     }
 
-    // 5. Update or Create Images
+    // Attach Images
     await prisma.productImage.deleteMany({
       where: { productId: product.id },
     });
 
-    for (let i = 0; i < uploadedUrls.length; i++) {
+    for (let i = 0; i < item.images.length; i++) {
       await prisma.productImage.create({
         data: {
           productId: product.id,
-          url: uploadedUrls[i],
+          url: item.images[i],
           altText: `${item.name} image ${i + 1}`,
           isPrimary: i === 0,
           sortOrder: i,
         },
       });
     }
-    console.log(`  ✓ Attached ${uploadedUrls.length} images to product.`);
+    console.log(`  ✓ Attached ${item.images.length} images to product.`);
 
-    // 6. Ensure inventory record exists
+    // Sync inventory
     await prisma.inventory.upsert({
       where: { productId: product.id },
       create: {
@@ -323,7 +341,9 @@ async function main() {
     console.log(`  ✓ Synced inventory quantity: ${item.stock}`);
   }
 
-  console.log("\nAll 7 products successfully seeded and ready on the storefront!");
+  console.log("\n================================================================================");
+  console.log("All 7 products successfully seeded into the database and live on the storefront!");
+  console.log("================================================================================");
   await prisma.$disconnect();
 }
 
