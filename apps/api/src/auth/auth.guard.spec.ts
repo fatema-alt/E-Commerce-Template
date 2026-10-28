@@ -41,4 +41,40 @@ describe('AdminGuard', () => {
       ),
     ).rejects.toThrow();
   });
+  it('rejects an ADMIN request with 403 Forbidden when an endpoint requires SUPER_ADMIN (publish)', async () => {
+    const reflector = {
+      getAllAndOverride: (key: string) =>
+        key === 'roles' ? ['SUPER_ADMIN'] : false,
+    } as unknown as Reflector;
+    const auth = {
+      session: async () => ({ id: 'admin-user-1', role: 'ADMIN' }),
+    } as unknown as AuthService;
+    const guard = new AdminGuard(reflector, auth);
+    await expect(
+      guard.canActivate(
+        request('POST', {
+          cookie: 'commerce_admin_session=valid_token',
+          'x-commerce-admin': '1',
+        }),
+      ),
+    ).rejects.toThrow();
+  });
+  it('allows SUPER_ADMIN to activate endpoints requiring SUPER_ADMIN (publish)', async () => {
+    const reflector = {
+      getAllAndOverride: (key: string) =>
+        key === 'roles' ? ['SUPER_ADMIN'] : false,
+    } as unknown as Reflector;
+    const auth = {
+      session: async () => ({ id: 'super-admin-1', role: 'SUPER_ADMIN' }),
+    } as unknown as AuthService;
+    const guard = new AdminGuard(reflector, auth);
+    await expect(
+      guard.canActivate(
+        request('POST', {
+          cookie: 'commerce_admin_session=valid_token',
+          'x-commerce-admin': '1',
+        }),
+      ),
+    ).resolves.toBe(true);
+  });
 });

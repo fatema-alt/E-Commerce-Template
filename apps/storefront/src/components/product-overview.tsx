@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { repairSimpleCart } from "../lib/cart";
 import type { Product } from "../lib/storefront";
+import { getTrackingItemId, trackViewItem } from "../lib/gtm";
 import { ProductGallery } from "./product-gallery";
 import { ProductReviewRating } from "./product-feedback";
 import { ProductPurchase } from "./product-purchase";
@@ -40,6 +41,31 @@ export function ProductOverview({ product }: { product: Product }) {
         ? variants[0].id
         : ""),
   );
+
+  useEffect(() => {
+    try {
+      const activeVariant = variants.find((v) => v.id === variantId);
+      const itemId = getTrackingItemId({
+        sku: activeVariant?.sku || product.sku,
+        productId: product.id,
+        id: activeVariant?.id,
+      });
+      trackViewItem({
+        item: {
+          item_id: itemId,
+          item_name: product.name,
+          price: activeVariant?.price ?? product.price,
+          quantity: 1,
+          item_brand: product.brand || "DS Mart",
+          item_category: product.category?.name || "General",
+          item_variant: activeVariant?.name || undefined,
+          currency: "BDT",
+        },
+      });
+    } catch {
+      // Non-blocking
+    }
+  }, [product.id, variantId]);
 
   const images = product.images || [];
   const matching = images.filter((image) => image.variantId === variantId);

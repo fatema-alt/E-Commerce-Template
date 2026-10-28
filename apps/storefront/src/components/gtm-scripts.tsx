@@ -26,6 +26,7 @@ export function GtmHeadScript({ config }: { config: ResolvedTrackingConfig }) {
   // Inline script: Consent Mode v2 Default + GTM Loader
   const inlineScript = `
 window.dataLayer = window.dataLayer || [];
+window.__dsConsentDefault = '${consent}';
 function gtag(){dataLayer.push(arguments);}
 gtag('consent', 'default', {
   'ad_storage': '${consent}',

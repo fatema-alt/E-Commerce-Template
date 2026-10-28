@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useSyncExternalStore, type MouseEvent } from "react";
 import type { Product } from "../lib/storefront";
 import { useCart } from "../lib/cart";
+import { getTrackingItemId, trackAddToCart } from "../lib/gtm";
 
 const money = new Intl.NumberFormat("en-BD", {
   style: "currency",
@@ -129,12 +130,37 @@ export function ProductCard({
           quantity: 1,
           price: defaultVariant?.price ?? product.price,
           imageUrl: product.imageUrl,
+          sku: defaultVariant?.sku || product.sku,
         },
         product.availableStock,
       );
 
       setAddedNotice(true);
       setTimeout(() => setAddedNotice(false), 2000);
+
+      try {
+        const itemId = getTrackingItemId({
+          sku: defaultVariant?.sku || product.sku,
+          productId: product.id,
+          id: defaultVariant?.id,
+        });
+        trackAddToCart({
+          items: [
+            {
+              item_id: itemId,
+              item_name: product.name,
+              price: defaultVariant?.price ?? product.price,
+              quantity: 1,
+              item_brand: product.brand || "DS Mart",
+              item_category: product.category?.name || "General",
+              item_variant: defaultVariant?.name || undefined,
+              currency: "BDT",
+            },
+          ],
+        });
+      } catch {
+        // Safe push wrapper
+      }
     } catch (err) {
       setCartError((err as Error).message);
       setTimeout(() => setCartError(""), 3500);

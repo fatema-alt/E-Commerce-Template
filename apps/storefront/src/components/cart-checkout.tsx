@@ -13,6 +13,17 @@ import {
   type Shopper,
 } from "../lib/shop-client";
 import { SectionCard, PriceSummary, ProductThumbnail } from "./shopping-ui";
+import {
+  getTrackingItemId,
+  trackAddToCart,
+  trackBeginCheckout,
+  trackPurchase,
+  hashUserData,
+  isOrderPurchaseTracked,
+  markOrderPurchaseTracked,
+  ENABLE_ONLINE_PAYMENT_PURCHASE_EVENT,
+  type TrackingEcommerceItem,
+} from "../lib/gtm";
 
 const pending = new Map<string, Promise<Quote>>();
 
@@ -150,6 +161,36 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
     }
   }, [checkout, cart.lines.length]);
 
+  const beginCheckoutFired = useRef(false);
+  useEffect(() => {
+    if (!checkout || cart.lines.length === 0 || beginCheckoutFired.current) return;
+    beginCheckoutFired.current = true;
+
+    try {
+      const items: TrackingEcommerceItem[] = cart.lines.map((l) => ({
+        item_id: getTrackingItemId({
+          sku: l.sku,
+          productId: l.productId,
+          id: l.variantId,
+        }),
+        item_name: l.name,
+        price: l.price,
+        quantity: l.quantity,
+        item_variant: l.variantName || undefined,
+        currency: "BDT",
+      }));
+      const totalVal = cart.lines.reduce((s, l) => s + l.price * l.quantity, 0);
+
+      trackBeginCheckout({
+        items,
+        value: totalVal,
+        coupon: appliedCoupon,
+      });
+    } catch {
+      // Non-blocking
+    }
+  }, [checkout, cart.lines, appliedCoupon]);
+
   useEffect(() => {
     let live = true;
     if (serialized !== "[]")
@@ -276,10 +317,36 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       );
       // The quote endpoint checks current stock, limits, price and coupon eligibility.
       const result = await requestQuote(nextItems, appliedCoupon);
+      const isIncrement = quantity > line.quantity;
+      const diff = quantity - line.quantity;
       cart.update(line, quantity);
       setQuote(result);
       setQuotedKey(nextItems + "::" + appliedCoupon);
       setError("");
+
+      if (isIncrement && diff > 0) {
+        try {
+          const itemId = getTrackingItemId({
+            sku: line.sku,
+            productId: line.productId,
+            id: line.variantId,
+          });
+          trackAddToCart({
+            items: [
+              {
+                item_id: itemId,
+                item_name: line.name,
+                price: line.price,
+                quantity: diff,
+                item_variant: line.variantName || undefined,
+                currency: "BDT",
+              },
+            ],
+          });
+        } catch {
+          // Safe non-blocking tracking
+        }
+      }
     } catch (e) {
       setNotice(
         (e as Error).message || "Unable to update quantity. Please try again.",
@@ -367,6 +434,64 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
         sessionStorage.removeItem("ds-checkout-draft");
       } catch {
         /* Optional draft storage. */
+      }
+
+      // Purchase tracking: exactly once per order, guarded by localStorage.
+      // COD orders fire immediately upon order creation.
+      // Online payment orders are held behind ENABLE_ONLINE_PAYMENT_PURCHASE_EVENT until server verification is complete.
+      const orderIdentifier = order.orderNumber || order.id;
+      const isCod = paymentMethod === "COD";
+
+      if (isCod || ENABLE_ONLINE_PAYMENT_PURCHASE_EVENT) {
+        if (!isOrderPurchaseTracked(orderIdentifier)) {
+          try {
+            const customerEmail = value("email");
+            const customerPhone = value("phone");
+            const customerName = value("name");
+            const customerCity = value("city");
+
+            const consentState =
+              typeof window !== "undefined" && (window as any).__dsConsentDefault
+                ? (window as any).__dsConsentDefault
+                : "denied";
+
+            const userData = await hashUserData(
+              {
+                email: customerEmail,
+                phone: customerPhone,
+                firstName: customerName.split(" ")[0] || customerName,
+                lastName: customerName.split(" ").slice(1).join(" ") || undefined,
+                city: customerCity,
+              },
+              consentState,
+            );
+
+            const items: TrackingEcommerceItem[] = (order.items || []).map((it) => ({
+              item_id: it.skuSnapshot?.trim() || it.nameSnapshot,
+              item_name: it.nameSnapshot,
+              price: Number(it.unitPrice) || 0,
+              quantity: it.quantity,
+              currency: "BDT",
+            }));
+
+            trackPurchase({
+              order: {
+                orderId: order.id,
+                orderNumber: order.orderNumber,
+                value: Number(order.grandTotal) || 0,
+                tax: Number(order.taxTotal) || 0,
+                shipping: Number(order.shippingTotal) || 0,
+                coupon: order.couponCode,
+                items,
+              },
+              userData,
+            });
+
+            markOrderPurchaseTracked(orderIdentifier);
+          } catch {
+            // Non-blocking: tracking failure must never interrupt order success
+          }
+        }
       }
       if (paymentMethod === "BKASH" || paymentMethod === "SSLCOMMERZ") {
         try {

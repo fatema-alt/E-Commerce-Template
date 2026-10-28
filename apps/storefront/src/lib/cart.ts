@@ -11,6 +11,7 @@ export type CartLine = {
   quantity: number;
   price: number;
   imageUrl?: string | null;
+  sku?: string;
 };
 const key = "commerce-cart-v1";
 const event = "commerce-cart-change";
@@ -37,6 +38,7 @@ function parse(raw: string): CartLine[] {
             typeof row.variantName === "string") &&
           (row.imageUrl == null || typeof row.imageUrl === "string") &&
           (row.variantId === undefined || typeof row.variantId === "string") &&
+          (row.sku === undefined || typeof row.sku === "string") &&
           Number.isSafeInteger(row.quantity) &&
           row.quantity > 0 &&
           row.quantity <= 10000 &&

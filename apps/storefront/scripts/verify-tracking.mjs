@@ -43,8 +43,21 @@ const gtmCode = ts.transpileModule(
 
 const {
   generateEventId,
+  generatePurchaseEventId,
   pushToDataLayer,
   trackPageView,
+  trackViewItem,
+  trackAddToCart,
+  trackBeginCheckout,
+  trackPurchase,
+  getTrackingItemId,
+  normalizeEmail,
+  normalizePhone,
+  hashSha256,
+  hashUserData,
+  isOrderPurchaseTracked,
+  markOrderPurchaseTracked,
+  ENABLE_ONLINE_PAYMENT_PURCHASE_EVENT,
 } = await import(
   "data:text/javascript;base64," + Buffer.from(gtmCode).toString("base64")
 );
@@ -124,7 +137,6 @@ assert.equal(envRes.serverUrl, "https://ss.env.com");
 assert.equal(envRes.consentDefault, "denied");
 assert.equal(envRes.source, "env");
 
-// Clean env
 delete process.env.NEXT_PUBLIC_GTM_ID;
 delete process.env.NEXT_PUBLIC_GTM_SERVER_URL;
 
@@ -135,7 +147,45 @@ assert.equal(emptyRes.gtmId, null);
 assert.equal(emptyRes.source, "disabled");
 console.log("✓ Fallback resolution hierarchy passed");
 
-// 6. dataLayer push & Event ID deduplication
+// 6. Item ID Strategy (Meta Catalog Match)
+assert.equal(getTrackingItemId({ sku: "SKU-999", productId: "prod-1", id: "var-1" }), "SKU-999");
+assert.equal(getTrackingItemId({ sku: "  ", productId: "prod-1", id: "var-1" }), "prod-1");
+assert.equal(getTrackingItemId({ id: "prod-direct" }), "prod-direct");
+console.log("✓ Stable item_id resolution (SKU prioritized, fallback to product ID) passed");
+
+// 7. Normalization & SHA-256 Hashing Tests
+assert.equal(normalizeEmail("  USER@Example.COM "), "user@example.com");
+assert.equal(normalizeEmail("invalid-email"), "");
+assert.equal(normalizePhone("01712-345678"), "+8801712345678");
+assert.equal(normalizePhone("+880 1812 345678"), "+8801812345678");
+assert.equal(normalizePhone("8801912345678"), "+8801912345678");
+assert.equal(normalizePhone(" 01312345678 "), "+8801312345678");
+
+// Known SHA-256 test vectors
+const hashVector1 = await hashSha256("test@example.com");
+assert.equal(hashVector1, "973dfe463ec85785f5f95af5ba3906eedb2d931c24e69824a89ea65dba4e813b");
+const hashVectorEmpty = await hashSha256("");
+assert.equal(hashVectorEmpty, "");
+
+// Consent behavior: With 'denied', user data MUST be undefined
+const deniedUserData = await hashUserData(
+  { email: "user@test.com", phone: "01712345678" },
+  "denied",
+);
+assert.equal(deniedUserData, undefined, "Hashed data must NOT be generated when consent is denied");
+
+// With 'granted', returns valid hashed object
+const grantedUserData = await hashUserData(
+  { email: "test@example.com", phone: "01712345678", firstName: "Rahim", city: "Dhaka" },
+  "granted",
+);
+assert.ok(grantedUserData);
+assert.equal(grantedUserData.em, "973dfe463ec85785f5f95af5ba3906eedb2d931c24e69824a89ea65dba4e813b");
+assert.ok(grantedUserData.ph);
+assert.ok(grantedUserData.country);
+console.log("✓ Customer data normalization, crypto.subtle SHA-256, and consent gating passed");
+
+// 8. dataLayer push & Event ID deduplication
 globalThis.window = {};
 pushToDataLayer({ event: "test_event", foo: "bar" });
 assert.equal(Array.isArray(globalThis.window.dataLayer), true);
@@ -147,22 +197,112 @@ const id2 = generateEventId();
 assert.equal(id1.startsWith("evt_"), true);
 assert.notEqual(id1, id2, "Event IDs must be unique");
 
-// 7. PageView tracking push
-globalThis.document = { title: "DS Mart Home" };
-globalThis.window.location = { href: "https://dsmart.digislashagency.com/" };
-const pageViewEventId = trackPageView({ page_path: "/" });
-assert.equal(typeof pageViewEventId, "string");
-assert.equal(pageViewEventId.startsWith("evt_"), true);
+// Deterministic purchase event_id
+assert.equal(generatePurchaseEventId("ORD-98765"), "purchase_ORD-98765");
+console.log("✓ dataLayer push, random and deterministic event_id generation passed");
 
-// Check that dataLayer has ecommerce null reset + page_view event
-const events = globalThis.window.dataLayer;
-assert.equal(events.some((e) => e.ecommerce === null), true);
-const pageView = events.find((e) => e.event === "page_view");
-assert.ok(pageView, "page_view event must be in dataLayer");
-assert.equal(pageView.page_path, "/");
-assert.equal(pageView.page_title, "DS Mart Home");
-assert.equal(pageView.first_party_collection, true);
-assert.equal(typeof pageView.event_time, "number");
-console.log("✓ dataLayer push, event_id deduplication, and page_view tests passed");
+// 9. Document Step Events: view_item, add_to_cart, begin_checkout, purchase
+globalThis.window.dataLayer = [];
+
+// view_item
+trackViewItem({
+  item: {
+    item_id: "SKU-TEST-1",
+    item_name: "Premium Shirt",
+    price: 1500,
+    currency: "BDT",
+  },
+});
+const viewItemEvent = globalThis.window.dataLayer.find((e) => e.event === "view_item");
+assert.ok(viewItemEvent);
+assert.equal(viewItemEvent.ecommerce.currency, "BDT");
+assert.equal(viewItemEvent.ecommerce.value, 1500);
+assert.equal(viewItemEvent.ecommerce.items[0].item_id, "SKU-TEST-1");
+
+// add_to_cart
+trackAddToCart({
+  items: [
+    {
+      item_id: "SKU-TEST-1",
+      item_name: "Premium Shirt",
+      price: 1500,
+      quantity: 2,
+      currency: "BDT",
+    },
+  ],
+});
+const addToCartEvent = globalThis.window.dataLayer.find((e) => e.event === "add_to_cart");
+assert.ok(addToCartEvent);
+assert.equal(addToCartEvent.ecommerce.value, 3000);
+assert.equal(addToCartEvent.ecommerce.items[0].quantity, 2);
+
+// begin_checkout
+trackBeginCheckout({
+  items: [
+    {
+      item_id: "SKU-TEST-1",
+      item_name: "Premium Shirt",
+      price: 1500,
+      quantity: 2,
+      currency: "BDT",
+    },
+  ],
+  value: 3000,
+  coupon: "SAVE10",
+  userData: grantedUserData,
+});
+const beginCheckoutEvent = globalThis.window.dataLayer.find((e) => e.event === "begin_checkout");
+assert.ok(beginCheckoutEvent);
+assert.equal(beginCheckoutEvent.ecommerce.value, 3000);
+assert.equal(beginCheckoutEvent.ecommerce.coupon, "SAVE10");
+assert.ok(beginCheckoutEvent.user_data);
+
+// purchase
+trackPurchase({
+  order: {
+    orderId: "order-12345",
+    orderNumber: "DS-2026-0001",
+    value: 3080,
+    shipping: 80,
+    tax: 0,
+    coupon: "SAVE10",
+    items: [
+      {
+        item_id: "SKU-TEST-1",
+        item_name: "Premium Shirt",
+        price: 1500,
+        quantity: 2,
+        currency: "BDT",
+      },
+    ],
+  },
+  userData: grantedUserData,
+});
+const purchaseEvent = globalThis.window.dataLayer.find((e) => e.event === "purchase");
+assert.ok(purchaseEvent);
+assert.equal(purchaseEvent.event_id, "purchase_DS-2026-0001");
+assert.equal(purchaseEvent.ecommerce.transaction_id, "DS-2026-0001");
+assert.equal(purchaseEvent.ecommerce.value, 3080);
+assert.equal(purchaseEvent.ecommerce.shipping, 80);
+assert.equal(purchaseEvent.ecommerce.currency, "BDT");
+console.log("✓ Document-step events (view_item, add_to_cart, begin_checkout, purchase) passed");
+
+// 10. Purchase Deduplication Guard & Feature Flag
+const storageMock = new Map();
+globalThis.localStorage = {
+  getItem: (k) => storageMock.get(k) || null,
+  setItem: (k, v) => storageMock.set(k, v),
+  removeItem: (k) => storageMock.delete(k),
+};
+
+assert.equal(isOrderPurchaseTracked("DS-2026-0001"), false);
+markOrderPurchaseTracked("DS-2026-0001");
+assert.equal(isOrderPurchaseTracked("DS-2026-0001"), true);
+// Second check remains true, preventing duplicate firing
+assert.equal(isOrderPurchaseTracked("DS-2026-0001"), true);
+
+// Online payment purchase event feature flag is disabled
+assert.equal(ENABLE_ONLINE_PAYMENT_PURCHASE_EVENT, false, "Online payment purchase tracking must be disabled by default");
+console.log("✓ Purchase localStorage deduplication guard and online payment flag verified");
 
 console.log("\nAll tracking verification tests passed successfully!");

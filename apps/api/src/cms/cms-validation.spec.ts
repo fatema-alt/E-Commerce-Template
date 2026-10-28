@@ -228,6 +228,65 @@ describe('CMS content validation', () => {
     expect(publishRoles).not.toContain('ADMIN');
     expect(rollbackRoles).toEqual(['SUPER_ADMIN']);
   });
+  it('records audit events with actorId, revision, and mutation state when tracking changes are saved', async () => {
+    const { CmsService } = await import('./cms.service.js');
+    const recordedAuditEvents: Array<any> = [];
+    const recordedPubEvents: Array<any> = [];
+    const mockTx = {
+      cmsAuditEvent: {
+        create: vi.fn(async (args: { data: any }) => {
+          recordedAuditEvents.push(args.data);
+          return args.data;
+        }),
+      },
+      cmsPublicationEvent: {
+        create: vi.fn(async (args: { data: any }) => {
+          recordedPubEvents.push(args.data);
+          return args.data;
+        }),
+      },
+      $executeRaw: vi.fn(async () => 1),
+    };
+    const cmsService = new CmsService({} as any, {} as any, {} as any);
+    await (cmsService as any).event(
+      mockTx,
+      'doc-settings-1',
+      2,
+      'super-admin-id',
+      'DRAFT_SAVED',
+      'version-1',
+    );
+    await (cmsService as any).event(
+      mockTx,
+      'doc-settings-1',
+      3,
+      'super-admin-id',
+      'PUBLISHED',
+      'version-1',
+    );
+
+    expect(recordedAuditEvents).toHaveLength(2);
+    expect(recordedAuditEvents[0]).toMatchObject({
+      documentId: 'doc-settings-1',
+      actorId: 'super-admin-id',
+      action: 'DRAFT_SAVED',
+      versionId: 'version-1',
+    });
+    expect(recordedAuditEvents[1]).toMatchObject({
+      documentId: 'doc-settings-1',
+      actorId: 'super-admin-id',
+      action: 'PUBLISHED',
+      versionId: 'version-1',
+    });
+    expect(recordedPubEvents).toHaveLength(1);
+    expect(recordedPubEvents[0]).toMatchObject({
+      documentId: 'doc-settings-1',
+      revision: 3,
+      actorId: 'super-admin-id',
+      action: 'PUBLISHED',
+      versionId: 'version-1',
+    });
+  });
   it.each([
     'javascript:alert(1)',
     'data:text/html,x',

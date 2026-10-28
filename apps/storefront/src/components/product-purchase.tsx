@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCart } from "../lib/cart";
 import type { Product } from "../lib/storefront";
 import { money } from "../lib/shop-client";
+import { getTrackingItemId, trackAddToCart } from "../lib/gtm";
 import { WishlistButton } from "./shopping-actions";
 
 export function ProductPurchase({
@@ -192,6 +193,7 @@ export function ProductPurchase({
             )?.url || product.imageUrl,
           quantity: count,
           price,
+          sku: variant?.sku || product.sku,
         },
         available,
       );
@@ -200,6 +202,30 @@ export function ProductPurchase({
         `${count} ${count === 1 ? "item" : "items"} added to your cart.`,
       );
       setQuantity("1");
+
+      try {
+        const itemId = getTrackingItemId({
+          sku: variant?.sku || product.sku,
+          productId: product.id,
+          id: variant?.id,
+        });
+        trackAddToCart({
+          items: [
+            {
+              item_id: itemId,
+              item_name: product.name,
+              price,
+              quantity: count,
+              item_brand: product.brand || "DS Mart",
+              item_category: product.category?.name || "General",
+              item_variant: variant?.name || undefined,
+              currency: "BDT",
+            },
+          ],
+        });
+      } catch {
+        // Safe push wrapper: tracking must never break shopping
+      }
 
       if (checkout) {
         router.push("/checkout");
