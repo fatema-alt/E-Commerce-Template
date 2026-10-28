@@ -46,17 +46,22 @@ Navigate to **Storefront CMS** > **Tracking & Pixels** (`/cms/tracking`):
 
 ---
 
-## 3. GTM Web Container Import Instructions
+## 3. GTM Web Container Import Instructions (Draft Starting Point)
+
+> [!WARNING]
+> **Container File Status**: `docs/tracking-gtm-web-container.json` is a starting draft template.
+> **DO NOT USE OVERWRITE**: Always import into a **new, dedicated test workspace** (e.g., `DS Mart Tracking Test`) using **Merge** > **Rename conflicting tags, triggers, and variables**. Never select "Overwrite" on an existing or production workspace.
 
 1. Open [Google Tag Manager](https://tagmanager.google.com/) and navigate to your Web Container.
-2. Go to **Admin** > **Import Container**.
-3. Select the file: `docs/tracking-gtm-web-container.json`.
-4. Choose **Existing workspace** (or create a new workspace named `DS Mart Tracking`).
-5. Choose **Merge** > **Rename conflicting tags, triggers, and variables**.
-6. In **Variables**:
+2. Create a new workspace: Click **Default Workspace** > **+** > Name it `DS Mart Tracking Setup`.
+3. Go to **Admin** > **Import Container**.
+4. Select the file: `docs/tracking-gtm-web-container.json`.
+5. Choose **Existing workspace** > select `DS Mart Tracking Setup`.
+6. Select **Merge** > **Rename conflicting tags, triggers, and variables**.
+7. In **Variables**:
    - Update `Const - GA4 Measurement ID` with your actual GA4 ID (e.g. `G-XXXXXXXXXX`).
    - Update `Const - Meta Pixel ID` with your actual Meta Dataset ID (e.g. `123456789012345`).
-7. Review Tags:
+8. Review Tags:
    - `Google Tag - GA4 Config & Server Tagging URL` (fires on All Pages)
    - `GA4 Event - page_view` (fires on `Event - page_view (Client Navigation)`)
    - `GA4 Event - view_item` (fires on `Event - view_item`)
@@ -68,18 +73,35 @@ Navigate to **Storefront CMS** > **Tracking & Pixels** (`/cms/tracking`):
    - `Meta Pixel - AddToCart`
    - `Meta Pixel - InitiateCheckout`
    - `Meta Pixel - Purchase`
-8. Click **Submit** to publish the container.
+9. Test thoroughly using GTM Preview (see Section 7) before publishing.
 
 ---
 
-## 4. GTM Server Container & Stape Setup
+## 4. GTM Server Container & Stape Setup (Draft Starting Point)
 
-1. In [Stape.io](https://stape.io) or Google Cloud Run, provision your server tagging container.
-2. Map your custom domain: `analytics.digislashagency.com` with an SSL certificate.
-3. In GTM Server Container, import `docs/tracking-gtm-server-container.json`.
-4. In the `Meta Conversions API (CAPI)` tag:
-   - Enter your **Meta CAPI Access Token** (generated from Meta Events Manager > Datasets > Settings > Generate Access Token).
-   - Verify `Event ID` is mapped to `{{Event ID}}` for browser-server deduplication.
+> [!WARNING]
+> **Container File Status**: `docs/tracking-gtm-server-container.json` is a starting draft template.
+> GTM Server Containers require template gallery imports that cannot be fully bundled in offline JSON exports. Follow the manual configuration steps below.
+
+### Mandatory Manual Configurations in Server Container:
+1. **Community Gallery Templates**:
+   - In GTM Server Container, navigate to **Templates** > **Tag Templates** > **Search Gallery**.
+   - Search for **"Meta Conversions API"** (by `facebookincubator` or `stape-io`) and click **Add to workspace**.
+   - If hosting with Stape.io, also install the **"Stape Client"** or **"Data Client"** template from the gallery.
+2. **Provisioning Server Environment**:
+   - In [Stape.io](https://stape.io) or Google Cloud Run, provision your server container.
+   - Point your custom subdomain (e.g., `analytics.digislashagency.com`) with a verified SSL certificate.
+3. **Container Import**:
+   - Go to **Admin** > **Import Container** > choose `docs/tracking-gtm-server-container.json`.
+   - Select a new workspace with **Merge** > **Rename conflicting**.
+4. **Secret Configuration (Server Container Only)**:
+   - In the Meta Conversions API tag:
+     - Enter your **Meta CAPI Access Token** (generated from Meta Events Manager > Datasets > Settings > Generate Access Token).
+     - Enter your **Meta Pixel/Dataset ID**.
+     - Verify `Event ID` is mapped to `{{Event ID}}` for browser-server deduplication.
+     - For testing, enter the `test_event_code` from Meta Test Events tab (remove before live production launch).
+   - In the GA4 Client / Tag:
+     - Configure your GA4 Measurement ID and GA4 API Secret (if using measurement protocol).
 
 ---
 
@@ -122,21 +144,80 @@ The chosen setting applies uniformly across GA4, Meta Pixel, and Server CAPI.
 
 ---
 
-## 7. Verification & Diagnostic Testing
+## 7. Step-by-Step Owner Pre-Flight Test Order Checklist
 
-1. **GTM Preview Mode**:
-   - Open GTM Web Container, click **Preview**, enter `https://dsmart.digislashagency.com`.
-   - Verify:
-     - First page load: Google Tag fires `Container Loaded` (exactly 1 pageview).
-     - Navigating between pages: custom `page_view` fires (exactly 1 pageview per navigation).
-     - Viewing a product: `view_item` fires once (selecting different variants does not refire).
-     - Clicking "Add to Cart" or "Buy Now": `add_to_cart` fires with product items.
-     - Cart quantity increase: `add_to_cart` fires with the incremented quantity.
-     - Checkout drawer / page: `begin_checkout` fires.
-     - Placing a COD order: Redirects to `/orders/[id]` (confirmation page); `purchase` fires once. Refreshing or navigating back never duplicates the purchase event.
-2. **Meta Test Events**:
-   - In Meta Events Manager > Test Events, enter your site URL.
-   - Place a test COD order.
-   - Confirm events show **"Deduplicated"** between Browser (Pixel) and Server (CAPI) with identical `event_id` (`purchase_<orderNumber>`).
-3. **GA4 DebugView**:
-   - In GA4 > Admin > DebugView, confirm real-time timeline displays `page_view`, `view_item`, `add_to_cart`, `begin_checkout`, and `purchase` with `currency: "BDT"`.
+Before directing live advertising traffic to the store, execute this verification checklist to validate the end-to-end tracking pipeline across GTM Preview, GA4 DebugView, and Meta Test Events.
+
+### Phase 1: Set Up Monitoring Consoles
+- [ ] **1. GTM Web Preview**: Open GTM Web Container, click **Preview**, enter `https://dsmart.digislashagency.com`, and click **Connect**.
+- [ ] **2. GTM Server Preview**: In your GTM Server Container, click **Preview** (or open Stape live logs).
+- [ ] **3. Meta Test Events**: In Meta Events Manager > Data Sources > select your Dataset > **Test Events** tab.
+  - Copy the `test_event_code` (e.g., `TEST12345`).
+  - Set it in your GTM Server Meta CAPI tag's `test_event_code` parameter.
+- [ ] **4. GA4 DebugView**: In Google Analytics > **Admin** > **DebugView** (under Data display).
+
+### Phase 2: User Journey & Event Verification
+- [ ] **5. First Page Load (`page_view`)**:
+  - The storefront lands on the homepage.
+  - In GTM Preview: Verify `Initialization` / `Consent` sets default consent, and `Google Tag` loads.
+  - Verify exactly **ONE** `page_view` is recorded on first load (no duplicate from Enhanced Measurement).
+  - Check browser console: Debug mode logs `[Analytics GTM] push: { event: "page_view", ... }`.
+- [ ] **6. Product Details Page (`view_item`)**:
+  - Click any product to open the product page.
+  - In GTM Preview: Verify custom `page_view` fires on navigation.
+  - Verify `view_item` event fires once with:
+    - `currency`: `"BDT"`
+    - `value`: product price
+    - `items[0].item_id`: product SKU (or product ID)
+    - `items[0].item_name`: product title
+  - Switch product variants (e.g. size/color): Verify `view_item` does NOT fire duplicate events.
+- [ ] **7. Add to Cart (`add_to_cart`)**:
+  - Test all 4 entry points:
+    1. PDP "Add to Cart" button -> `add_to_cart` fires with selected item.
+    2. PDP "Buy Now" button -> `add_to_cart` fires and opens checkout drawer.
+    3. Product Card "Quick Add" (+) on catalog grid -> `add_to_cart` fires.
+    4. In Cart drawer, increment item quantity (+) -> `add_to_cart` fires for the added unit.
+- [ ] **8. Begin Checkout (`begin_checkout`)**:
+  - Proceed to the checkout screen.
+  - Verify `begin_checkout` fires with full cart items array, `currency: "BDT"`, and subtotal `value`.
+  - Verify customer data in `begin_checkout` contains SHA-256 hashed data if consent is `granted`, or omitted if consent is `denied`.
+- [ ] **9. Complete Cash on Delivery (COD) Order (`purchase`)**:
+  - Select payment method **Cash on Delivery (COD)** and click "Place Order".
+  - Verify browser redirects to the confirmation page (`/orders/[id]`).
+  - Verify `purchase` event fires **ONCE** on `/orders/[id]` with:
+    - `transaction_id`: Backend Order Number (e.g. `ORD-XXXX-XXXX`)
+    - `event_id`: Deterministic ID (`purchase_ORD-XXXX-XXXX`)
+    - `value`: Configured order value (net items or grand total per `PURCHASE_VALUE_MODE`)
+    - `currency`: `"BDT"`
+    - `shipping`: Backend shipping charge (e.g. `80` or `150`)
+    - `tax`: `0`
+    - `coupon`: Applied coupon code (if any)
+    - `items`: Snapshot items list
+
+### Phase 3: Deduplication & Platform Validations
+- [ ] **10. Meta Event Deduplication**:
+  - In Meta Events Manager > **Test Events** tab:
+  - Find the `Purchase` event.
+  - Verify it shows **Both (Browser & Server)** with status **"Deduplicated"**.
+  - Verify the `event_id` matches exactly between Browser Pixel and Server CAPI.
+- [ ] **11. GA4 DebugView Verification**:
+  - Check real-time timeline in GA4 DebugView.
+  - Confirm `page_view`, `view_item`, `add_to_cart`, `begin_checkout`, and `purchase` appear in exact sequence.
+  - Click `purchase` to inspect parameters: `currency: "BDT"`, `transaction_id`, `value`, `items`.
+
+### Phase 4: Edge Cases & Guards
+- [ ] **12. Reload & Back Navigation Deduplication**:
+  - On the `/orders/[id]` confirmation page, click **Refresh (F5)**.
+  - Verify NO duplicate `purchase` event is pushed to dataLayer.
+  - Click **Back** in browser and then **Forward** back to `/orders/[id]`.
+  - Verify NO duplicate `purchase` event is pushed (guarded by consumed fresh token and `localStorage["ds_tracked_orders"]`).
+- [ ] **13. Order History Guard**:
+  - Navigate to **Account** > **Orders** and click an old historical order.
+  - Verify `purchase` NEVER fires for past orders.
+- [ ] **14. Consent Default Check**:
+  - In Admin `/cms/tracking`, set consent default to `denied`, save draft, and publish.
+  - In incognito window, place an order.
+  - Verify dataLayer event does NOT contain `user_data` (customer personal data omitted).
+- [ ] **15. Master Kill Switch**:
+  - In Admin `/cms/tracking`, toggle "Enable tracking" OFF, save draft, and publish.
+  - In storefront, inspect DOM: verify no GTM `<script>` or `<noscript>` iframe is injected, and dataLayer receives no events.

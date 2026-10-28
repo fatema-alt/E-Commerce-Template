@@ -17,11 +17,7 @@ import {
   getTrackingItemId,
   trackAddToCart,
   trackBeginCheckout,
-  trackPurchase,
-  hashUserData,
-  isOrderPurchaseTracked,
-  markOrderPurchaseTracked,
-  ENABLE_ONLINE_PAYMENT_PURCHASE_EVENT,
+  calculatePurchaseValue,
   type TrackingEcommerceItem,
 } from "../lib/gtm";
 
@@ -438,15 +434,35 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
 
       // Set a one-time "fresh order" token so the confirmation page (/orders/[id])
       // fires the purchase event reliably after landing, avoiding drop-off on redirect.
+      // Privacy rule: MUST NOT contain personal data (no email, phone, address).
+      // Only stores non-PII order payload needed for purchase tracking.
       try {
+        const orderValue = calculatePurchaseValue({
+          grandTotal: Number(order.grandTotal) || 0,
+          subtotal: Number(order.subtotal) || 0,
+          discountTotal: Number(order.discountTotal) || 0,
+        });
+
+        const items: TrackingEcommerceItem[] = (order.items || []).map(
+          (it) => ({
+            item_id: it.skuSnapshot?.trim() || it.nameSnapshot,
+            item_name: it.nameSnapshot,
+            price: Number(it.unitPrice) || 0,
+            quantity: it.quantity,
+            currency: "BDT",
+          }),
+        );
+
         sessionStorage.setItem(
           `ds_fresh_order_${order.id}`,
           JSON.stringify({
+            orderNumber: order.orderNumber,
+            value: orderValue,
+            shipping: Number(order.shippingTotal) || 0,
+            tax: Number(order.taxTotal) || 0,
+            coupon: order.couponCode || appliedCoupon || undefined,
+            items,
             paymentMethod,
-            customerEmail: value("email"),
-            customerPhone: value("phone"),
-            customerName: value("name"),
-            customerCity: value("city"),
             createdAt: Date.now(),
           }),
         );

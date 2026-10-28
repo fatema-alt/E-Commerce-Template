@@ -368,15 +368,25 @@ export function OrderHistory({ id }: { id?: string }) {
       return;
     }
 
-    const orderIdentifier = order.orderNumber || order.id;
-    if (isOrderPurchaseTracked(orderIdentifier)) {
-      return;
-    }
-
-    let freshData: any = {};
+    let freshData: {
+      orderNumber?: string;
+      value?: number;
+      shipping?: number;
+      tax?: number;
+      coupon?: string;
+      items?: TrackingEcommerceItem[];
+      paymentMethod?: string;
+      createdAt?: number;
+    } = {};
     try {
       freshData = JSON.parse(freshDataRaw);
     } catch {}
+
+    const orderIdentifier =
+      freshData.orderNumber || order.orderNumber || order.id;
+    if (isOrderPurchaseTracked(orderIdentifier)) {
+      return;
+    }
 
     const isCod =
       order.paymentMethod === "COD" || freshData.paymentMethod === "COD";
@@ -391,44 +401,59 @@ export function OrderHistory({ id }: { id?: string }) {
             ? (window as any).__dsConsentDefault
             : "denied";
 
-        const customerName =
-          freshData.customerName || order.customerName || "";
+        // Privacy rule: customer personal data is loaded from the backend order API response,
+        // never stored unhashed in sessionStorage.
+        const customerName = order.customerName || "";
+        const customerCity =
+          order.addresses && order.addresses[0]
+            ? order.addresses[0].city
+            : undefined;
+
         const userData = await hashUserData(
           {
-            email: freshData.customerEmail,
-            phone: freshData.customerPhone || order.customerPhone,
+            phone: order.customerPhone,
             firstName: customerName.split(" ")[0] || customerName,
             lastName:
               customerName.split(" ").slice(1).join(" ") || undefined,
-            city: freshData.customerCity,
+            city: customerCity,
           },
           consentState,
         );
 
-        const items: TrackingEcommerceItem[] = (order.items || []).map(
-          (it) => ({
-            item_id: it.skuSnapshot?.trim() || it.nameSnapshot,
-            item_name: it.nameSnapshot,
-            price: Number(it.unitPrice) || 0,
-            quantity: it.quantity,
-            currency: "BDT",
-          }),
-        );
+        const items: TrackingEcommerceItem[] =
+          freshData.items && freshData.items.length > 0
+            ? freshData.items
+            : (order.items || []).map((it) => ({
+                item_id: it.skuSnapshot?.trim() || it.nameSnapshot,
+                item_name: it.nameSnapshot,
+                price: Number(it.unitPrice) || 0,
+                quantity: it.quantity,
+                currency: "BDT",
+              }));
 
-        const orderValue = calculatePurchaseValue({
-          grandTotal: Number(order.grandTotal) || 0,
-          subtotal: Number(order.subtotal) || 0,
-          discountTotal: Number(order.discountTotal) || 0,
-        });
+        const orderValue =
+          typeof freshData.value === "number"
+            ? freshData.value
+            : calculatePurchaseValue({
+                grandTotal: Number(order.grandTotal) || 0,
+                subtotal: Number(order.subtotal) || 0,
+                discountTotal: Number(order.discountTotal) || 0,
+              });
 
         trackPurchase({
           order: {
             orderId: order.id,
-            orderNumber: order.orderNumber,
+            orderNumber: freshData.orderNumber || order.orderNumber,
             value: orderValue,
-            tax: Number(order.taxTotal) || 0,
-            shipping: Number(order.shippingTotal) || 0,
-            coupon: order.couponCode,
+            tax:
+              typeof freshData.tax === "number"
+                ? freshData.tax
+                : Number(order.taxTotal) || 0,
+            shipping:
+              typeof freshData.shipping === "number"
+                ? freshData.shipping
+                : Number(order.shippingTotal) || 0,
+            coupon: freshData.coupon ?? order.couponCode,
             items,
           },
           userData,

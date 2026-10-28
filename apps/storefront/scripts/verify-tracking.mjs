@@ -317,22 +317,41 @@ globalThis.localStorage = {
   removeItem: (k) => storageMock.delete(k),
 };
 
-// Simulate order creation setting one-time fresh token
-sessionStorage.setItem("ds_fresh_order_order-1", JSON.stringify({ paymentMethod: "COD" }));
-assert.ok(sessionStorage.getItem("ds_fresh_order_order-1"));
+// Simulate order creation setting one-time fresh token without any PII
+const sampleFreshToken = {
+  orderNumber: "ORD-2026-0001",
+  value: 450,
+  shipping: 80,
+  tax: 0,
+  coupon: "PROMO10",
+  items: [
+    { item_id: "DS-SHIRT-M", item_name: "DS Cotton Shirt", price: 450, quantity: 1, currency: "BDT" }
+  ],
+  paymentMethod: "COD",
+  createdAt: Date.now(),
+};
+sessionStorage.setItem("ds_fresh_order_order-1", JSON.stringify(sampleFreshToken));
+const rawStoredToken = sessionStorage.getItem("ds_fresh_order_order-1");
+assert.ok(rawStoredToken);
+const parsedStoredToken = JSON.parse(rawStoredToken);
+assert.equal("customerEmail" in parsedStoredToken, false, "Fresh token must not contain email");
+assert.equal("customerPhone" in parsedStoredToken, false, "Fresh token must not contain phone");
+assert.equal("customerAddress" in parsedStoredToken, false, "Fresh token must not contain address");
+assert.equal(parsedStoredToken.orderNumber, "ORD-2026-0001");
+assert.equal(parsedStoredToken.value, 450);
 
 // Confirmation page consumption: read and immediately delete
 const freshToken = sessionStorage.getItem("ds_fresh_order_order-1");
 sessionStorage.removeItem("ds_fresh_order_order-1");
 assert.ok(freshToken);
-assert.equal(isOrderPurchaseTracked("DS-2026-0001"), false);
-markOrderPurchaseTracked("DS-2026-0001");
-assert.equal(isOrderPurchaseTracked("DS-2026-0001"), true);
+assert.equal(isOrderPurchaseTracked("ORD-2026-0001"), false);
+markOrderPurchaseTracked("ORD-2026-0001");
+assert.equal(isOrderPurchaseTracked("ORD-2026-0001"), true);
 
 // Reload or back navigation: fresh token is gone, and localStorage prevents duplicate
 const freshTokenOnReload = sessionStorage.getItem("ds_fresh_order_order-1");
 assert.equal(freshTokenOnReload, null, "Fresh token must be null on reload / back");
-assert.equal(isOrderPurchaseTracked("DS-2026-0001"), true, "Order must remain marked as tracked");
+assert.equal(isOrderPurchaseTracked("ORD-2026-0001"), true, "Order must remain marked as tracked");
 
 // Online payment purchase event feature flag is disabled
 assert.equal(ENABLE_ONLINE_PAYMENT_PURCHASE_EVENT, false, "Online payment purchase tracking must be disabled by default");
