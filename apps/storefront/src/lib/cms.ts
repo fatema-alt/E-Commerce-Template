@@ -1,5 +1,6 @@
 import { cache } from "react";
 import type { ContactSettings, RibbonSettings } from "./engagement";
+import type { TrackingSettings } from "./tracking";
 import {
   fallbackConfig,
   imageUrl,
@@ -41,6 +42,7 @@ export type CmsPage = {
 export type Settings = {
   announcementRibbon?: RibbonSettings;
   contactWidget?: ContactSettings;
+  tracking?: TrackingSettings;
   homePageKey?: string;
   storeName?: string;
   tagline?: string;

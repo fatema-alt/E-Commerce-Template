@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test:product": "node scripts/verify-product.mjs",
     "test:analytics": "node scripts/verify-analytics.mjs",
-    "test:hero": "node scripts/verify-hero.mjs"
+    "test:hero": "node scripts/verify-hero.mjs",
+    "test:tracking": "node scripts/verify-tracking.mjs"
   },
   "dependencies": {
     "@commerce/product-content": "workspace:*",

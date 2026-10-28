@@ -10,6 +10,8 @@ import { themeScript } from "../lib/theme-init";
 import { connection } from "next/server";
 import { FloatingContact } from "../components/store-engagement";
 import { StoreAnalytics } from "../components/store-analytics";
+import { GtmHeadScript, GtmNoScript } from "../components/gtm-scripts";
+import { resolveTrackingConfig } from "../lib/tracking";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -54,17 +56,20 @@ async function StoreFrame({ children }: { children: ReactNode }) {
     "--body-font": fonts[String(t.fontFamily)] || fonts.system,
     "--heading-font": fonts[String(t.headingFontFamily)] || fonts.system,
   } as CSSProperties;
+  const trackingConfig = resolveTrackingConfig(config.settings.tracking);
   return (
     <div
       lang={config.settings.locale || "en"}
       style={vars}
       className={`storefront button-${t.buttonStyle || "solid"} card-${t.productCardStyle || "bordered"} layout-${t.layoutPreset || "balanced"}`}
     >
+      <GtmHeadScript config={trackingConfig} />
+      <GtmNoScript config={trackingConfig} />
       <a className="skip-link" href="#main">
         Skip to content
       </a>
       <Header config={config} />
-      <StoreAnalytics />
+      <StoreAnalytics tracking={trackingConfig} />
       {unavailable ? <main id="main" className="container main-content"><div className="shop-panel store-unavailable"><p className="eyebrow">DS Mart</p><h1>We’ll be right back.</h1><p>Our store is temporarily unavailable. Please try again shortly.</p><a className="primary-button" href="/">Try again</a><a className="secondary-button" href="/help">Shopping help</a></div></main> : children}
       <StoreBenefits />
       <Footer config={config} />
