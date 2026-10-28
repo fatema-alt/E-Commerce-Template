@@ -34,11 +34,6 @@ type NavItem = {
 const navigation: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   {
-    label: "Homepage Builder",
-    href: "/cms/pages?key=home",
-    icon: Sparkles,
-  },
-  {
     label: "Products",
     href: "/products",
     icon: Package,
@@ -66,14 +61,12 @@ const navigation: NavItem[] = [
     href: "/cms",
     icon: LayoutDashboard,
     children: [
-      { label: "Homepage Builder", href: "/cms/pages?key=home", icon: Sparkles },
-      { label: "All Pages", href: "/cms/pages", icon: List },
-      { label: "Theme Customizer", href: "/cms/theme", icon: Palette },
-      { label: "Navigation Menus", href: "/cms/navigation", icon: FolderTree },
+      { label: "Store info", href: "/cms/settings", icon: Settings },
+      { label: "Look", href: "/cms/theme", icon: Palette },
+      { label: "Homepage", href: "/cms/homepage", icon: Sparkles },
+      { label: "Pages", href: "/cms/pages", icon: List },
+      { label: "Menus", href: "/cms/navigation", icon: FolderTree },
       { label: "Media Library", href: "/cms/media", icon: ImageIcon },
-      { label: "Site Settings", href: "/cms/settings", icon: Settings },
-      { label: "Announcement Bar", href: "/cms/announcements", icon: Sparkles },
-      { label: "Floating Contact Widget", href: "/cms/contact-widget", icon: Users },
     ],
   },
   {
@@ -82,7 +75,7 @@ const navigation: NavItem[] = [
     icon: Settings,
     children: [
       { label: "Payment Gateways", href: "/settings/payments", icon: CreditCard },
-      { label: "Site Settings", href: "/cms/settings", icon: Settings },
+      { label: "Store info", href: "/cms/settings", icon: Settings },
     ],
   },
 ];

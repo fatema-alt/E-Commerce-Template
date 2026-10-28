@@ -17,13 +17,15 @@ import {
 import { button, input, SchemaField } from "./schema-fields";
 import { getStandardEcommerceTemplate } from "./standard-template";
 import { VisualHomepageBuilder } from "./visual-homepage-builder";
+import { StoreLookEditor } from "./store-look-editor";
+import { CMS_AREAS, THEME_PRESETS } from "./cms-task-config";
 import { EngagementPreview, engagementDefaults } from "./engagement-preview";
 
 const tabs = [
-  ["SITE_SETTINGS", "Site Settings", "settings"],
-  ["THEME", "Theme", "theme"],
+  ["SITE_SETTINGS", "Store info", "settings"],
+  ["THEME", "Look", "theme"],
   ["PAGE", "Pages", "pages"],
-  ["NAVIGATION", "Navigation", "navigation"],
+  ["NAVIGATION", "Menus", "navigation"],
   ["MEDIA", "Media Library", "media"],
   ["ANNOUNCEMENTS", "Announcement Bar", "announcements"],
   ["CONTACT_WIDGET", "Floating Contact Widget", "contact-widget"],
@@ -40,8 +42,10 @@ export function CmsWorkspace({
   kind,
   defaultKey,
   scope,
+  area,
 }: {
   kind: string;
+  area?: "homepage" | "pages";
   defaultKey?: string;
   scope?: "announcementRibbon" | "contactWidget";
 }) {
@@ -68,7 +72,7 @@ export function CmsWorkspace({
   const [scheduledAt, setScheduledAt] = useState("");
   const [block, setBlock] = useState("hero");
   const [preview, setPreview] = useState(false);
-  const [builderMode, setBuilderMode] = useState(true);
+  const [builderMode, setBuilderMode] = useState(area !== "pages");
   const sequence = useRef(0);
   const editable = role === "ADMIN" || role === "SUPER_ADMIN";
   const publisher = role === "SUPER_ADMIN";
@@ -198,12 +202,17 @@ export function CmsWorkspace({
       setDirty(false);
       setPreview(false);
     } catch (e) {
-      if (scope && kind === "SITE_SETTINGS" && e instanceof CmsRequestError && e.status === 404) {
+      if (kind === "SITE_SETTINGS" && e instanceof CmsRequestError && e.status === 404) {
         if (current !== sequence.current) return;
         setKey(documentKey); setDoc(null);
-        setContent({ storeName: "DS Mart", locale: "en", currency: "BDT", [scope]: engagementDefaults[scope] });
+        setContent({ storeName: "DS Mart", locale: "en", currency: "BDT", ...(scope ? { [scope]: engagementDefaults[scope] } : {}) });
         setVersions([]); setHistoryTotal(0); setDirty(true);
         setNotice("New Site Settings draft. Configure, save and publish when ready.");
+      } else if (kind === "THEME" && e instanceof CmsRequestError && e.status === 404) {
+        if (current !== sequence.current) return;
+        setKey(documentKey); setDoc(null); setContent({...THEME_PRESETS[1].values});
+        setVersions([]); setHistoryTotal(0); setDirty(true);
+        setNotice("Choose a look, save a draft and publish when ready.");
       } else if (documentKey === "home" && kind === "PAGE" && e instanceof CmsRequestError && e.status === 404) {
         if (current !== sequence.current) return;
         setKey("home");
@@ -377,7 +386,7 @@ export function CmsWorkspace({
   function updateSections(next: Section[]) {
     change({ ...content, sections: next as unknown as Value });
   }
-  const heading = scope === "announcementRibbon" ? "Announcement Bar" : scope === "contactWidget" ? "Floating Contact Widget" : tabs.find((tab) => tab[0] === kind)?.[1];
+  const heading = area === "homepage" ? "Homepage" : scope === "announcementRibbon" ? "Announcement Bar" : scope === "contactWidget" ? "Floating Contact Widget" : tabs.find((tab) => tab[0] === kind)?.[1];
   return (
     <div className="space-y-6">
       <div>
@@ -394,19 +403,11 @@ export function CmsWorkspace({
         aria-label="CMS navigation"
         className="flex flex-wrap gap-2 border-b pb-4"
       >
-        {tabs.map(([id, title, path]) => (
-          <Link
-            key={id}
-            href={`/cms/${path}`}
-            onClick={(e) => {
-              if (!canLeave()) e.preventDefault();
-            }}
-            aria-current={(scope ? (scope === "announcementRibbon" ? id === "ANNOUNCEMENTS" : id === "CONTACT_WIDGET") : kind === id) ? "page" : undefined}
-            className={`rounded-lg px-4 py-2 text-sm font-medium ${(scope ? (scope === "announcementRibbon" ? id === "ANNOUNCEMENTS" : id === "CONTACT_WIDGET") : kind === id) ? "bg-indigo-600 text-white" : "bg-white text-slate-600"}`}
-          >
-            {title}
-          </Link>
-        ))}
+        {CMS_AREAS.map(item => {
+          const active = item.kind === kind && (kind !== "PAGE" || item.id === (area || "pages"));
+          return <Link key={item.id} href={item.href} onClick={event=>{if(!canLeave())event.preventDefault();}} aria-current={active ? "page" : undefined} className={"cms-area-link " + (active ? "cms-area-active" : "")}>{item.title}</Link>;
+        })}
+        <Link className="cms-area-link" href="/cms/media" onClick={event=>{if(!canLeave())event.preventDefault();}} aria-current={kind === "MEDIA" ? "page" : undefined}>Media library</Link>
       </nav>
 
 
@@ -598,9 +599,10 @@ export function CmsWorkspace({
           )}
         </div>
       ) : (
-        <div className="grid items-start gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
-          <aside className="space-y-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-            <h2 className="font-semibold text-slate-900 dark:text-slate-100">Documents</h2>
+        <div className={kind === "SITE_SETTINGS" || kind === "THEME" ? "grid items-start gap-6" : "grid items-start gap-6 xl:grid-cols-[240px_minmax(0,1fr)]"}>
+          <aside style={{order: kind === "SITE_SETTINGS" || kind === "THEME" ? 2 : undefined}} className="cms-config-browser space-y-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+            <details open={kind === "PAGE" || kind === "NAVIGATION"}>
+            <summary className="cursor-pointer font-semibold">{kind === "PAGE" ? "Pages" : kind === "NAVIGATION" ? "Menus" : "Advanced: saved configurations"}</summary>
             {documents.map((item) => (
               <button
                 key={item.key}
@@ -641,13 +643,14 @@ export function CmsWorkspace({
                 </button>
               </div>
             )}
+            </details>
           </aside>
           {key && registry ? (
             <div className="min-w-0 space-y-5">
               <section className="rounded-xl border bg-white p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h2 className="break-all text-xl font-semibold">{key}</h2>
+                    <h2 className="break-all text-xl font-semibold">{kind === "SITE_SETTINGS" || kind === "THEME" ? heading : String(content.title || content.label || key)}</h2>
                     <p className="mt-1 text-xs text-slate-500">
                       {doc?.state ?? "NEW"} Â· revision {doc?.revision ?? 0} Â·{" "}
                       {dirty ? "Unsaved changes" : "Saved"}
@@ -718,6 +721,8 @@ export function CmsWorkspace({
                       content={content}
                       assets={assets}
                     />
+                  ) : kind === "SITE_SETTINGS" || kind === "THEME" ? (
+                    <StoreLookEditor kind={kind} schema={registry.documents[kind]} content={content} assets={assets} onChange={value=>change(value)} />
                   ) : kind === "PAGE" ? (
                     <>
                       <SchemaField
