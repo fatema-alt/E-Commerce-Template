@@ -49,6 +49,12 @@ export type Quote = {
   tax: string;
   total: string;
   quoteToken: string;
+  /** Shipping rate tiers returned by server for UI display. */
+  shippingRates?: {
+    insideDhaka: number;
+    outsideDhaka: number;
+    freeAbove: number;
+  };
 };
 export type Shopper = {
   id: string;

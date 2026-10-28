@@ -19,6 +19,7 @@ import {
   OrderLineDto,
 } from '../orders/dto/create-order.dto.js';
 import { Trim } from '../orders/dto/trim.js';
+
 export class LoginShopperDto {
   @Trim() @IsEmail() @MaxLength(254) email!: string;
   @IsString() @MinLength(12) @MaxLength(256) password!: string;
@@ -39,6 +40,14 @@ export class QuoteDto {
   @IsString()
   @Length(2, 32)
   couponCode?: string;
+
+  /**
+   * Optional address hints from the checkout form.
+   * Used to compute a contextual shipping estimate during quote.
+   * The final fee is always re-verified server-side in checkout().
+   */
+  @IsOptional() @Trim() @IsString() @MaxLength(120) city?: string;
+  @IsOptional() @Trim() @IsString() @MaxLength(120) district?: string;
 }
 
 export class ValidateCouponDto {
@@ -57,6 +66,7 @@ export class ValidateCouponDto {
 export class ShopCheckoutDto extends OmitType(CreateOrderDto, [
   'customerId',
   'paymentMethod',
+  'shippingTotal',
 ] as const) {
   @IsOptional()
   @IsIn(['COD', 'BANK_TRANSFER', 'BKASH', 'SSLCOMMERZ', 'NAGAD', 'ONLINE'])

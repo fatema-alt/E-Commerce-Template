@@ -38,14 +38,24 @@ async function repairObsoleteVariants(lines: CartLine[]) {
   return repaired;
 }
 
-function requestQuote(serialized: string, couponCode?: string) {
+function requestQuote(
+  serialized: string,
+  couponCode?: string,
+  city?: string,
+  district?: string,
+) {
   const cacheKey =
-    serialized + (couponCode ? `::${couponCode.trim().toUpperCase()}` : "");
+    serialized +
+    (couponCode ? `::${couponCode.trim().toUpperCase()}` : "") +
+    (city ? `::city:${city.trim().toLowerCase()}` : "") +
+    (district ? `::dist:${district.trim().toLowerCase()}` : "");
   let promise = pending.get(cacheKey);
   if (!promise) {
     promise = shopRequest<Quote>("quote", {
       items: JSON.parse(serialized),
       ...(couponCode ? { couponCode: couponCode.trim().toUpperCase() } : {}),
+      ...(city ? { city: city.trim() } : {}),
+      ...(district ? { district: district.trim() } : {}),
     }).finally(() => pending.delete(cacheKey));
     pending.set(cacheKey, promise);
   }
@@ -93,7 +103,14 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       quantity,
     })),
   );
-  const currentKey = serialized + "::" + appliedCoupon;
+  // Address hints for shipping estimate (checkout page only).
+  const [addrCity, setAddrCity] = useState("");
+  const [addrDistrict, setAddrDistrict] = useState("");
+  const currentKey =
+    serialized +
+    "::" +
+    appliedCoupon +
+    (checkout ? `::city:${addrCity}::dist:${addrDistrict}` : "");
   const validQuote = quote && quotedKey === currentKey;
   const locked = busy || updating || couponBusy;
 
@@ -121,6 +138,12 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
           typeof draft[name] === "string"
         )
           field.value = draft[name];
+      }
+      if (typeof draft.city === "string" && draft.city.trim()) {
+        setAddrCity(draft.city.trim());
+      }
+      if (typeof draft.district === "string" && draft.district.trim()) {
+        setAddrDistrict(draft.district.trim());
       }
     } catch {
       /* Storage is optional; the form remains usable. */
@@ -160,6 +183,39 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       live = false;
     };
   }, [serialized, currentKey, review, appliedCoupon, cart.lines]);
+
+  // On the checkout page, re-request a quote whenever the city/district changes
+  // so the shipping fee updates live as the customer fills the address form.
+  useEffect(() => {
+    if (!checkout || serialized === "[]") return;
+    const cityVal = addrCity.trim();
+    const districtVal = addrDistrict.trim();
+    if (!cityVal && !districtVal) return;
+    let live = true;
+    const timer = setTimeout(() => {
+      void requestQuote(serialized, appliedCoupon, cityVal, districtVal)
+        .then((result) => {
+          if (live) {
+            setQuote(result);
+            setQuotedKey(
+              serialized +
+                "::" +
+                appliedCoupon +
+                `::city:${cityVal}::dist:${districtVal}`,
+            );
+            setError("");
+          }
+        })
+        .catch(() => {
+          /* Silently ignore transient address-hint errors. */
+        });
+    }, 600);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addrCity, addrDistrict, checkout]);
 
   useEffect(() => {
     let live = true;
@@ -608,6 +664,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                         required
                         minLength={2}
                         maxLength={120}
+                        onChange={(e) => setAddrCity(e.target.value)}
                       />
                     </label>
                     <label>
@@ -616,6 +673,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                         name="district"
                         autoComplete="address-level1"
                         maxLength={120}
+                        onChange={(e) => setAddrDistrict(e.target.value)}
                       />
                     </label>
                     <label>
@@ -836,6 +894,14 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                   Delivery within Bangladesh. Your final total is verified again
                   when placing the order.
                 </p>
+                {validQuote && quote.shippingRates && (
+                  <p className="muted small" style={{ marginTop: "4px" }}>
+                    {quote.shippingRates.freeAbove > 0
+                      ? `Free delivery on orders over ৳${quote.shippingRates.freeAbove.toLocaleString()}. `
+                      : ""}
+                    Delivery: ৳{quote.shippingRates.insideDhaka} inside Dhaka · ৳{quote.shippingRates.outsideDhaka} elsewhere.
+                  </p>
+                )}
                 {!checkout && (
                   <Link
                     className="primary-button checkout-link"

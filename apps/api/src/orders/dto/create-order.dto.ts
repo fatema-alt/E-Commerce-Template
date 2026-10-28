@@ -12,6 +12,7 @@ import {
   IsString,
   IsUUID,
   Length,
+  Matches,
   Max,
   Min,
   ValidateNested,
@@ -23,6 +24,7 @@ export class OrderLineDto {
   @IsOptional() @IsUUID() variantId?: string;
   @IsInt() @Min(1) @Max(10000) quantity!: number;
 }
+
 export class CheckoutAddressDto {
   @Trim() @IsString() @Length(2, 120) recipientName!: string;
   @Trim() @IsString() @Length(6, 32) phone!: string;
@@ -34,6 +36,7 @@ export class CheckoutAddressDto {
   @IsOptional() @Trim() @IsString() @Length(1, 120) upazila?: string;
   @IsOptional() @Trim() @IsString() @Length(1, 20) postalCode?: string;
 }
+
 export class CreateOrderDto {
   @IsOptional() @IsUUID() customerId?: string;
   @Trim() @IsString() @Length(2, 120) customerName!: string;
@@ -51,4 +54,14 @@ export class CreateOrderDto {
   shippingAddress!: CheckoutAddressDto;
   @IsOptional() @Trim() @IsString() @Length(0, 2000) customerNote?: string;
   @IsOptional() @Trim() @IsString() @Length(2, 32) couponCode?: string;
+  /**
+   * Pre-calculated shipping fee (BDT) verified server-side before being passed
+   * to orders.service. Not exposed to the public API — only injected internally
+   * by shop.service after re-verifying the confirmed address.
+   * Format: decimal string e.g. "80.00" or "150.00".
+   */
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{1,10}(\.\d{1,2})?$/)
+  shippingTotal?: string;
 }

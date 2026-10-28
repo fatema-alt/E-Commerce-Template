@@ -18,6 +18,7 @@ import { hashPassword, verifyPassword } from '../auth/password.js';
 import { OrdersService } from '../orders/orders.service.js';
 import { PaymentsService } from '../payments/payments.service.js';
 import { PromotionsService } from '../promotions/promotions.service.js';
+import { calcShipping, getShippingRates } from './shipping.config.js';
 import type {
   QuoteDto,
   RegisterShopperDto,
@@ -317,12 +318,31 @@ export class ShopService {
 
     const total = subtotal.minus(discount);
 
+    // --- Shipping calculation ---
+    // city/district are optional hints sent from the storefront address form.
+    // If not provided yet (cart page), we return the default outside-Dhaka rate
+    // so the customer can see an estimate; the final amount is re-verified on
+    // checkout submission using the confirmed shipping address.
+    const shippingFee = calcShipping(
+      total.toNumber(),
+      dto.city,
+      dto.district,
+    );
+    const shipping = new Prisma.Decimal(shippingFee);
+    const grandTotal = total.plus(shipping);
+
+    // Rates config surfaced to the client so the UI can display the rule.
+    const rates = getShippingRates();
+
     const payload = Buffer.from(
       JSON.stringify({
         sessionId,
         items: dto.items,
         subtotal: subtotal.toFixed(2),
         discount: discount.toFixed(2),
+        shipping: shipping.toFixed(2),
+        city: dto.city,
+        district: dto.district,
         couponCode: appliedCoupon?.code,
         expires: Date.now() + 10 * 60000,
       }),
@@ -336,11 +356,16 @@ export class ShopService {
       subtotal: subtotal.toFixed(2),
       discount: discount.toFixed(2),
       coupon: appliedCoupon,
-      shipping: '0.00',
+      shipping: shipping.toFixed(2),
       tax: '0.00',
-      total: total.toFixed(2),
+      total: grandTotal.toFixed(2),
       currency: 'BDT',
       quoteToken,
+      shippingRates: {
+        insideDhaka: rates.insideDhaka,
+        outsideDhaka: rates.outsideDhaka,
+        freeAbove: rates.freeAbove,
+      },
     };
   }
 
@@ -383,6 +408,9 @@ export class ShopService {
       items: QuoteDto['items'];
       subtotal: string;
       discount?: string;
+      shipping?: string;
+      city?: string;
+      district?: string;
       couponCode?: string;
       expires: number;
     };
@@ -399,6 +427,28 @@ export class ShopService {
       throw new ConflictException(
         'Your cart changed or quote expired. Review it again.',
       );
+
+    // --- Re-verify shipping fee server-side using the confirmed address ---
+    // The city/district hint stored in the quoteToken is advisory; we always
+    // re-calculate from the actual shipping address supplied in the DTO.
+    const confirmedShippingFee = calcShipping(
+      parseFloat(quote.subtotal) - parseFloat(quote.discount ?? '0'),
+      dto.shippingAddress?.city,
+      dto.shippingAddress?.district,
+    );
+    const shippingTotal = new Prisma.Decimal(confirmedShippingFee);
+
+    // Tolerate ±1 BDT rounding drift but reject any material mismatch if quote.shipping was provided.
+    // This prevents a customer from gaming the quote by changing address after locking the token.
+    if (quote.shipping !== undefined) {
+      const quotedShipping = new Prisma.Decimal(quote.shipping);
+      if (shippingTotal.minus(quotedShipping).abs().greaterThan(1)) {
+        throw new ConflictException(
+          'Delivery address changed — please review your order summary and try again.',
+        );
+      }
+    }
+
     const availablePayments = await this.payments();
     if (!availablePayments.methods.some(method => method.id === (dto.paymentMethod || 'COD') && method.enabled))
       throw new BadRequestException('The selected payment method is currently unavailable');
@@ -411,6 +461,7 @@ export class ShopService {
         customerId: session.customerId || undefined,
         paymentMethod: dto.paymentMethod || 'COD',
         couponCode: quote.couponCode || dto.couponCode,
+        shippingTotal: shippingTotal.toFixed(2),
       },
       key ? `shop:${session.id}:${key}` : undefined,
       session.id,

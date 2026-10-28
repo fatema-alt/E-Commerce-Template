@@ -452,7 +452,13 @@ export class OrdersService {
               appliedCouponCode = coupon.code;
             }
 
-            const grandTotal = subtotal.minus(discountTotal);
+            // Shipping total: passed in from shop.service (already server-verified)
+            // or 0 for admin-created orders.
+            const shippingTotal = dto.shippingTotal
+              ? new D(dto.shippingTotal)
+              : new D(0);
+
+            const grandTotal = subtotal.minus(discountTotal).plus(shippingTotal);
 
             const order = await tx.order.create({
               data: {
@@ -465,6 +471,7 @@ export class OrdersService {
                 source: storefront ? 'STOREFRONT' : undefined,
                 subtotal,
                 discountTotal,
+                shippingTotal,
                 grandTotal,
                 couponId: appliedCouponId,
                 couponCode: appliedCouponCode,

@@ -100,7 +100,7 @@ export function PriceSummary({
       )}
       <div>
         <dt>Delivery</dt>
-        <dd>{money(shipping)}</dd>
+        <dd>{Number(shipping) === 0 ? "Free" : money(shipping)}</dd>
       </div>
       <div>
         <dt>Tax</dt>
