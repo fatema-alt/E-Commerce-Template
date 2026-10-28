@@ -1,8 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-// Regex identifying common mojibake sequences produced by decoding UTF-8 as CP1252/ISO-8859-1
-const MOJIBAKE_REGEX = /(?:â€|Â·|â†|Ã[¡-ÿ]|\uFFFD|Â[©®°±²³´µ¶·¹º»¼½¾¿])/;
+// Regex identifying common mojibake sequences produced by decoding UTF-8 as CP1252/ISO-8859-1.
+// Written strictly with Unicode escape codes (\u00e2\u20ac, \u00c2\u00b7, etc.) so that this script
+// contains no literal mojibake and does not trigger false positives when scanning itself.
+const MOJIBAKE_REGEX = /(?:\u00e2\u20ac|\u00c2\u00b7|\u00e2\u2020|\u00c3[\u00a1-\u00ff]|\uFFFD|\u00c2[\u00a9\u00ae\u00b0\u00b1\u00b2\u00b3\u00b4\u00b5\u00b6\u00b7\u00b9\u00ba\u00bb\u00bc\u00bd\u00be\u00bf])/;
 
 const ignoreDirs = new Set([
   'node_modules',
@@ -55,14 +57,11 @@ function scan(dir) {
         const lines = content.split(/\r?\n/);
         lines.forEach((line, index) => {
           if (MOJIBAKE_REGEX.test(line)) {
-            // Exclude the checker itself
-            if (!fullPath.includes('check-mojibake.mjs')) {
-              findings.push({
-                file: path.relative(process.cwd(), fullPath).replace(/\\/g, '/'),
-                line: index + 1,
-                content: line.trim(),
-              });
-            }
+            findings.push({
+              file: path.relative(process.cwd(), fullPath).replace(/\\/g, '/'),
+              line: index + 1,
+              content: line.trim(),
+            });
           }
         });
       }
