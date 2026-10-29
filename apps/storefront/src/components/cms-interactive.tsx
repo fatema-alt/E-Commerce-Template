@@ -63,19 +63,27 @@ export function BannerSlider({
 export function SaleCountdown({ endsAt }: { endsAt: string }) {
   const [remaining, setRemaining] = useState<number | null>(null);
   useEffect(() => {
+    const end = new Date(endsAt).getTime();
+    if (isNaN(end)) return;
     const tick = () =>
-      setRemaining(Math.max(0, new Date(endsAt).getTime() - Date.now()));
+      setRemaining(Math.max(0, end - Date.now()));
     tick();
     const timer = window.setInterval(tick, 1000);
     return () => window.clearInterval(timer);
   }, [endsAt]);
-  if (remaining === null)
+
+  const end = new Date(endsAt).getTime();
+  if (!endsAt || isNaN(end)) return null;
+
+  if (remaining === null) {
+    const d = new Date(endsAt);
     return (
-      <p>
-        Ends {new Date(endsAt).toISOString().slice(0, 16).replace("T", " ")} UTC
+      <p className="sale-clock">
+        Ends {d.toISOString().slice(0, 10)}
       </p>
     );
-  if (!remaining) return <p>Sale event ended</p>;
+  }
+  if (remaining <= 0) return <p className="sale-clock">Sale event ended</p>;
   return (
     <p className="sale-clock">
       Ends in {Math.floor(remaining / 86400000)}d{" "}

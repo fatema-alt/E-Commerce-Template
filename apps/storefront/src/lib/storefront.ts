@@ -7,6 +7,7 @@ export type Category = {
   slug: string;
   imageUrl?: string | null;
   parentId?: string | null;
+  productCount?: number;
 };
 export type Product = {
   type?: "SIMPLE" | "VARIABLE";
@@ -294,6 +295,7 @@ function category(v: unknown): Category | null {
     slug: v.slug,
     imageUrl: imageUrl(v.imageUrl),
     parentId: typeof v.parentId === "string" ? v.parentId : null,
+    productCount: typeof v.productCount === "number" ? v.productCount : undefined,
   };
 }
 export function product(v: unknown): Product | null {
@@ -394,10 +396,14 @@ export function product(v: unknown): Product | null {
   };
 }
 export { getCmsConfig as getConfig } from "./cms";
-export async function getCategories(ids?: string[]): Promise<Category[]> {
+export async function getCategories(
+  ids?: string[],
+  options?: { includeCounts?: boolean },
+): Promise<Category[]> {
   const x = await getJson(
     "/storefront/categories?pageSize=100" +
-      (ids?.length ? "&ids=" + encodeURIComponent(ids.join(",")) : ""),
+      (ids?.length ? "&ids=" + encodeURIComponent(ids.join(",")) : "") +
+      (options?.includeCounts ? "&includeCounts=true" : ""),
   );
   return Array.isArray(x)
     ? x.map(category).filter((v): v is Category => v !== null)

@@ -1,11 +1,88 @@
 "use client";
 
-import NextImage from "next/image";
+import NextImage, { getImageProps } from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { Asset } from "../lib/cms";
 import type { HeroBlock } from "../lib/storefront";
-import { heroSlides } from "../lib/hero-slides";
+import { heroSlides, type HeroSlide } from "../lib/hero-slides";
+
+function SlideVisual({ slide, index, full }: { slide: HeroSlide; index: number; full: boolean }) {
+  if (!slide.imageSrc) {
+    return (
+      <div className={full ? "ds-hero-banner-image" : "ds-hero-split-image"}>
+        <NextImage
+          src="/brand/ds-symbol.png"
+          alt="DS Mart"
+          fill
+          sizes="40vw"
+          className="ds-hero-brand-placeholder"
+        />
+      </div>
+    );
+  }
+
+  const isFirst = index === 0;
+
+  if (slide.mobileSrc) {
+    const {
+      props: { srcSet: desktopSrcSet },
+    } = getImageProps({
+      src: slide.imageSrc,
+      alt: slide.alt,
+      fill: true,
+      sizes: full ? "(max-width: 1280px) 100vw, 1280px" : "(max-width: 700px) 100vw, 55vw",
+      unoptimized: slide.imageSrc.startsWith("http:") || slide.imageSrc.startsWith("data:"),
+    });
+
+    const {
+      props: { srcSet: mobileSrcSet, ...mobileRest },
+    } = getImageProps({
+      src: slide.mobileSrc,
+      alt: slide.mobileAlt || slide.alt,
+      fill: true,
+      sizes: "100vw",
+      unoptimized: slide.mobileSrc.startsWith("http:") || slide.mobileSrc.startsWith("data:"),
+    });
+
+    return (
+      <div className={full ? "ds-hero-banner-image" : "ds-hero-split-image"} data-mobile="true">
+        <picture className="ds-hero-picture">
+          <source media="(max-width: 700px)" srcSet={mobileSrcSet} />
+          <source media="(min-width: 701px)" srcSet={desktopSrcSet} />
+          <img
+            {...mobileRest}
+            alt={slide.alt}
+            loading={isFirst ? "eager" : "lazy"}
+            fetchPriority={isFirst ? "high" : "auto"}
+            decoding="async"
+            className="ds-hero-img"
+          />
+        </picture>
+      </div>
+    );
+  }
+
+  const { props } = getImageProps({
+    src: slide.imageSrc,
+    alt: slide.alt,
+    fill: true,
+    sizes: full ? "(max-width: 1280px) 100vw, 1280px" : "(max-width: 700px) 100vw, 55vw",
+    unoptimized: slide.imageSrc.startsWith("http:") || slide.imageSrc.startsWith("data:"),
+  });
+
+  return (
+    <div className={full ? "ds-hero-banner-image" : "ds-hero-split-image"}>
+      <img
+        {...props}
+        loading={isFirst ? "eager" : "lazy"}
+        fetchPriority={isFirst ? "high" : "auto"}
+        decoding="async"
+        className="ds-hero-img"
+      />
+    </div>
+  );
+}
 
 export function HeroBanner({ config, assets = [], block }: {
   config?: Record<string, unknown>; assets?: Asset[]; block?: HeroBlock;
@@ -53,6 +130,7 @@ export function HeroBanner({ config, assets = [], block }: {
       }}>
       <div className="ds-hero-shell">
         <div className="ds-hero-stage"
+          data-active={current !== 0 ? "true" : undefined}
           onTouchStart={(event) => { touchStart.current = event.changedTouches[0].clientX; }}
           onTouchEnd={(event) => {
             if (touchStart.current !== null && count > 1) {
@@ -63,14 +141,7 @@ export function HeroBanner({ config, assets = [], block }: {
           }}>
           {slides.map((slide, index) => {
             const full = slide.type === "full_banner";
-            const visual = <div className={full ? "ds-hero-banner-image" : "ds-hero-split-image"} data-mobile={!!slide.mobileSrc}>
-              {slide.imageSrc ? <>
-                <NextImage src={slide.imageSrc} alt={slide.alt} fill sizes={full ? "(max-width: 1280px) 100vw, 1280px" : "(max-width: 700px) 100vw, 55vw"}
-                  className={slide.mobileSrc ? "ds-hero-desktop-image" : undefined} loading={index === 0 ? "eager" : "lazy"}
-                  fetchPriority={index === 0 ? "high" : "auto"} unoptimized={slide.imageSrc.startsWith("http:") || slide.imageSrc.startsWith("data:")} />
-                {slide.mobileSrc && <NextImage src={slide.mobileSrc} alt={slide.mobileAlt || slide.alt} fill sizes="100vw" className="ds-hero-mobile-image" unoptimized={slide.mobileSrc.startsWith("http:") || slide.mobileSrc.startsWith("data:")} />}
-              </> : <NextImage src="/brand/ds-symbol.png" alt="DS Mart" fill sizes="40vw" className="ds-hero-brand-placeholder" />}
-            </div>;
+            const visual = <SlideVisual slide={slide} index={index} full={full} />;
             return <article key={slide.id} className={`ds-hero-slide ds-hero-${slide.type} ${index === current ? "is-active" : ""}`}
               style={{ background: slide.gradient }} role="group" aria-roledescription="slide" aria-label={`${index + 1} of ${count}: ${slide.title || "Featured offer"}`}
               aria-hidden={index !== current} inert={index !== current}>

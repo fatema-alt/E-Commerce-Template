@@ -27,8 +27,12 @@ export async function generateMetadata(): Promise<Metadata> {
     return { robots: { index: false } };
   }
 }
-async function Home() {
-  const page = await getHomePage();
+async function Home(props: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = (await props.searchParams) || {};
+  const requestedCount = sp.count ? Number(sp.count) : undefined;
+  const page = requestedCount ? null : await getHomePage();
   if (
     page &&
     Array.isArray(page.content?.sections) &&
@@ -40,10 +44,13 @@ async function Home() {
         <CmsSections sections={page.content.sections} assets={page.assets} />
       </main>
     );
-  const [categories, products] = await Promise.all([
-    getCategories(),
+  const [allCategories, products] = await Promise.all([
+    getCategories(undefined, { includeCounts: true }),
     getFeaturedProducts(),
   ]);
+  const categories = requestedCount
+    ? allCategories.slice(0, requestedCount)
+    : allCategories;
   return (
     <HomeSections
       blocks={fallbackConfig.home}
@@ -52,7 +59,9 @@ async function Home() {
     />
   );
 }
-export default function Page() {
+export default function Page(props: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   return (
     <Suspense
       fallback={
@@ -61,7 +70,7 @@ export default function Page() {
         </main>
       }
     >
-      <Home />
+      <Home searchParams={props.searchParams} />
     </Suspense>
   );
 }

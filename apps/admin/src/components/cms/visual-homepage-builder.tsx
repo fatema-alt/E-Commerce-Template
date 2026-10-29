@@ -501,24 +501,70 @@ export function VisualHomepageBuilder({
                           </div>
                         )
                       ) : section.type === "categoryGrid" ? (
-                        <div className="p-5 rounded-xl bg-white border border-slate-200">
-                          <h3 className="text-base font-bold text-slate-900 mb-3">
-                            {String(c.title || "Shop by Department")}
-                          </h3>
-                          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
-                            {["Electronics", "Fashion", "Home & Living", "Beauty", "Groceries", "Deals"].map(
-                              (dept, i) => (
-                                <div
-                                  key={i}
-                                  className="aspect-square rounded-lg bg-slate-100 border border-slate-200 flex flex-col items-center justify-center p-2 text-center"
-                                >
-                                  <span className="text-lg">🛍️</span>
-                                  <span className="text-[10px] font-semibold text-slate-700 mt-1 truncate w-full">
-                                    {dept}
-                                  </span>
+                        <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <h3 className="text-base font-bold text-slate-900">
+                                {String(c.title || "Shop by Department")}
+                              </h3>
+                              <p className="text-[11px] text-slate-500">Bento grid layout with automatic odd-tile mobile balance</p>
+                            </div>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                              Bento Grid
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-6 gap-2">
+                            <div className="col-span-4 rounded-lg bg-slate-900 text-white p-3 flex flex-col justify-between min-h-[90px] relative overflow-hidden">
+                              <div className="flex items-center justify-between text-[10px] text-slate-300">
+                                <span className="bg-white/20 px-1.5 py-0.5 rounded-full font-medium">12 items</span>
+                                <span className="text-lime-300 font-bold">↗</span>
+                              </div>
+                              <span className="font-bold text-xs text-white">Electronics (Lead)</span>
+                            </div>
+                            <div className="col-span-2 rounded-lg bg-slate-100 border border-slate-200 p-2.5 flex flex-col justify-between">
+                              <span className="text-right text-[10px] text-slate-400 font-bold">↗</span>
+                              <span className="font-semibold text-[11px] text-slate-800">Fashion</span>
+                            </div>
+                            <div className="col-span-2 rounded-lg bg-slate-100 border border-slate-200 p-2 flex flex-col justify-between">
+                              <span className="text-right text-[10px] text-slate-400 font-bold">↗</span>
+                              <span className="font-medium text-[10px] text-slate-700">Home & Living</span>
+                            </div>
+                            <div className="col-span-2 rounded-lg bg-slate-100 border border-slate-200 p-2 flex flex-col justify-between">
+                              <span className="text-right text-[10px] text-slate-400 font-bold">↗</span>
+                              <span className="font-medium text-[10px] text-slate-700">Beauty</span>
+                            </div>
+                            <div className="col-span-2 rounded-lg bg-slate-100 border border-slate-200 p-2 flex flex-col justify-between">
+                              <span className="text-right text-[10px] text-slate-400 font-bold">↗</span>
+                              <span className="font-medium text-[10px] text-slate-700">Groceries</span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : section.type === "productGrid" || section.type === "productCarousel" ? (
+                        <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <h3 className="text-base font-bold text-slate-900">
+                                {String(c.title || (section.type === "productCarousel" ? "Featured Products Carousel" : "Product Grid"))}
+                              </h3>
+                              <p className="text-[11px] text-slate-500">
+                                {section.type === "productCarousel" ? "Horizontal carousel layout" : "Product grid layout"}
+                              </p>
+                            </div>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                              {section.type === "productCarousel" ? "Carousel" : "Fixed Grid"}
+                            </span>
+                          </div>
+                          <div className={section.type === "productCarousel" ? "flex gap-2.5 overflow-x-auto pb-2" : "grid grid-cols-2 sm:grid-cols-4 gap-2.5"}>
+                            {[1, 2, 3, 4].map((n) => (
+                              <div key={n} className={`rounded-lg bg-slate-50 border border-slate-200 p-2.5 ${section.type === "productCarousel" ? "min-w-[130px] flex-shrink-0" : ""}`}>
+                                <div className="aspect-square rounded bg-slate-200/70 mb-2 flex items-center justify-center text-slate-400 text-xs">
+                                  🖼️
                                 </div>
-                              ),
-                            )}
+                                <span className="text-[10px] text-slate-400 font-bold uppercase block">DS Mart</span>
+                                <span className="text-[11px] font-semibold text-slate-800 block truncate">Product Name #{n}</span>
+                                <span className="text-xs font-bold text-slate-900 mt-1 block">৳2,490</span>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       ) : section.type === "flashSale" ? (

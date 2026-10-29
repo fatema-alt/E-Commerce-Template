@@ -174,14 +174,20 @@ export function assetSource(assets: Asset[], id?: string) {
 export async function sectionProducts(
   config: Record<string, unknown>,
 ): Promise<Product[]> {
+  const curatedIds = Array.isArray(config.productIds) ? (config.productIds as string[]) : [];
+  const hasCuratedIds = curatedIds.length > 0;
+  const requestedLimit = Number(config.limit);
+  const count = hasCuratedIds
+    ? Math.max(curatedIds.length, isNaN(requestedLimit) || requestedLimit <= 0 ? curatedIds.length : requestedLimit)
+    : (isNaN(requestedLimit) || requestedLimit <= 0 ? 12 : requestedLimit);
   const query = new URLSearchParams({
-    pageSize: String(Math.min(100, Math.max(1, Number(config.limit) || 12))),
-    source: String(config.source || "latest"),
+    pageSize: String(Math.min(100, Math.max(1, count))),
+    source: hasCuratedIds ? "selected" : String(config.source || "latest"),
   });
-  if (typeof config.categoryId === "string")
+  if (typeof config.categoryId === "string" && config.categoryId)
     query.set("categoryId", config.categoryId);
-  if (Array.isArray(config.productIds))
-    query.set("ids", config.productIds.join(","));
+  if (hasCuratedIds)
+    query.set("ids", curatedIds.join(","));
   const response = await fetch(`${base}/storefront/products?${query}`, {
     cache: "no-store",
     signal: AbortSignal.timeout(8000),
