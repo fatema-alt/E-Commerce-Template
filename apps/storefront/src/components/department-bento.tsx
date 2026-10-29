@@ -293,14 +293,10 @@ export function DepartmentBento({
                 </>
               )}
 
-              {/* Top metadata strip: item count badge (only when real data exists) & arrow */}
+              {/* Top metadata strip: item count badge (only when real data exists and card has image) & arrow */}
               <div className="bento-top-bar">
-                {typeof cat.productCount === "number" && cat.productCount > 0 ? (
-                  <span
-                    className={`bento-count-badge ${
-                      hasImage ? "bento-badge-image" : "bento-badge-typo"
-                    }`}
-                  >
+                {hasImage && typeof cat.productCount === "number" && cat.productCount > 0 ? (
+                  <span className="bento-count-badge bento-badge-image">
                     {cat.productCount} {cat.productCount === 1 ? "item" : "items"}
                   </span>
                 ) : (
@@ -317,7 +313,7 @@ export function DepartmentBento({
                 </div>
               </div>
 
-              {/* Bottom content: category title and explore link */}
+              {/* Bottom content: category title and optional explore link for image cards */}
               <div className="bento-content">
                 <h3
                   className={`bento-title ${
@@ -326,14 +322,12 @@ export function DepartmentBento({
                 >
                   {cat.name}
                 </h3>
-                <span
-                  className={`bento-explore ${
-                    hasImage ? "bento-explore-image" : "bento-explore-typo"
-                  }`}
-                >
-                  <span>Explore department</span>
-                  <span aria-hidden="true">→</span>
-                </span>
+                {hasImage && (
+                  <span className="bento-explore bento-explore-image">
+                    <span>Explore department</span>
+                    <span aria-hidden="true">→</span>
+                  </span>
+                )}
               </div>
             </Link>
           );

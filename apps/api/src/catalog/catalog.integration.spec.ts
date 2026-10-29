@@ -5,6 +5,7 @@ import { ProductVariantsService } from '../products/variants/product-variants.se
 import { CategoriesService } from '../categories/categories.service.js';
 import { VariantStockAdjustmentType } from '../products/variants/dto/adjust-variant-stock.dto.js';
 import { CatalogQueryDto } from './catalog-query.dto.js';
+import { StorefrontQueryDto } from './storefront-query.dto.js';
 import { StorefrontController } from './storefront.controller.js';
 import { AuthService } from '../auth/auth.service.js';
 
@@ -333,6 +334,94 @@ describe.skipIf(!process.env.CATALOG_TEST_DATABASE_URL)(
           },
         }),
       ).toBeNull();
+    });
+
+    it('accurately counts active visible products across parent and child categories, excluding soft-deleted, inactive, and hidden products', async () => {
+      const publicCatalog = new StorefrontController(db as never);
+      const testSuffix = randomUUID().slice(0, 8);
+
+      // 1. Create parent and child categories
+      const parentCat = (await categories.create({
+        name: 'Parent Category ' + testSuffix,
+        slug: 'parent-' + testSuffix,
+      }))!;
+      const childCat = (await categories.create({
+        name: 'Child Category ' + testSuffix,
+        slug: 'child-' + testSuffix,
+        parentId: parentCat.id,
+      }))!;
+
+      // 2. In child category: create 1 active visible product
+      await products.create({
+        name: 'Active Child Product ' + testSuffix,
+        slug: 'active-child-' + testSuffix,
+        sku: 'ACT-C-' + testSuffix,
+        categoryId: childCat.id,
+        price: '49.99',
+        stock: 5,
+        status: 'ACTIVE',
+        isActive: true,
+        isVisible: true,
+      });
+
+      // 3. In child category: create 1 soft-deleted product
+      const softDeleted = await products.create({
+        name: 'Soft Deleted Product ' + testSuffix,
+        slug: 'deleted-child-' + testSuffix,
+        sku: 'DEL-C-' + testSuffix,
+        categoryId: childCat.id,
+        price: '29.99',
+        stock: 5,
+        status: 'ACTIVE',
+        isActive: true,
+        isVisible: true,
+      });
+      await db.product.update({
+        where: { id: softDeleted!.id },
+        data: { deletedAt: new Date() },
+      });
+
+      // 4. In parent category: create 1 inactive product
+      await products.create({
+        name: 'Inactive Parent Product ' + testSuffix,
+        slug: 'inactive-parent-' + testSuffix,
+        sku: 'INACT-P-' + testSuffix,
+        categoryId: parentCat.id,
+        price: '19.99',
+        stock: 5,
+        status: 'DRAFT',
+        isActive: false,
+        isVisible: true,
+      });
+
+      // 5. In parent category: create 1 hidden product
+      await products.create({
+        name: 'Hidden Parent Product ' + testSuffix,
+        slug: 'hidden-parent-' + testSuffix,
+        sku: 'HIDDEN-P-' + testSuffix,
+        categoryId: parentCat.id,
+        price: '39.99',
+        stock: 5,
+        status: 'ACTIVE',
+        isActive: true,
+        isVisible: false,
+      });
+
+      // 6. Query categories with includeCounts = true
+      const query = new StorefrontQueryDto();
+      query.includeCounts = true;
+      query.ids = parentCat.id;
+
+      const result = (await publicCatalog.categories(query)) as Array<{
+        id: string;
+        name: string;
+        productCount?: number;
+      }>;
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(parentCat.id);
+      // Parent must count ONLY the 1 active visible product in its descendant tree
+      expect(result[0].productCount).toBe(1);
     });
   },
 );
