@@ -41,7 +41,7 @@ async function Home() {
       </main>
     );
   const [categories, products] = await Promise.all([
-    getCategories(),
+    getCategories(undefined, { includeCounts: true }),
     getFeaturedProducts(),
   ]);
   return (

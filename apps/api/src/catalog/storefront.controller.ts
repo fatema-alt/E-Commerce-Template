@@ -256,8 +256,45 @@ export class StorefrontController {
 
   @Get('categories')
   categories(@Query() query: StorefrontQueryDto) {
+    if (!query.includeCounts) {
+      return this.prisma.$queryRaw(
+        Prisma.sql`WITH RECURSIVE visible AS (SELECT id, name, slug, "parentId", "imageUrl", "sortOrder" FROM categories WHERE "parentId" IS NULL AND "isActive" AND "isVisible" UNION ALL SELECT c.id, c.name, c.slug, c."parentId", c."imageUrl", c."sortOrder" FROM categories c JOIN visible v ON c."parentId" = v.id WHERE c."isActive" AND c."isVisible") SELECT * FROM visible ${query.ids ? Prisma.sql`WHERE id IN (${Prisma.join(query.ids.split(','))})` : Prisma.empty} ORDER BY "sortOrder", id LIMIT ${query.pageSize} OFFSET ${(query.page - 1) * query.pageSize}`,
+      );
+    }
+
     return this.prisma.$queryRaw(
-      Prisma.sql`WITH RECURSIVE visible AS (SELECT id, name, slug, "parentId", "imageUrl", "sortOrder" FROM categories WHERE "parentId" IS NULL AND "isActive" AND "isVisible" UNION ALL SELECT c.id, c.name, c.slug, c."parentId", c."imageUrl", c."sortOrder" FROM categories c JOIN visible v ON c."parentId" = v.id WHERE c."isActive" AND c."isVisible") SELECT * FROM visible ${query.ids ? Prisma.sql`WHERE id IN (${Prisma.join(query.ids.split(','))})` : Prisma.empty} ORDER BY "sortOrder", id LIMIT ${query.pageSize} OFFSET ${(query.page - 1) * query.pageSize}`,
+      Prisma.sql`WITH RECURSIVE visible AS (
+        SELECT id, name, slug, "parentId", "imageUrl", "sortOrder"
+        FROM categories
+        WHERE "parentId" IS NULL AND "isActive" AND "isVisible"
+        UNION ALL
+        SELECT c.id, c.name, c.slug, c."parentId", c."imageUrl", c."sortOrder"
+        FROM categories c
+        JOIN visible v ON c."parentId" = v.id
+        WHERE c."isActive" AND c."isVisible"
+      ),
+      cat_tree AS (
+        SELECT id, id AS root_id
+        FROM visible
+        UNION ALL
+        SELECT c.id, t.root_id
+        FROM categories c
+        JOIN cat_tree t ON c."parentId" = t.id
+        WHERE c."isActive" AND c."isVisible"
+      ),
+      counts AS (
+        SELECT t.root_id AS id, COUNT(DISTINCT p.id)::int AS "productCount"
+        FROM cat_tree t
+        JOIN products p ON p."categoryId" = t.id
+        WHERE p."deletedAt" IS NULL AND p.status = 'ACTIVE' AND p."isActive" AND p."isVisible"
+        GROUP BY t.root_id
+      )
+      SELECT v.*, COALESCE(counts."productCount", 0)::int AS "productCount"
+      FROM visible v
+      LEFT JOIN counts ON v.id = counts.id
+      ${query.ids ? Prisma.sql`WHERE v.id IN (${Prisma.join(query.ids.split(','))})` : Prisma.empty}
+      ORDER BY v."sortOrder", v.id
+      LIMIT ${query.pageSize} OFFSET ${(query.page - 1) * query.pageSize}`,
     );
   }
 

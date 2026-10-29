@@ -15,7 +15,7 @@ import { BannerSlider, SaleCountdown } from "./cms-interactive";
 import { Newsletter } from './newsletter';
 import { BrandArtwork } from "./brand-artwork";
 import { HeroBanner } from "./hero-banner";
-import { DepartmentGrid } from "./department-grid";
+import { DepartmentBento } from "./department-bento";
 import { RecentlyViewedSection } from "./recently-viewed";
 import { CustomerReviewsSection } from "./customer-reviews-section";
 function Picture({ image, assets }: { image?: Image; assets: Asset[] }) {
@@ -126,8 +126,8 @@ async function Block({
   if (section.type === "categoryGrid") {
     const rawCategoryIds = Array.isArray(c.categoryIds) ? (c.categoryIds as string[]) : [];
     const [all, configured] = await Promise.all([
-      getCategories(),
-      rawCategoryIds.length ? getCategories(rawCategoryIds) : Promise.resolve([]),
+      getCategories(undefined, { includeCounts: true }),
+      rawCategoryIds.length ? getCategories(rawCategoryIds, { includeCounts: true }) : Promise.resolve([]),
     ]);
     const selected =
       rawCategoryIds.length > 0
@@ -135,7 +135,13 @@ async function Block({
             .map((id) => configured.find((category) => category.id === id))
             .filter((category): category is (typeof all)[number] => category !== undefined)
         : all;
-    return <DepartmentGrid categories={selected} hasMore={all.length > 6} title={typeof c.title === "string" && c.title.trim() ? c.title : undefined} />;
+    return (
+      <DepartmentBento
+        categories={selected}
+        hasMore={all.length > selected.length}
+        title={typeof c.title === "string" && c.title.trim() ? c.title : undefined}
+      />
+    );
   }
   if (
     section.type === "featuredCollections" ||

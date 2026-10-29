@@ -1,4 +1,4 @@
-import { DepartmentGrid } from "./department-grid";
+import { DepartmentBento } from "./department-bento";
 import Link from "next/link";
 import type { Category, ContentBlock, Product } from "../lib/storefront";
 import { Newsletter } from "./newsletter";
@@ -30,7 +30,7 @@ export function HomeSections({
               className="section department-home-section"
               aria-label={block.title}
             >
-              <DepartmentGrid categories={categories} title={block.title} />
+              <DepartmentBento categories={categories} title={block.title} />
             </section>
           );
         }
