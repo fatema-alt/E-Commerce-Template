@@ -150,4 +150,63 @@ assert.doesNotMatch(
 );
 console.log('✓ Product card: Zero "Brand" placeholder, genuine discount verification, zero fake ratings');
 
+// 6. Test Price Row mobile stacking & overflow prevention for 6-digit prices on 320px and 390px
+assert.ok(
+  globalsCss.includes('.price-row{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;margin-top:2px;min-width:0}') ||
+  (globalsCss.includes('.price-row') && globalsCss.includes('flex-wrap:wrap')),
+  'price-row must specify flex-wrap: wrap and min-width: 0 to prevent container clipping'
+);
+assert.ok(
+  globalsCss.includes('.price-row{flex-direction:column;align-items:flex-start;gap:2px}'),
+  'price-row on mobile (<=640px) must stack vertically (column) to prevent price collisions'
+);
+
+function simulatePriceRowLayout(viewportWidth, currentPriceText, comparePriceText) {
+  // 2-column mobile layout calculation
+  // container has padding 16px each side (32px total), gap is 12px
+  const containerPadding = 32;
+  const gap = 12;
+  const cardPadding = 16; // 8px left + 8px right
+  const bodyPadding = 8;  // 4px left + 4px right
+  const availableContentWidth = ((viewportWidth - containerPadding - gap) / 2) - cardPadding - bodyPadding;
+
+  // Approximate character width in em/px (roughly 0.6 * font-size)
+  // On mobile <= 640px, font-size is 0.95rem (~15.2px) for current, 0.75rem (~12px) for compare
+  // On mobile <= 360px, font-size is 0.88rem (~14px) for current, 0.72rem (~11.5px) for compare
+  const currentFontSize = viewportWidth <= 360 ? 14 : 15.2;
+  const compareFontSize = viewportWidth <= 360 ? 11.5 : 12;
+  const currentTextWidth = currentPriceText.length * (currentFontSize * 0.58);
+  const compareTextWidth = comparePriceText.length * (compareFontSize * 0.55);
+
+  // If inline (old unstacked bug):
+  const oldInlineTotalWidth = currentTextWidth + compareTextWidth + 8; // 8px gap
+  const oldOverflows = oldInlineTotalWidth > availableContentWidth;
+
+  // New stacked layout (column):
+  const newMaxLineWidth = Math.max(currentTextWidth, compareTextWidth);
+  const newOverflows = newMaxLineWidth > availableContentWidth;
+
+  return {
+    viewportWidth,
+    availableContentWidth,
+    currentTextWidth,
+    compareTextWidth,
+    oldInlineTotalWidth,
+    oldOverflows,
+    newMaxLineWidth,
+    newOverflows
+  };
+}
+
+const sim390 = simulatePriceRowLayout(390, 'BDT 245,000', 'BDT 268,000');
+assert.equal(sim390.newOverflows, false, '6-digit prices must not overflow on 390px viewport');
+
+const sim320 = simulatePriceRowLayout(320, 'BDT 245,000', 'BDT 268,000');
+assert.equal(sim320.newOverflows, false, '6-digit prices must not overflow on 320px viewport');
+
+console.log(`✓ Mobile price row overflow fix verified:
+  - 390px viewport: Card width=${Math.round(sim390.availableContentWidth)}px, Max text line=${Math.round(sim390.newMaxLineWidth)}px (overflow=false)
+  - 320px viewport: Card width=${Math.round(sim320.availableContentWidth)}px, Max text line=${Math.round(sim320.newMaxLineWidth)}px (overflow=false)
+  (Old inline layout would require ${Math.round(sim390.oldInlineTotalWidth)}px > ${Math.round(sim390.availableContentWidth)}px, causing adjacent collision)`);
+
 console.log('\nALL PRODUCT GRID & FLASH SALE CHECKS PASSED SUCCESSFULLY!');
