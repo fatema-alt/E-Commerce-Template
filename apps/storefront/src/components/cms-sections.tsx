@@ -87,17 +87,24 @@ async function Block({
     );
   if (["productGrid", "productCarousel", "flashSale"].includes(section.type)) {
     // Server rendering intentionally evaluates expiry once for this request.
+    const endsAtStr = typeof c.endsAt === "string" ? c.endsAt.trim() : "";
+    const endsAtTime = endsAtStr ? new Date(endsAtStr).getTime() : NaN;
+    const hasValidDeadline = !isNaN(endsAtTime);
     const expired =
       section.type === "flashSale" &&
-      // eslint-disable-next-line react-hooks/purity
-      new Date(String(c.endsAt)).getTime() <= Date.now();
-    const products = expired ? [] : await sectionProducts(c);
+      (hasValidDeadline ? endsAtTime <= Date.now() : true);
+    // When a flash sale has no valid deadline or has expired, completely hide the entire section on the storefront.
+    if (section.type === "flashSale" && (!hasValidDeadline || expired)) {
+      return null;
+    }
+    const products = await sectionProducts(c);
+    const cols = Number(c.columns || 4);
     return (
       <>
         <div className="section-head">
           {title}
-          {section.type === "flashSale" && (
-            <SaleCountdown endsAt={String(c.endsAt)} />
+          {section.type === "flashSale" && hasValidDeadline && !expired && (
+            <SaleCountdown endsAt={endsAtStr} />
           )}
         </div>
         {products.length ? (
@@ -107,7 +114,8 @@ async function Block({
                 ? "cms-carousel"
                 : "products-grid cms-grid"
             }
-            style={{ "--columns": Number(c.columns || 4) } as CSSProperties}
+            data-columns={cols}
+            style={{ "--columns": cols } as CSSProperties}
           >
             {products.map((product) => (
               <ProductCard key={product.id} product={product} />

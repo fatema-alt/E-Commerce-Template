@@ -193,7 +193,7 @@ export function ProductCard({
 
         {/* Floating Badges (Top-Left) */}
         <div className="product-card-badges">
-          {hasDiscount && (
+          {hasDiscount && discountPercent > 0 && (
             <span className="card-badge badge-sale">
               -{discountPercent}%
             </span>
@@ -261,9 +261,7 @@ export function ProductCard({
       <div className="product-body">
         {product.brand ? (
           <span className="product-brand">{product.brand}</span>
-        ) : (
-          <span className="product-brand text-transparent select-none">Brand</span>
-        )}
+        ) : null}
 
         <Link
           className="product-name"
@@ -276,7 +274,7 @@ export function ProductCard({
         {/* Price Row */}
         <div className="price-row">
           <strong className="current-price">{money.format(product.price)}</strong>
-          {hasDiscount && (
+          {hasDiscount && discountPercent > 0 && (
             <del className="compare-price">{money.format(product.compareAtPrice!)}</del>
           )}
         </div>
