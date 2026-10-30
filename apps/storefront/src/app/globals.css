@@ -223,10 +223,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
 /* CMS hero: modern spotlight slider with segmented progress bars & presets */
 .ds-hero-shell{border:1px solid var(--c-line);border-radius:24px;overflow:hidden;box-shadow:var(--shadow);background:var(--glass-solid);position:relative}
 .ds-hero-stage{display:grid;isolation:isolate;touch-action:pan-y}
-.ds-hero-slide{grid-area:1/1;min-width:0;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .4s ease,visibility .4s;overflow:hidden;position:relative}
-.ds-hero-slide:first-child{opacity:1;visibility:visible;pointer-events:auto;z-index:1}
-.ds-hero-stage[data-active="true"] .ds-hero-slide:first-child:not(.is-active){opacity:0;visibility:hidden;pointer-events:none;z-index:0}
-.ds-hero-slide.is-active{opacity:1;visibility:visible;pointer-events:auto;z-index:2}
+.ds-hero-slide{grid-area:1/1;min-width:0;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(6px);transition:opacity 380ms cubic-bezier(0.16,1,0.3,1),transform 380ms cubic-bezier(0.16,1,0.3,1),visibility 380ms;overflow:hidden;position:relative}
+.ds-hero-slide:first-child{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0);z-index:1}
+.ds-hero-stage[data-active="true"] .ds-hero-slide:first-child:not(.is-active){opacity:0;visibility:hidden;pointer-events:none;transform:translateY(6px);z-index:0}
+.ds-hero-slide.is-active{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0);z-index:2}
 
 /* Theme Presets */
 .ds-hero-slide.theme-dark{background-color:#0f172a;color:#f8fafc}
@@ -309,9 +309,15 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .ds-hero-arrow-btn:hover,.ds-hero-pause-btn:hover{background:var(--lime);color:var(--lime-ink);border-color:var(--lime)}
 
 .hero-banner-ecosystem:focus-visible,.ds-hero-shell a:focus-visible,.ds-hero-controls button:focus-visible{outline:3px solid #38bdf8;outline-offset:2px}
+.ds-hero-shell[data-active-type="full_banner"] .ds-hero-controls{position:absolute;bottom:0;left:0;right:0;background:rgba(15,23,42,0.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-top:1px solid rgba(255,255,255,0.15);color:#ffffff;z-index:10}
+.ds-hero-shell[data-active-type="full_banner"] .ds-hero-counter{color:#ffffff}
+.ds-hero-shell[data-active-type="full_banner"] .ds-hero-arrow-btn,.ds-hero-shell[data-active-type="full_banner"] .ds-hero-pause-btn{background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);color:#ffffff}
+.ds-hero-shell[data-active-type="full_banner"] .ds-hero-arrow-btn:hover,.ds-hero-shell[data-active-type="full_banner"] .ds-hero-pause-btn:hover{background:var(--lime);color:#0f172a;border-color:var(--lime)}
+.ds-hero-shell[data-active-type="full_banner"] .ds-hero-progress-bar{background:rgba(255,255,255,0.3)}
+
 
 @media(prefers-reduced-motion:reduce){
-  .ds-hero-slide{transition:none !important}
+  .ds-hero-slide{transition:none !important;transform:none !important}
   .ds-hero-progress-fill{animation:none !important;width:100% !important}
 }
 
@@ -333,6 +339,16 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .ds-hero-controls{padding:10px 16px;gap:10px}
   .ds-hero-progress-group{max-width:none}
   .ds-hero-arrow-btn,.ds-hero-pause-btn{width:36px;height:36px;font-size:.85rem}
+}
+@media(max-width:360px){
+  .ds-hero-shell{border-radius:14px}
+  .ds-hero-copy{padding:18px 14px}
+  .ds-hero-copy h2{font-size:1.35rem;line-height:1.2}
+  .ds-hero-copy p{font-size:0.85rem;line-height:1.4}
+  .ds-hero-controls{padding:8px 12px;gap:8px}
+  .ds-hero-counter{font-size:0.75rem}
+  .ds-hero-arrow-btn,.ds-hero-pause-btn{width:32px;height:32px;font-size:0.8rem}
+  .ds-hero-split-image{min-height:180px;height:190px}
 }
 
 /* sections */

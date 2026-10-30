@@ -26,17 +26,56 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
         padding: 4,
       },
       config: {
-        bannerType: "with_button",
         showTrustStrip: false,
-        title: "Shop Smart. Live Smart.",
-        subtitle:
-          "Explore the catalogue and check available payment and delivery options at checkout.",
-        button: {
-          label: "Start Shopping ↗",
-          href: "/shop",
-        },
-        bannerLink: "/shop",
-        align: "left",
+        intervalSeconds: 5,
+        showArrows: true,
+        showProgress: true,
+        pauseOnHover: true,
+        slides: [
+          {
+            slideType: "split_content",
+            enabled: true,
+            title: "Smart Studio and Creator Gear",
+            subtitle: "Explore camera equipment, lighting, and audio accessories.",
+            badge: "Electronics",
+            themePreset: "dark",
+            imageBackdrop: "circle",
+            button: {
+              label: "View products",
+              href: "/category/electronics",
+            },
+            secondaryButton: {
+              label: "Catalogue guide",
+              href: "/help",
+            },
+          },
+          {
+            slideType: "split_content",
+            enabled: true,
+            title: "Modern Living and Workplace Essentials",
+            subtitle: "Curated items for productivity, commute, and home.",
+            badge: "Lifestyle",
+            themePreset: "lime",
+            imageBackdrop: "lime_ring",
+            button: {
+              label: "Explore collection",
+              href: "/shop",
+            },
+          },
+          {
+            slideType: "split_content",
+            enabled: true,
+            title: "Wireless Audio and Studio Acoustics",
+            subtitle: "Audio peripherals and monitoring headphones.",
+            badge: "Audio",
+            themePreset: "light",
+            imageBackdrop: "circle",
+            button: {
+              label: "Check products",
+              href: "/category/audio",
+            },
+          },
+        ],
       },
     },
     {

@@ -140,7 +140,7 @@ export function HeroBanner({ config, assets = [], block }: {
         if (event.key === "Home") { event.preventDefault(); setActive(0); }
         if (event.key === "End") { event.preventDefault(); setActive(count - 1); }
       }}>
-      <div className="ds-hero-shell">
+      <div className="ds-hero-shell" data-active-type={slides[current]?.type}>
         <div className="ds-hero-stage"
           data-active={current !== 0 ? "true" : undefined}
           onTouchStart={(event) => { touchStart.current = event.changedTouches[0].clientX; }}
