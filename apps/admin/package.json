@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:editor": "node scripts/verify-product-editor.mjs",
-    "test:engagement": "node scripts/verify-engagement.mjs"
+    "test:engagement": "node scripts/verify-engagement.mjs",
+    "test:hero": "node scripts/verify-hero-builder.mjs"
   },
   "dependencies": {
     "@commerce/product-content": "workspace:*",

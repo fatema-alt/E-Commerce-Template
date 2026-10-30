@@ -2,6 +2,9 @@
   "description": "Editable banned claims for store-authored UI/default copy. Dynamic catalogue/CMS content is reviewed separately. Regex patterns are case insensitive.",
   "files": [
     "apps/admin/src/components/cms/standard-template.ts",
+    "apps/admin/src/components/cms/visual-homepage-builder.tsx",
+    "apps/admin/src/components/cms/hero-inspector.tsx",
+    "apps/admin/src/components/cms/hero-preview.tsx",
     "apps/storefront/src/lib/storefront.ts",
     "apps/storefront/src/components/hero-banner.tsx",
     "apps/storefront/src/components/newsletter.tsx",
@@ -15,21 +18,109 @@
     "apps/storefront/src/app/help/page.tsx"
   ],
   "duplicatePhrases": [
-    "Product information", "Review product details before ordering.",
-    "Contact our team", "Ask about products or an existing order."
+    "Product information",
+    "Review product details before ordering.",
+    "Contact our team",
+    "Ask about products or an existing order."
   ],
   "maxVisibleOccurrencesPerPage": 1,
   "rules": [
-    { "name": "Authenticity guarantees", "pattern": "100\\s*%\\s*(?:authentic|genuine)|authentic guarantee", "examples": ["100% authentic", "100% genuine"] },
-    { "name": "Distributor and warranty guarantees", "pattern": "authori[sz]ed\\s+(?:brand\\s+)?distributors?|full\\s+warranty", "examples": ["authorized distributor", "authorized brand distributors", "full warranty"] },
-    { "name": "Unconfirmed service promises", "pattern": "24\\s*/\\s*7|hassle[\\s-]*free|lightning[\\s-]*fast", "examples": ["24/7", "hassle-free", "lightning-fast"] },
-    { "name": "Nationwide claims", "pattern": "anywhere\\s+(?:(?:in|across)\\s+)?Bangladesh|all\\s+across\\s+Bangladesh|nationwide", "examples": ["anywhere in Bangladesh", "anywhere across Bangladesh", "nationwide"] },
-    { "name": "Hardcoded delivery or returns times", "pattern": "\\b\\d+\\s*(?:[-–]|to)\\s*\\d+\\s*(?:hours?|h|days?)\\b|\\b\\d+[\\s-]*(?:day|hour)s?\\b", "examples": ["24 to 48 hours", "24-48h delivery", "7-Day Returns", "within 14 days"] },
-    { "name": "Unsupported rankings", "pattern": "\\bbest\\s+sellers\\b|\\btop\\s+sellers\\b", "examples": ["Best Sellers", "top sellers"] },
-    { "name": "Parcel inspection", "pattern": "parcel\\s+inspection|inspect(?:ion)?\\s+(?:the\\s+parcel|before\\s+paying)|pay\\s+upon\\s+parcel\\s+inspection", "examples": ["parcel inspection", "inspect before paying"] },
-    { "name": "Cashback and EMI", "pattern": "cashback|\\bEMI\\b", "examples": ["bKash cashback", "0% EMI"] },
-    { "name": "Hardcoded money", "pattern": "৳\\s*[0-9]|\\b(?:BDT|Tk\\.?)\\s*[0-9]|[0-9][0-9,.]*\\s*(?:BDT|taka)\\b", "examples": ["Delivery ৳80", "Free delivery above BDT 2000", "Delivery 80 taka"] },
-    { "name": "Hardcoded delivery amounts without currency", "pattern": "\\b(?:free[\\s-]+delivery|free[\\s-]+shipping|delivery|shipping)\\b[^.!?\\n]{0,80}\\b[0-9][0-9,]*\\b", "examples": ["Free delivery over 2000", "Free-delivery threshold 2500", "Delivery fee: 80", "Shipping: 150"] },
-    { "name": "Invented campaigns and discounts", "pattern": "\\d+(?:[.,]\\d+)?\\s*%|exclusive\\s+(?:member|voucher)|weekly\\s+(?:newsletter|sales)|secret\\s+weekend|limited\\s+time\\s+flash|\\b(?:full|quick)\\s+refunds?\\b", "examples": ["60% OFF", "EXCLUSIVE MEMBER OFFERS", "quick refunds"] }
+    {
+      "name": "Authenticity guarantees",
+      "pattern": "100\\s*%\\s*(?:authentic|genuine)|authentic guarantee",
+      "examples": [
+        "100% authentic",
+        "100% genuine"
+      ]
+    },
+    {
+      "name": "Distributor and warranty guarantees",
+      "pattern": "authori[sz]ed\\s+(?:brand\\s+)?distributors?|full\\s+warranty",
+      "examples": [
+        "authorized distributor",
+        "authorized brand distributors",
+        "full warranty"
+      ]
+    },
+    {
+      "name": "Unconfirmed service promises",
+      "pattern": "24\\s*/\\s*7|hassle[\\s-]*free|lightning[\\s-]*fast",
+      "examples": [
+        "24/7",
+        "hassle-free",
+        "lightning-fast"
+      ]
+    },
+    {
+      "name": "Nationwide claims",
+      "pattern": "anywhere\\s+(?:(?:in|across)\\s+)?Bangladesh|all\\s+across\\s+Bangladesh|nationwide",
+      "examples": [
+        "anywhere in Bangladesh",
+        "anywhere across Bangladesh",
+        "nationwide"
+      ]
+    },
+    {
+      "name": "Hardcoded delivery or returns times",
+      "pattern": "\\b\\d+\\s*(?:[-–]|to)\\s*\\d+\\s*(?:hours?|h|days?)\\b|\\b\\d+[\\s-]*(?:day|hour)s?\\b",
+      "examples": [
+        "24 to 48 hours",
+        "24-48h delivery",
+        "7-Day Returns",
+        "within 14 days"
+      ]
+    },
+    {
+      "name": "Unsupported rankings",
+      "pattern": "\\bbest\\s+sellers\\b|\\btop\\s+sellers\\b",
+      "examples": [
+        "Best Sellers",
+        "top sellers"
+      ]
+    },
+    {
+      "name": "Parcel inspection",
+      "pattern": "parcel\\s+inspection|inspect(?:ion)?\\s+(?:the\\s+parcel|before\\s+paying)|pay\\s+upon\\s+parcel\\s+inspection",
+      "examples": [
+        "parcel inspection",
+        "inspect before paying"
+      ]
+    },
+    {
+      "name": "Cashback and EMI",
+      "pattern": "cashback|\\bEMI\\b",
+      "examples": [
+        "bKash cashback",
+        "0% EMI"
+      ]
+    },
+    {
+      "name": "Hardcoded money",
+      "pattern": "৳\\s*[0-9]|\\b(?:BDT|Tk\\.?)\\s*[0-9]|[0-9][0-9,.]*\\s*(?:BDT|taka)\\b",
+      "examples": [
+        "Delivery ৳80",
+        "Free delivery above BDT 2000",
+        "Delivery 80 taka"
+      ]
+    },
+    {
+      "name": "Hardcoded delivery amounts without currency",
+      "pattern": "\\b(?:free[\\s-]+delivery|free[\\s-]+shipping|delivery|shipping)\\b[^.!?\\n]{0,80}\\b[0-9][0-9,]*\\b",
+      "examples": [
+        "Free delivery over 2000",
+        "Free-delivery threshold 2500",
+        "Delivery fee: 80",
+        "Shipping: 150"
+      ]
+    },
+    {
+      "name": "Invented campaigns and discounts",
+      "pattern": "\\d+(?:[.,]\\d+)?\\s*%|exclusive\\s+(?:member|voucher)|weekly\\s+(?:newsletter|sales)|secret\\s+weekend|limited\\s+time\\s+flash|\\b(?:full|quick)\\s+refunds?\\b",
+      "examples": [
+        "60% OFF",
+        "EXCLUSIVE MEMBER OFFERS",
+        "quick refunds"
+      ]
+    }
   ]
 }
