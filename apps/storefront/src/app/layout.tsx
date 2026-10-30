@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense, type CSSProperties, type ReactNode } from "react";
-import { Hanken_Grotesk } from "next/font/google";
+import { Hanken_Grotesk, Hind_Siliguri } from "next/font/google";
 import { getCmsConfig, type CmsConfig } from "../lib/cms";
 import { fallbackConfig } from "../lib/storefront";
 import { unstable_rethrow } from "next/navigation";
@@ -22,6 +22,12 @@ export const metadata: Metadata = {
 };
 
 const hanken = Hanken_Grotesk({ subsets: ["latin"], variable: "--font-hanken", display: "swap" });
+const hindSiliguri = Hind_Siliguri({
+  weight: ["400", "500", "600", "700"],
+  subsets: ["bengali", "latin"],
+  variable: "--font-hind",
+  display: "swap",
+});
 const fonts: Record<string, string> = {
   system: "system-ui, sans-serif",
   sans: "Arial, sans-serif",
@@ -79,7 +85,7 @@ async function StoreFrame({ children }: { children: ReactNode }) {
 }
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={hanken.variable} data-scroll-behavior="smooth" suppressHydrationWarning>
+    <html lang="en" className={`${hanken.variable} ${hindSiliguri.variable}`} data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

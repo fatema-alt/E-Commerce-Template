@@ -24,6 +24,125 @@ describe('CMS content validation', () => {
     } }] };
     expect(validateCmsContent('PAGE', content)).toEqual(content);
   });
+  it('accepts modern hero spotlight options (themePreset, customTheme, imageBackdrop, showArrows, showProgress, pauseOnHover)', () => {
+    const image = { assetId: '12345678-1234-1234-1234-123456789abc', alt: 'Camera Gear' };
+    const validContent = {
+      title: 'Home',
+      sections: [{
+        id: 'hero',
+        type: 'hero',
+        visible: true,
+        config: {
+          intervalSeconds: 6,
+          showArrows: true,
+          showProgress: true,
+          pauseOnHover: true,
+          slides: [
+            {
+              title: 'Spotlight 1',
+              themePreset: 'dark',
+              imageBackdrop: 'circle',
+              badge: 'Cameras',
+              image,
+            },
+            {
+              title: 'Spotlight 2',
+              themePreset: 'custom',
+              customTheme: {
+                bg: '#112233',
+                text: '#ffffff',
+                accent: '#d8f45a',
+              },
+              imageBackdrop: 'lime_ring',
+              image,
+            },
+          ],
+        },
+      }],
+    };
+    expect(validateCmsContent('PAGE', validContent)).toEqual(validContent);
+
+    // Rejects invalid custom hex colour
+    const invalidHexCases = ['red', '#fff', '#12345G', '#12345678', 'url(x)'];
+    for (const badHex of invalidHexCases) {
+      const invalidHex = {
+        ...validContent,
+        sections: [{
+          ...validContent.sections[0],
+          config: {
+            ...validContent.sections[0].config,
+            slides: [{
+              title: 'Bad Hex',
+              themePreset: 'custom',
+              customTheme: { bg: badHex, text: '#ffffff', accent: '#000000' },
+            }],
+          },
+        }],
+      };
+      expect(() => validateCmsContent('PAGE', invalidHex)).toThrow();
+    }
+
+    // Rejects customTheme with missing keys
+    const missingKey = {
+      ...validContent,
+      sections: [{
+        ...validContent.sections[0],
+        config: {
+          ...validContent.sections[0].config,
+          slides: [{
+            title: 'Missing Key',
+            themePreset: 'custom',
+            customTheme: { bg: '#112233', text: '#ffffff' }, // missing accent
+          }],
+        },
+      }],
+    };
+    expect(() => validateCmsContent('PAGE', missingKey)).toThrow();
+
+    // Rejects invalid themePreset
+    const invalidPreset = {
+      ...validContent,
+      sections: [{
+        ...validContent.sections[0],
+        config: {
+          ...validContent.sections[0].config,
+          slides: [{ title: 'Bad Preset', themePreset: 'neon' }],
+        },
+      }],
+    };
+    expect(() => validateCmsContent('PAGE', invalidPreset)).toThrow();
+
+    // Accepts themePreset: "custom" without customTheme (renderer provides fallback to light)
+    const customWithoutTheme = {
+      ...validContent,
+      sections: [{
+        ...validContent.sections[0],
+        config: {
+          ...validContent.sections[0].config,
+          slides: [{ title: 'Custom without Theme', themePreset: 'custom' }],
+        },
+      }],
+    };
+    expect(validateCmsContent('PAGE', customWithoutTheme)).toEqual(customWithoutTheme);
+
+    // Legacy config with none of the new fields still validates cleanly
+    const legacyConfig = {
+      title: 'Home',
+      sections: [{
+        id: 'hero',
+        type: 'hero',
+        visible: true,
+        config: {
+          intervalSeconds: 5,
+          slides: [
+            { title: 'Legacy 1', slideType: 'full_banner', image },
+            { title: 'Legacy 2', slideType: 'split_content', theme: 'blue' },
+          ],
+        },
+      }],
+    };
+    expect(validateCmsContent('PAGE', legacyConfig)).toEqual(legacyConfig);
+  });
   it('rejects unsupported hero types, unsafe gradients and invalid mobile assets', () => {
     const page = (slide: Record<string, unknown>) => ({ title: 'Home', sections: [{ id: 'hero', type: 'hero', visible: true, config: { slides: [{ title: 'Offer', ...slide }] } }] });
     expect(() => validateCmsContent('PAGE', page({ slideType: 'unknown' }))).toThrow();

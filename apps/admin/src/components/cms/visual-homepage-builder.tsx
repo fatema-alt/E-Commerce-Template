@@ -13,6 +13,8 @@ import {
 import { SchemaField, button, input } from "./schema-fields";
 import { getStandardEcommerceTemplate } from "./standard-template";
 import { editableHeroSlides } from "./hero-slides";
+import { HeroInspector } from "./hero-inspector";
+import { HeroSectionPreview } from "./hero-preview";
 
 export type Section = {
   id: string;
@@ -174,7 +176,7 @@ export function VisualHomepageBuilder({
                 ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs"
                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
             }`}
-            title="Desktop View (100%)"
+            title="Desktop View"
           >
             <span>🖥️</span>
             <span>Desktop</span>
@@ -403,7 +405,7 @@ export function VisualHomepageBuilder({
             {/* Viewport Frame Header */}
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-2 text-[11px] text-slate-600">
               <span className="font-mono">
-                Storefront Live Preview ({viewport === "desktop" ? "100%" : viewport === "tablet" ? "768px" : "390px"})
+                Storefront Live Preview ({viewport === "desktop" ? "Desktop" : viewport === "tablet" ? "768px" : "390px"})
               </span>
               <span>Click any section to edit</span>
             </div>
@@ -446,19 +448,8 @@ export function VisualHomepageBuilder({
 
                       {/* Visual Preview Content based on type */}
                       {section.type === "hero" && Array.isArray(c.slides) ? (
-                        <div className="space-y-3 rounded-xl bg-white p-4 pt-10 text-slate-900">
-                          <p className="text-xs font-semibold">Hero slideshow · {c.slides.length} slides · {String(c.intervalSeconds || 5)} seconds</p>
-                          {c.slides.map((value, slideIndex) => {
-                            const slide = value as Record<string, Value>;
-                            const image = slide.image as Record<string, Value> | undefined;
-                            const asset = assets.find((entry) => entry.id === image?.assetId);
-                            return <div key={slideIndex} className="rounded-lg border border-slate-200 p-3 space-y-2">
-                              <span className="text-xs text-slate-500">Slide {slideIndex + 1} · {slide.slideType === "full_banner" || (!slide.slideType && slide.bannerType === "without_button") ? "Full banner" : "Split content"}{slide.enabled === false ? " · Disabled" : ""}</span>
-                              {asset?.url && <img src={assetUrl(asset.url)} alt={String(image?.alt || "")} className="max-h-40 w-full rounded-lg object-contain" />}
-                              <h3 className="text-sm font-bold">{String(slide.title || "Untitled slide")}</h3>
-                              {!(slide.slideType === "full_banner" || (!slide.slideType && slide.bannerType === "without_button")) && <p className="text-xs">{String(slide.subtitle || "")}</p>}
-                            </div>;
-                          })}
+                        <div className="pt-6">
+                          <HeroSectionPreview config={c} assets={assets} viewport={viewport} />
                         </div>
                       ) : section.type === "hero" ? (
                         c.bannerType === "without_button" ? (
@@ -562,7 +553,7 @@ export function VisualHomepageBuilder({
                                 </div>
                                 <span className="text-[10px] text-slate-400 font-bold uppercase block">DS Mart</span>
                                 <span className="text-[11px] font-semibold text-slate-800 block truncate">Product Name #{n}</span>
-                                <span className="text-xs font-bold text-slate-900 mt-1 block">৳2,490</span>
+                                <span className="text-xs font-bold text-slate-900 mt-1 block">Item price</span>
                               </div>
                             ))}
                           </div>
@@ -583,7 +574,7 @@ export function VisualHomepageBuilder({
                               <div key={n} className="rounded-lg bg-white p-2.5 border border-rose-100 shadow-2xs">
                                 <div className="aspect-square rounded bg-slate-100 mb-2" />
                                 <span className="text-[11px] font-semibold block truncate">Deal Item #{n}</span>
-                                <span className="text-xs font-bold text-rose-600">৳1,450</span>
+                                <span className="text-xs font-bold text-rose-600">Deal price</span>
                               </div>
                             ))}
                           </div>
@@ -594,9 +585,9 @@ export function VisualHomepageBuilder({
                             {(
                               (c.items as any[]) || [
                                 { title: "Cash on Delivery", icon: "truck" },
-                                { title: "100% Authentic", icon: "shield" },
-                                { title: "7-Day Returns", icon: "return" },
-                                { title: "24/7 Support", icon: "support" },
+                                { title: "Verified Products", icon: "shield" },
+                                { title: "Standard Returns", icon: "return" },
+                                { title: "Customer Support", icon: "support" },
                               ]
                             ).slice(0, 4).map((item, i) => (
                               <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
@@ -619,7 +610,7 @@ export function VisualHomepageBuilder({
                               <div key={n} className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs">
                                 <span className="text-amber-500 font-bold">★★★★★</span>
                                 <p className="text-[11px] text-slate-600 mt-1 italic line-clamp-2">
-                                  "Super fast delivery and authentic product as promised. Highly recommend DS Mart!"
+                                  "Prompt delivery and quality items as described. Great shopping experience at DS Mart!"
                                 </p>
                                 <span className="text-[10px] font-semibold text-slate-800 mt-2 block">
                                   Verified Customer #{n}
@@ -802,27 +793,35 @@ export function VisualHomepageBuilder({
                       {!registry.blocks.hero.properties?.slides && <p className="text-xs">Restart the API to load the updated hero schema.</p>}
                     </div>
                   )}
-                  {selectedSection.type === "hero" && Array.isArray(selectedSection.config.slides) && <p className="text-xs">Edit each item under Slides. Choose Full banner image for artwork with embedded text, or Image + HTML content for a split layout. Add, reorder or disable slides below.</p>}
-                  <SchemaField
-                    name={label(selectedSection.type)}
-                    schema={selectedSection.type === "hero" ? {
-                      ...registry.blocks.hero,
-                      properties: Array.isArray(selectedSection.config.slides)
-                        ? { slides: registry.blocks.hero.properties!.slides, intervalSeconds: registry.blocks.hero.properties!.intervalSeconds }
-                        : Object.fromEntries(Object.entries(registry.blocks.hero.properties ?? {}).filter(([key]) => key !== "slides")),
-                      required: Array.isArray(selectedSection.config.slides) ? ["slides", "intervalSeconds"] : [],
-                    } : registry.blocks[selectedSection.type]}
-                    value={selectedSection.config}
-                    assets={assets}
-                    onChange={(nextConfig) => {
-                      const next = [...sections];
-                      next[selectedIndex] = {
-                        ...selectedSection,
-                        config: nextConfig as Record<string, Value>,
-                      };
-                      onUpdateSections(next);
-                    }}
-                  />
+                  {selectedSection.type === "hero" && Array.isArray(selectedSection.config.slides) ? (
+                    <HeroInspector
+                      config={selectedSection.config}
+                      assets={assets}
+                      onChange={(nextConfig) => {
+                        const next = [...sections];
+                        next[selectedIndex] = {
+                          ...selectedSection,
+                          config: nextConfig as Record<string, Value>,
+                        };
+                        onUpdateSections(next);
+                      }}
+                    />
+                  ) : (
+                    <SchemaField
+                      name={label(selectedSection.type)}
+                      schema={registry.blocks[selectedSection.type]}
+                      value={selectedSection.config}
+                      assets={assets}
+                      onChange={(nextConfig) => {
+                        const next = [...sections];
+                        next[selectedIndex] = {
+                          ...selectedSection,
+                          config: nextConfig as Record<string, Value>,
+                        };
+                        onUpdateSections(next);
+                      }}
+                    />
+                  )}
                 </div>
               </div>
             )}
