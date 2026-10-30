@@ -73,6 +73,9 @@ export const BLOCK_SCHEMAS: Record<string, Schema> = {
       align: choice('left', 'center', 'right'),
       intervalSeconds: number(3, 30),
       showTrustStrip: bool,
+      showArrows: bool,
+      showProgress: bool,
+      pauseOnHover: bool,
       slides: array(object({
         slideType: choice('full_banner', 'split_content'),
         enabled: bool,
@@ -88,6 +91,13 @@ export const BLOCK_SCHEMAS: Record<string, Schema> = {
         badge: text(200, 0),
         badgeColor: choice('amber', 'emerald', 'purple'),
         theme: choice('lime', 'blue', 'pink'),
+        themePreset: choice('dark', 'lime', 'light', 'custom'),
+        customTheme: object({
+          bg: color,
+          text: color,
+          accent: color,
+        }, ['bg', 'text', 'accent']),
+        imageBackdrop: choice('none', 'circle', 'lime_ring'),
         floatingBadges: array(object({ icon: text(20), text: text(200) }), 3),
       }, ['title']), 10, 1),
     },
