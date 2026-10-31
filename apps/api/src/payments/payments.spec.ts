@@ -230,10 +230,12 @@ describe('Payments Module Unit Tests', () => {
       );
     });
 
-    it('returns and updates admin payment settings', async () => {
+    it('returns and updates admin payment settings and checkout payment options', async () => {
       const settings = await service.getAdminSettings();
       expect(settings.gateways.length).toBe(4);
       expect(settings.gateways.find((g) => g.provider === 'BKASH')).toBeDefined();
+      expect(settings.paymentOptions).toBeDefined();
+      expect(settings.paymentOptions.optionAEnabled).toBe(true);
 
       await service.updateAdminSetting('BKASH', {
         isEnabled: true,
@@ -241,6 +243,22 @@ describe('Payments Module Unit Tests', () => {
         config: { appKey: 'test_app_key' },
       });
       expect(mockDb.paymentGatewayConfig.upsert).toHaveBeenCalled();
+
+      await service.updateAdminSetting('PAYMENT_OPTIONS', {
+        isEnabled: true,
+        config: {
+          optionAEnabled: true,
+          optionBEnabled: true,
+          optionCEnabled: true,
+          optionCDiscountPercent: 5,
+          optionCDiscountFixed: 0,
+        },
+      });
+      expect(mockDb.paymentGatewayConfig.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { provider: 'PAYMENT_OPTIONS' },
+        }),
+      );
     });
 
     it('initiates payment for an unpaid order with Option B (full amount)', async () => {
