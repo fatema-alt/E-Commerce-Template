@@ -74,7 +74,7 @@ export class ProductsController {
     return this.productsService.getStockMovements(id);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
   @Delete(':id')
   remove(@Param('id', ParseUUIDPipe) id: string, @Req() req: AdminRequest) {
     return this.productsService.remove(id, req.admin?.id);

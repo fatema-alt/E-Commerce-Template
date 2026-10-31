@@ -47,7 +47,7 @@ export function useCatalogRole() {
   return {
     role,
     canEdit: role === "ADMIN" || role === "SUPER_ADMIN",
-    canDelete: role === "SUPER_ADMIN",
+    canDelete: role === "ADMIN" || role === "SUPER_ADMIN",
   };
 }
 

@@ -310,9 +310,9 @@ export class ProductsService {
   }
 
   async bulk(dto: BulkProductDto, actorId?: string, role?: string) {
-    if (dto.action === 'DELETE' && role !== 'SUPER_ADMIN')
+    if (dto.action === 'DELETE' && role !== 'SUPER_ADMIN' && role !== 'ADMIN')
       throw new (await import('@nestjs/common')).ForbiddenException(
-        'Permanent deletion requires SUPER_ADMIN',
+        'Deletion requires ADMIN or SUPER_ADMIN',
       );
     if (dto.action === 'CATEGORY' && !dto.categoryId)
       throw new BadRequestException('Select a category');
@@ -655,41 +655,74 @@ export class ProductsService {
 
   async remove(id: string, actorId?: string) {
     // Retain the established soft-delete contract so financial/stock history survives.
-    return this.prisma.$transaction(
-      async (tx) => {
-        const product = await tx.product.findFirst({
-          where: { id, deletedAt: null },
-        });
-        if (!product) throw new NotFoundException('Product not found');
-        const reserved = await tx.inventory.count({
-          where: {
-            OR: [{ productId: id }, { variant: { productId: id } }],
-            reserved: { gt: 0 },
-          },
-        });
-        if (reserved)
-          throw new ConflictException(
-            'Release inventory reservations before deleting',
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          const product = await tx.product.findFirst({
+            where: { id, deletedAt: null },
+          });
+          if (!product) throw new NotFoundException('Product not found');
+
+          // Reconcile any orphaned inventory reservations that don't belong to active orders
+          const activeReservations = await tx.orderStockReservation.findMany({
+            where: {
+              inventory: {
+                OR: [{ productId: id }, { variant: { productId: id } }],
+              },
+              status: 'ACTIVE',
+            },
+            select: { inventoryId: true, quantity: true },
+          });
+          const activeMap = new Map<string, number>();
+          for (const res of activeReservations) {
+            activeMap.set(
+              res.inventoryId,
+              (activeMap.get(res.inventoryId) ?? 0) + res.quantity,
+            );
+          }
+          const inventories = await tx.inventory.findMany({
+            where: {
+              OR: [{ productId: id }, { variant: { productId: id } }],
+            },
+          });
+          for (const inv of inventories) {
+            const expectedReserved = activeMap.get(inv.id) ?? 0;
+            if (inv.reserved !== expectedReserved) {
+              await tx.inventory.update({
+                where: { id: inv.id },
+                data: { reserved: expectedReserved },
+              });
+            }
+          }
+
+          // Deactivate any variants so they don't remain active in downstream queries
+          await tx.productVariant.updateMany({
+            where: { productId: id },
+            data: { isActive: false },
+          });
+
+          await audit(
+            tx,
+            'product',
+            id,
+            'SOFT_DELETE',
+            { name: product.name },
+            actorId,
           );
-        await audit(
-          tx,
-          'product',
-          id,
-          'SOFT_DELETE',
-          { name: product.name },
-          actorId,
-        );
-        return tx.product.update({
-          where: { id },
-          data: {
-            deletedAt: new Date(),
-            isActive: false,
-            status: ProductStatus.ARCHIVED,
-          },
-        });
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
+          return tx.product.update({
+            where: { id },
+            data: {
+              deletedAt: new Date(),
+              isActive: false,
+              status: ProductStatus.ARCHIVED,
+            },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      this.handleError(error);
+    }
   }
 
   private handleError(error: unknown): never {

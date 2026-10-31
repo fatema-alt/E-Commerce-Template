@@ -484,7 +484,10 @@ export default function ProductsPage({
         `${API}/products/${editingId}/images/${imageId}`,
         { method: "DELETE" },
       );
-      if (!response.ok) throw new Error("Could not delete image");
+      if (!response.ok)
+        throw new Error(
+          await readApiError(response, "Could not delete image"),
+        );
       setImageSuccess("Image removed from gallery");
       await loadImages(editingId);
     } catch (err) {
@@ -916,7 +919,10 @@ export default function ProductsPage({
         `${API}/products/${product.id}`,
         { method: "DELETE" },
       );
-      if (!response.ok) throw new Error("Failed to delete product");
+      if (!response.ok)
+        throw new Error(
+          await readApiError(response, "Failed to delete product"),
+        );
       setSuccess("Product deleted successfully");
       await loadProducts();
     } catch (err) {
