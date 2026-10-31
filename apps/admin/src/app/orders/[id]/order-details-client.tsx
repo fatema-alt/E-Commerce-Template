@@ -165,6 +165,8 @@ export default function OrderDetailsClient() {
                   ["Discount", order.discountTotal],
                   ["Tax", order.taxTotal],
                   ["Total", order.grandTotal],
+                  ["Amount paid", order.paidTotal],
+                  ["Amount due on delivery", order.amountDueOnDelivery ?? 0],
                 ] as const
               ).map(([label, value]) => (
                 <div key={label} className="flex justify-between">

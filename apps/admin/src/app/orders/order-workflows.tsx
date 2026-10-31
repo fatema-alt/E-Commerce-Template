@@ -386,10 +386,13 @@ export function PaymentWorkflow({
   return (
     <Panel title="Payment and COD accounting">
       <p className="text-sm">
-        {order.paymentMethod} · {order.paymentStatus.replaceAll("_", " ")}
+        {order.paymentMethod}
+        {order.paymentOption ? ` (${order.paymentOption})` : ""} ·{" "}
+        {order.paymentStatus.replaceAll("_", " ")}
       </p>
       <p className="text-sm">
-        Paid {formatMoney(order.paidTotal)} · Refunded{" "}
+        Paid {formatMoney(order.paidTotal)} · Due on delivery{" "}
+        {formatMoney(order.amountDueOnDelivery ?? 0)} · Refunded{" "}
         {formatMoney(order.refundedTotal)} · Refund eligible{" "}
         {formatMoney(order.refundableBalance)}
       </p>

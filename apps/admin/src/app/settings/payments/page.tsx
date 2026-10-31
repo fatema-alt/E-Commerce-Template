@@ -27,12 +27,30 @@ interface GatewayConfig {
   updatedAt?: string;
 }
 
+interface PaymentModelOptions {
+  optionAEnabled: boolean;
+  optionBEnabled: boolean;
+  optionCEnabled: boolean;
+  optionCDiscountType: "percent" | "fixed";
+  optionCDiscountPercent: number;
+  optionCDiscountFixed: number;
+}
+
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
 
 export default function PaymentSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [gateways, setGateways] = useState<Record<string, GatewayConfig>>({});
+  const [paymentOptions, setPaymentOptions] = useState<PaymentModelOptions>({
+    optionAEnabled: true,
+    optionBEnabled: true,
+    optionCEnabled: true,
+    optionCDiscountType: "percent",
+    optionCDiscountPercent: 0,
+    optionCDiscountFixed: 0,
+  });
+  const [savingOptions, setSavingOptions] = useState(false);
   const [toast, setToast] = useState<{
     type: "success" | "error";
     message: string;
@@ -59,6 +77,21 @@ export default function PaymentSettingsPage() {
         map[gw.provider] = gw;
       }
       setGateways(map);
+      if (data.paymentOptions) {
+        setPaymentOptions({
+          optionAEnabled: Boolean(data.paymentOptions.optionAEnabled),
+          optionBEnabled: Boolean(data.paymentOptions.optionBEnabled),
+          optionCEnabled: Boolean(data.paymentOptions.optionCEnabled),
+          optionCDiscountType:
+            Number(data.paymentOptions.optionCDiscountFixed) > 0
+              ? "fixed"
+              : "percent",
+          optionCDiscountPercent:
+            Number(data.paymentOptions.optionCDiscountPercent) || 0,
+          optionCDiscountFixed:
+            Number(data.paymentOptions.optionCDiscountFixed) || 0,
+        });
+      }
     } catch (err: any) {
       setToast({
         type: "error",
@@ -150,6 +183,52 @@ export default function PaymentSettingsPage() {
       );
     } finally {
       setSaving((p) => ({ ...p, [provider]: false }));
+    }
+  };
+
+  const handleSaveOptions = async () => {
+    try {
+      setSavingOptions(true);
+      const payload = {
+        isEnabled: true,
+        config: {
+          optionAEnabled: paymentOptions.optionAEnabled,
+          optionBEnabled: paymentOptions.optionBEnabled,
+          optionCEnabled: paymentOptions.optionCEnabled,
+          optionCDiscountPercent:
+            paymentOptions.optionCDiscountType === "percent"
+              ? paymentOptions.optionCDiscountPercent
+              : 0,
+          optionCDiscountFixed:
+            paymentOptions.optionCDiscountType === "fixed"
+              ? paymentOptions.optionCDiscountFixed
+              : 0,
+        },
+      };
+
+      const res = await authenticatedFetch(
+        `${API_BASE}/admin/payments/settings/PAYMENT_OPTIONS`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to save payment options");
+      }
+
+      showToast("success", "Checkout payment options saved successfully.");
+      await fetchSettings();
+    } catch (err: any) {
+      showToast(
+        "error",
+        err.message || "Failed to update checkout payment options.",
+      );
+    } finally {
+      setSavingOptions(false);
     }
   };
 
@@ -282,6 +361,187 @@ export default function PaymentSettingsPage() {
 
       {/* Gateways Grid */}
       <div className="space-y-6">
+        {/* 0. Checkout Payment Model (Rayyan-Style Options) */}
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col justify-between gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                <CreditCard size={24} />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Checkout Payment Options
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Configure customer payment options for checkout (advance delivery charge, card payment, and full online payment).
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={savingOptions}
+              onClick={handleSaveOptions}
+              className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+            >
+              <Save size={14} />
+              <span>{savingOptions ? "Saving..." : "Save Payment Options"}</span>
+            </button>
+          </div>
+
+          <div className="mt-6 space-y-6">
+            {/* Option A */}
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Option A: Pay delivery charge now, remainder on delivery
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Customer pays only the delivery charge online in advance. The remaining order balance is collected in cash upon delivery.
+                  </p>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Advance amount automatically equals the order delivery charge from delivery settings (no hardcoded charge). Automatically hidden when delivery is free.
+                  </p>
+                </div>
+                <label className="relative inline-flex cursor-pointer items-center">
+                  <input
+                    type="checkbox"
+                    checked={paymentOptions.optionAEnabled}
+                    onChange={(e) =>
+                      setPaymentOptions((prev) => ({
+                        ...prev,
+                        optionAEnabled: e.target.checked,
+                      }))
+                    }
+                    className="peer sr-only"
+                  />
+                  <div className="peer h-6 w-11 rounded-full bg-slate-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
+                  <span className="ml-3 text-xs font-semibold text-slate-700">
+                    {paymentOptions.optionAEnabled ? "Active" : "Disabled"}
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* Option B */}
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Option B: Pay full amount online by card
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Customer pays the entire order balance online using active payment gateways (cards, internet banking, or mobile financial services).
+                  </p>
+                </div>
+                <label className="relative inline-flex cursor-pointer items-center">
+                  <input
+                    type="checkbox"
+                    checked={paymentOptions.optionBEnabled}
+                    onChange={(e) =>
+                      setPaymentOptions((prev) => ({
+                        ...prev,
+                        optionBEnabled: e.target.checked,
+                      }))
+                    }
+                    className="peer sr-only"
+                  />
+                  <div className="peer h-6 w-11 rounded-full bg-slate-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
+                  <span className="ml-3 text-xs font-semibold text-slate-700">
+                    {paymentOptions.optionBEnabled ? "Active" : "Disabled"}
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* Option C */}
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Option C: Pay full amount online (optional discount)
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Customer pays the full order balance online with an optional admin-configured discount incentive.
+                  </p>
+                </div>
+                <label className="relative inline-flex cursor-pointer items-center">
+                  <input
+                    type="checkbox"
+                    checked={paymentOptions.optionCEnabled}
+                    onChange={(e) =>
+                      setPaymentOptions((prev) => ({
+                        ...prev,
+                        optionCEnabled: e.target.checked,
+                      }))
+                    }
+                    className="peer sr-only"
+                  />
+                  <div className="peer h-6 w-11 rounded-full bg-slate-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
+                  <span className="ml-3 text-xs font-semibold text-slate-700">
+                    {paymentOptions.optionCEnabled ? "Active" : "Disabled"}
+                  </span>
+                </label>
+              </div>
+
+              {/* Discount settings for Option C */}
+              <div className="mt-4 border-t border-slate-200/60 pt-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700">
+                      Discount Calculation
+                    </label>
+                    <select
+                      value={paymentOptions.optionCDiscountType}
+                      onChange={(e) =>
+                        setPaymentOptions((prev) => ({
+                          ...prev,
+                          optionCDiscountType: e.target.value as "percent" | "fixed",
+                        }))
+                      }
+                      className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                      <option value="percent">Percentage Discount (%)</option>
+                      <option value="fixed">Fixed Amount Discount (BDT)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700">
+                      {paymentOptions.optionCDiscountType === "percent"
+                        ? "Discount Percentage (%)"
+                        : "Discount Amount (BDT)"}
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={paymentOptions.optionCDiscountType === "percent" ? 100 : 100000}
+                      step={paymentOptions.optionCDiscountType === "percent" ? "0.1" : "1"}
+                      value={
+                        paymentOptions.optionCDiscountType === "percent"
+                          ? paymentOptions.optionCDiscountPercent
+                          : paymentOptions.optionCDiscountFixed
+                      }
+                      onChange={(e) => {
+                        const val = Math.max(0, Number(e.target.value) || 0);
+                        setPaymentOptions((prev) => ({
+                          ...prev,
+                          ...(prev.optionCDiscountType === "percent"
+                            ? { optionCDiscountPercent: val, optionCDiscountFixed: 0 }
+                            : { optionCDiscountFixed: val, optionCDiscountPercent: 0 }),
+                        }));
+                      }}
+                      className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+                </div>
+                <p className="mt-2 text-[11px] text-slate-500">
+                  If set to 0, no discount is applied. When greater than 0, an explicit line item &quot;Online payment discount: -BDT {'{amount}'}&quot; appears in the order summary without promotional slogans.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* 1. Cash on Delivery (COD) */}
         {cod && (
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">

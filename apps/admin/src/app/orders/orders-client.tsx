@@ -50,6 +50,8 @@ export type OrderDetail = OrderRow & {
   }>;
   customerEmail?: string | null;
   paymentMethod: string;
+  paymentOption?: string | null;
+  amountDueOnDelivery?: string | number;
   customerNote?: string | null;
   subtotal: string | number;
   shippingTotal: string | number;

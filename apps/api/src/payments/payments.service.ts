@@ -188,6 +188,11 @@ export class PaymentsService implements OnModuleInit {
 
     const codRow = configsMap.get('COD');
 
+    const optionsRow = configsMap.get('PAYMENT_OPTIONS');
+    const optionsCfg = (optionsRow?.config as Record<string, any>) || {};
+    const optCPercent = Number(optionsCfg.optionCDiscountPercent) || 0;
+    const optCFixed = Number(optionsCfg.optionCDiscountFixed) || 0;
+
     return {
       gateways: [
         {
@@ -247,6 +252,22 @@ export class PaymentsService implements OnModuleInit {
           updatedAt: bankRow?.updatedAt,
         },
       ],
+      paymentOptions: {
+        optionAEnabled:
+          optionsCfg.optionAEnabled !== undefined
+            ? Boolean(optionsCfg.optionAEnabled)
+            : true,
+        optionBEnabled:
+          optionsCfg.optionBEnabled !== undefined
+            ? Boolean(optionsCfg.optionBEnabled)
+            : true,
+        optionCEnabled:
+          optionsCfg.optionCEnabled !== undefined
+            ? Boolean(optionsCfg.optionCEnabled)
+            : true,
+        optionCDiscountPercent: optCPercent,
+        optionCDiscountFixed: optCFixed,
+      },
     };
   }
 
