@@ -11,7 +11,7 @@ async function proxy(
   const allowed =
     req.method === "GET"
       ? /^(me|newsletter|payment-methods|orders(?:\/[a-f0-9-]{36})?|payments\/methods|payments\/status\/[a-f0-9-]{36}|products\/[a-f0-9-]{36}\/(?:reviews|reviews\/summary|qa))$/
-      : /^(register|login|logout|password|quote|orders|coupons\/validate|payments\/initiate|newsletter(?:\/preferences)?|products\/[a-f0-9-]{36}\/(?:reviews|qa)|reviews\/[a-f0-9-]{36}\/helpful)$/;
+      : /^(register|login|logout|password|quote|orders|coupons\/validate|payments\/(?:initiate|switch-option)|newsletter(?:\/preferences)?|products\/[a-f0-9-]{36}\/(?:reviews|qa)|reviews\/[a-f0-9-]{36}\/helpful)$/;
   if (!allowed.test(path))
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   let body: string | undefined;

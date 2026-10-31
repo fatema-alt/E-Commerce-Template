@@ -40,6 +40,7 @@ export type Quote = {
   }[];
   subtotal: string;
   discount?: string;
+  onlinePaymentDiscount?: string;
   coupon?: {
     code: string;
     discount: string;
@@ -48,6 +49,9 @@ export type Quote = {
   shipping: string;
   tax: string;
   total: string;
+  payableNow?: string;
+  amountDueOnDelivery?: string;
+  paymentOption?: string;
   quoteToken: string;
   /** Shipping rate tiers returned by server for UI display. */
   shippingRates?: {
@@ -69,6 +73,10 @@ export type Order = {
   status: string;
   paymentStatus: string;
   paymentMethod: string;
+  paymentOption?: string | null;
+  paidTotal?: string;
+  refundedTotal?: string;
+  amountDueOnDelivery?: string;
   createdAt: string;
   grandTotal: string;
   subtotal: string;
@@ -107,4 +115,11 @@ export type Payments = {
     accountNumber: string;
     branch: string;
   } | null;
+  options?: {
+    optionAEnabled: boolean;
+    optionBEnabled: boolean;
+    optionCEnabled: boolean;
+    optionCDiscountPercent: number;
+    optionCDiscountFixed: number;
+  };
 };

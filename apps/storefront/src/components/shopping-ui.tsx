@@ -78,6 +78,7 @@ export function PriceSummary({
   total,
   discount,
   coupon,
+  onlinePaymentDiscount,
 }: {
   subtotal: string;
   shipping: string;
@@ -85,6 +86,7 @@ export function PriceSummary({
   total: string;
   discount?: string;
   coupon?: string;
+  onlinePaymentDiscount?: string;
 }) {
   return (
     <dl className="summary-details">
@@ -96,6 +98,12 @@ export function PriceSummary({
         <div className="summary-discount">
           <dt>Discount{coupon ? ` (${coupon})` : ""}</dt>
           <dd>−{money(discount!)}</dd>
+        </div>
+      )}
+      {Number(onlinePaymentDiscount) > 0 && (
+        <div className="summary-discount">
+          <dt>Online payment discount</dt>
+          <dd>−{money(onlinePaymentDiscount!)}</dd>
         </div>
       )}
       <div>
@@ -119,6 +127,9 @@ const labels: Record<string, string> = {
   BKASH: "bKash",
   SSLCOMMERZ: "SSLCommerz",
   BANK_TRANSFER: "Bank Transfer",
+  OPTION_A: "Pay delivery charge now, rest on delivery",
+  OPTION_B: "Pay full amount online by card",
+  OPTION_C: "Pay full amount online",
   RETURN_REQUESTED: "Return requested",
   RETURN_APPROVED: "Return approved",
   PARTIALLY_PAID: "Partially paid",

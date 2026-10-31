@@ -173,12 +173,36 @@ export function OrderDetails({
                 <dt>Payment method</dt>
                 <dd>{statusLabel(order.paymentMethod)}</dd>
               </div>
+              {order.paymentOption && (
+                <div>
+                  <dt>Payment option</dt>
+                  <dd>{statusLabel(order.paymentOption)}</dd>
+                </div>
+              )}
               <div>
                 <dt>Payment status</dt>
                 <dd>
                   <StatusBadge status={order.paymentStatus} />
                 </dd>
               </div>
+              {order.paidTotal !== undefined && Number(order.paidTotal) > 0 && (
+                <div>
+                  <dt>Amount paid</dt>
+                  <dd>{money(order.paidTotal)}</dd>
+                </div>
+              )}
+              {order.amountDueOnDelivery !== undefined && (
+                <div>
+                  <dt>Amount due on delivery</dt>
+                  <dd>
+                    <strong>
+                      {Number(order.amountDueOnDelivery) === 0
+                        ? "BDT 0.00"
+                        : money(order.amountDueOnDelivery)}
+                    </strong>
+                  </dd>
+                </div>
+              )}
             </dl>
             {paymentAction}
           </SectionCard>

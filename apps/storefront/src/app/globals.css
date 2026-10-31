@@ -622,6 +622,12 @@ input[type=checkbox],input[type=radio]{width:auto;accent-color:var(--c-ink)}
 .payment-options{display:grid;gap:10px;margin-block:18px}
 .payment-options label{grid-template-columns:auto 1fr;align-items:center;gap:12px;padding:16px;border-radius:var(--r-lg);border:1px solid var(--c-line);background:var(--glass-solid);font-weight:500}
 .payment-options label:has(input:checked){border-color:var(--c-ink);box-shadow:0 0 0 1px var(--c-ink)}
+.nested-gateway-selector{grid-column:1/-1;margin-top:10px;padding-top:10px;border-top:1px solid var(--c-line);display:flex;flex-direction:column;gap:8px}
+.nested-gateway-title{font-size:.8rem;color:var(--c-muted);font-weight:500}
+.nested-gateway-options{display:flex;flex-wrap:wrap;gap:8px}
+.gateway-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;border:1px solid var(--c-line);background:var(--bg-c);font-size:.82rem;font-weight:500;cursor:pointer}
+.gateway-pill.is-selected{border-color:var(--c-ink);box-shadow:0 0 0 1px var(--c-ink)}
+.gateway-pill input{width:14px;height:14px;margin:0;accent-color:var(--c-ink)}
 .payment-disabled{opacity:.5}
 .bank-details,.consent-row{padding:14px 16px;border-radius:var(--r-md);background:var(--glass);font-size:.9rem}
 .consent-row{display:flex;gap:10px;align-items:flex-start;font-weight:400}

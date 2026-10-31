@@ -525,6 +525,7 @@ export function OrderHistory({ id }: { id?: string }) {
                         {
                           orderId: order.id,
                           method: order.paymentMethod,
+                          ...(order.paymentOption ? { paymentOption: order.paymentOption } : {}),
                         },
                       );
                       if (res.redirectUrl) {
@@ -543,7 +544,7 @@ export function OrderHistory({ id }: { id?: string }) {
                 >
                   {paying
                     ? "Connecting to gateway…"
-                    : `Complete Payment with ${order.paymentMethod === "BKASH" ? "bKash" : "SSLCommerz"} (${money(order.grandTotal)})`}
+                    : `Complete Payment with ${order.paymentMethod === "BKASH" ? "bKash" : "SSLCommerz"} (${money(order.paymentOption === "OPTION_A" ? order.shippingTotal : order.grandTotal)})`}
                 </button>
               </div>
             )

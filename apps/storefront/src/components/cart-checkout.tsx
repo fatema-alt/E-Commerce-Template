@@ -51,12 +51,14 @@ function requestQuote(
   couponCode?: string,
   city?: string,
   district?: string,
+  paymentOption?: string,
 ) {
   const cacheKey =
     serialized +
     (couponCode ? `::${couponCode.trim().toUpperCase()}` : "") +
     (city ? `::city:${city.trim().toLowerCase()}` : "") +
-    (district ? `::dist:${district.trim().toLowerCase()}` : "");
+    (district ? `::dist:${district.trim().toLowerCase()}` : "") +
+    (paymentOption ? `::opt:${paymentOption}` : "");
   let promise = pending.get(cacheKey);
   if (!promise) {
     promise = shopRequest<Quote>("quote", {
@@ -64,6 +66,7 @@ function requestQuote(
       ...(couponCode ? { couponCode: couponCode.trim().toUpperCase() } : {}),
       ...(city ? { city: city.trim() } : {}),
       ...(district ? { district: district.trim() } : {}),
+      ...(paymentOption ? { paymentOption } : {}),
     }).finally(() => pending.delete(cacheKey));
     pending.set(cacheKey, promise);
   }
@@ -82,7 +85,15 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
   const [review, setReview] = useState(0);
   const [payments, setPayments] = useState<Payments | null>(null);
   const [paymentError, setPaymentError] = useState("");
-  const [paymentMethod, setPayment] = useState("");
+  type CheckoutPaymentOption =
+    | "OPTION_A"
+    | "OPTION_B"
+    | "OPTION_C"
+    | "BANK_TRANSFER"
+    | "COD";
+  const [selectedOption, setSelectedOption] =
+    useState<CheckoutPaymentOption | "">("");
+  const [chosenGateway, setChosenGateway] = useState<string>("");
   const [user, setUser] = useState<Shopper | null>(null);
   const [placed, setPlaced] = useState("");
   const [couponCode, setCouponCode] = useState("");
@@ -112,13 +123,92 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
     })),
   );
   // Address hints for shipping estimate (checkout page only).
-  const [addrCity, setAddrCity] = useState("");
-  const [addrDistrict, setAddrDistrict] = useState("");
+  const [addrCity, setAddrCity] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      const draft = JSON.parse(
+        sessionStorage.getItem("ds-checkout-draft") || "{}",
+      );
+      return typeof draft.city === "string" ? draft.city.trim() : "";
+    } catch {
+      return "";
+    }
+  });
+  const [addrDistrict, setAddrDistrict] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      const draft = JSON.parse(
+        sessionStorage.getItem("ds-checkout-draft") || "{}",
+      );
+      return typeof draft.district === "string" ? draft.district.trim() : "";
+    } catch {
+      return "";
+    }
+  });
+
+  const onlineGateways = (payments?.methods || []).filter(
+    (method) =>
+      (method.id === "BKASH" || method.id === "SSLCOMMERZ") && method.enabled,
+  );
+  const hasOnlineGateways = onlineGateways.length > 0;
+  const shippingCharge = quote ? Number(quote.shipping) : 0;
+  const isFreeDelivery = quote ? shippingCharge <= 0 : false;
+
+  const optionAAvailable =
+    hasOnlineGateways &&
+    payments?.options?.optionAEnabled !== false &&
+    !isFreeDelivery;
+
+  const optionBAvailable =
+    hasOnlineGateways && payments?.options?.optionBEnabled !== false;
+
+  const optionCAvailable =
+    hasOnlineGateways && payments?.options?.optionCEnabled !== false;
+
+  const bankAvailable =
+    Boolean(payments?.bank) &&
+    Boolean(
+      payments?.methods.some((m) => m.id === "BANK_TRANSFER" && m.enabled),
+    );
+
+  const codAvailable =
+    (isFreeDelivery || !hasOnlineGateways) &&
+    Boolean(payments?.methods.some((m) => m.id === "COD" && m.enabled));
+
+  const availableOptionIds: CheckoutPaymentOption[] = [
+    optionAAvailable ? ("OPTION_A" as const) : null,
+    optionBAvailable ? ("OPTION_B" as const) : null,
+    optionCAvailable ? ("OPTION_C" as const) : null,
+    bankAvailable ? ("BANK_TRANSFER" as const) : null,
+    codAvailable ? ("COD" as const) : null,
+  ].filter((v): v is CheckoutPaymentOption => v !== null);
+
+  const paymentOption: CheckoutPaymentOption =
+    selectedOption && availableOptionIds.includes(selectedOption)
+      ? selectedOption
+      : (availableOptionIds[0] ?? "OPTION_A");
+
+  const selectedGateway: string =
+    chosenGateway && onlineGateways.some((g) => g.id === chosenGateway)
+      ? chosenGateway
+      : (onlineGateways[0]?.id ?? "");
+
+  const setPaymentOption = (opt: CheckoutPaymentOption) => {
+    setSelectedOption(opt);
+  };
+  const setSelectedGateway = (
+    idOrUpdater: string | ((curr: string) => string),
+  ) => {
+    setChosenGateway(idOrUpdater);
+  };
+
   const currentKey =
     serialized +
     "::" +
     appliedCoupon +
-    (checkout ? `::city:${addrCity}::dist:${addrDistrict}` : "");
+    (checkout
+      ? `::city:${addrCity.trim()}::dist:${addrDistrict.trim()}::opt:${paymentOption}`
+      : "");
   const validQuote = quote && quotedKey === currentKey;
   const locked = busy || updating || couponBusy;
 
@@ -146,12 +236,6 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
           typeof draft[name] === "string"
         )
           field.value = draft[name];
-      }
-      if (typeof draft.city === "string" && draft.city.trim()) {
-        setAddrCity(draft.city.trim());
-      }
-      if (typeof draft.district === "string" && draft.district.trim()) {
-        setAddrDistrict(draft.district.trim());
       }
     } catch {
       /* Storage is optional; the form remains usable. */
@@ -191,7 +275,13 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
   useEffect(() => {
     let live = true;
     if (serialized !== "[]")
-      void requestQuote(serialized, appliedCoupon)
+      void requestQuote(
+        serialized,
+        appliedCoupon,
+        checkout && addrCity.trim() ? addrCity.trim() : undefined,
+        checkout && addrDistrict.trim() ? addrDistrict.trim() : undefined,
+        checkout ? paymentOption : undefined,
+      )
         .then((result) => {
           if (live) {
             setQuote(result);
@@ -220,7 +310,17 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
     return () => {
       live = false;
     };
-  }, [serialized, currentKey, review, appliedCoupon, cart.lines]);
+  }, [
+    serialized,
+    currentKey,
+    review,
+    appliedCoupon,
+    cart.lines,
+    checkout,
+    addrCity,
+    addrDistrict,
+    paymentOption,
+  ]);
 
   // On the checkout page, re-request a quote whenever the city/district changes
   // so the shipping fee updates live as the customer fills the address form.
@@ -231,7 +331,13 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
     if (!cityVal && !districtVal) return;
     let live = true;
     const timer = setTimeout(() => {
-      void requestQuote(serialized, appliedCoupon, cityVal, districtVal)
+      void requestQuote(
+        serialized,
+        appliedCoupon,
+        cityVal,
+        districtVal,
+        paymentOption,
+      )
         .then((result) => {
           if (live) {
             setQuote(result);
@@ -239,7 +345,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
               serialized +
                 "::" +
                 appliedCoupon +
-                `::city:${cityVal}::dist:${districtVal}`,
+                `::city:${cityVal}::dist:${districtVal}::opt:${paymentOption}`,
             );
             setError("");
           }
@@ -253,7 +359,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addrCity, addrDistrict, checkout]);
+  }, [addrCity, addrDistrict, checkout, paymentOption]);
 
   useEffect(() => {
     let live = true;
@@ -262,13 +368,14 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
         .then((methods) => {
           if (live) {
             setPayments(methods);
-            setPayment((current) =>
-              methods.methods.some(
-                (method) => method.id === current && method.enabled,
-              )
-                ? current
-                : methods.methods.find((method) => method.enabled)?.id || "",
+            const online = (methods.methods || []).filter(
+              (m) => (m.id === "BKASH" || m.id === "SSLCOMMERZ") && m.enabled,
             );
+            if (online.length > 0) {
+              setSelectedGateway((curr) =>
+                online.some((g) => g.id === curr) ? curr : online[0].id,
+              );
+            }
             setPaymentError("");
           }
         })
@@ -379,13 +486,23 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
 
   async function placeOrder(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const isOnlineOption =
+      paymentOption === "OPTION_A" ||
+      paymentOption === "OPTION_B" ||
+      paymentOption === "OPTION_C";
+    const effectivePaymentMethod =
+      paymentOption === "BANK_TRANSFER"
+        ? "BANK_TRANSFER"
+        : paymentOption === "COD"
+          ? "COD"
+          : selectedGateway;
+
     if (
       !validQuote ||
       submissionLock.current ||
       mutationLock.current ||
-      !payments?.methods.some(
-        (method) => method.id === paymentMethod && method.enabled,
-      )
+      !availableOptionIds.includes(paymentOption) ||
+      (isOnlineOption && !selectedGateway)
     )
       return;
     const data = new FormData(e.currentTarget);
@@ -396,7 +513,8 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       customerName: value("name"),
       ...(value("email") ? { customerEmail: value("email") } : {}),
       customerPhone: phone,
-      paymentMethod,
+      paymentMethod: effectivePaymentMethod,
+      paymentOption,
       shippingAddress: {
         recipientName: value("name"),
         phone,
@@ -463,18 +581,26 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
             tax: Number(order.taxTotal) || 0,
             coupon: order.couponCode || appliedCoupon || undefined,
             items,
-            paymentMethod,
+            paymentMethod: effectivePaymentMethod,
             createdAt: Date.now(),
           }),
         );
       } catch {
         /* Storage non-fatal */
       }
-      if (paymentMethod === "BKASH" || paymentMethod === "SSLCOMMERZ") {
+      if (
+        isOnlineOption &&
+        (effectivePaymentMethod === "BKASH" ||
+          effectivePaymentMethod === "SSLCOMMERZ")
+      ) {
         try {
           const result = await shopRequest<{ redirectUrl: string }>(
             "payments/initiate",
-            { orderId: order.id, method: paymentMethod },
+            {
+              orderId: order.id,
+              method: effectivePaymentMethod,
+              paymentOption,
+            },
           );
           if (result.redirectUrl) {
             window.location.href = result.redirectUrl;
@@ -801,42 +927,236 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                   {!payments && !paymentError && (
                     <p role="status">Loading available payment methods…</p>
                   )}
-                  <div className="payment-options">
-                    {payments?.methods.filter((method) => method.id !== "COD" || method.enabled).map((method) => (
-                      <label
-                        key={method.id}
-                        className={!method.enabled ? "payment-disabled" : ""}
+                  {payments && availableOptionIds.length === 0 && (
+                    <p role="alert">
+                      No payment methods are currently available. Please contact
+                      the store.
+                    </p>
+                  )}
+                  <div
+                    className="payment-options"
+                    role="radiogroup"
+                    aria-label="Payment method"
+                  >
+                    {optionAAvailable && (
+                      <div
+                        className={`payment-option-card ${paymentOption === "OPTION_A" ? "is-selected" : ""}`}
                       >
-                        <input
-                          type="radio"
-                          name="paymentMethod"
-                          value={method.id}
-                          checked={paymentMethod === method.id}
-                          disabled={!method.enabled}
-                          onChange={() => setPayment(method.id)}
-                        />
-                        <span>
-                          <strong>{method.label}</strong>
-                          <small>
-                            {!method.enabled
-                              ? "Currently unavailable"
-                              : method.id === "COD"
-                                ? "Pay the courier when your order arrives."
-                                : "Follow the instructions for your selected payment method."}
-                          </small>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                  {payments &&
-                    !payments.methods.some((method) => method.enabled) && (
-                      <p role="alert">
-                        No payment methods are currently available. Please
-                        contact the store.
-                      </p>
+                        <label className="payment-option-header">
+                          <input
+                            type="radio"
+                            name="paymentOption"
+                            value="OPTION_A"
+                            checked={paymentOption === "OPTION_A"}
+                            onChange={() => setPaymentOption("OPTION_A")}
+                          />
+                          <span>
+                            <strong>Pay delivery charge now</strong>
+                            <small>
+                              Pay only the delivery charge of BDT{" "}
+                              {validQuote
+                                ? Number(quote.shipping).toLocaleString("en-BD")
+                                : "0"}{" "}
+                              online now. Pay the remaining BDT{" "}
+                              {validQuote
+                                ? Math.max(
+                                    0,
+                                    Number(quote.total) - Number(quote.shipping),
+                                  ).toLocaleString("en-BD")
+                                : "0"}{" "}
+                              in cash when the order is delivered.
+                            </small>
+                          </span>
+                        </label>
+                        {paymentOption === "OPTION_A" &&
+                          onlineGateways.length > 1 && (
+                            <div
+                              className="nested-gateway-selector"
+                              role="radiogroup"
+                              aria-label="Payment provider"
+                            >
+                              <span className="nested-gateway-title">
+                                Pay with:
+                              </span>
+                              <div className="nested-gateway-options">
+                                {onlineGateways.map((g) => (
+                                  <label
+                                    key={g.id}
+                                    className={`gateway-pill ${selectedGateway === g.id ? "is-selected" : ""}`}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name="gatewayProviderA"
+                                      value={g.id}
+                                      checked={selectedGateway === g.id}
+                                      onChange={() => setSelectedGateway(g.id)}
+                                    />
+                                    <span>{g.label}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                      </div>
                     )}
-                  {paymentMethod === "BANK_TRANSFER" && payments?.bank && (
-                    <div className="bank-details">
+
+                    {optionBAvailable && (
+                      <div
+                        className={`payment-option-card ${paymentOption === "OPTION_B" ? "is-selected" : ""}`}
+                      >
+                        <label className="payment-option-header">
+                          <input
+                            type="radio"
+                            name="paymentOption"
+                            value="OPTION_B"
+                            checked={paymentOption === "OPTION_B"}
+                            onChange={() => setPaymentOption("OPTION_B")}
+                          />
+                          <span>
+                            <strong>Pay by card</strong>
+                            <small>
+                              Pay BDT{" "}
+                              {validQuote
+                                ? Number(quote.total).toLocaleString("en-BD")
+                                : "0"}{" "}
+                              online.
+                            </small>
+                          </span>
+                        </label>
+                        {paymentOption === "OPTION_B" &&
+                          onlineGateways.length > 1 && (
+                            <div
+                              className="nested-gateway-selector"
+                              role="radiogroup"
+                              aria-label="Payment provider"
+                            >
+                              <span className="nested-gateway-title">
+                                Pay with:
+                              </span>
+                              <div className="nested-gateway-options">
+                                {onlineGateways.map((g) => (
+                                  <label
+                                    key={g.id}
+                                    className={`gateway-pill ${selectedGateway === g.id ? "is-selected" : ""}`}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name="gatewayProviderB"
+                                      value={g.id}
+                                      checked={selectedGateway === g.id}
+                                      onChange={() => setSelectedGateway(g.id)}
+                                    />
+                                    <span>{g.label}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                      </div>
+                    )}
+
+                    {optionCAvailable && (
+                      <div
+                        className={`payment-option-card ${paymentOption === "OPTION_C" ? "is-selected" : ""}`}
+                      >
+                        <label className="payment-option-header">
+                          <input
+                            type="radio"
+                            name="paymentOption"
+                            value="OPTION_C"
+                            checked={paymentOption === "OPTION_C"}
+                            onChange={() => setPaymentOption("OPTION_C")}
+                          />
+                          <span>
+                            <strong>Pay full amount online</strong>
+                            <small>
+                              Pay BDT{" "}
+                              {validQuote
+                                ? Number(quote.total).toLocaleString("en-BD")
+                                : "0"}{" "}
+                              now. Nothing is due on delivery.
+                            </small>
+                          </span>
+                        </label>
+                        {paymentOption === "OPTION_C" &&
+                          onlineGateways.length > 1 && (
+                            <div
+                              className="nested-gateway-selector"
+                              role="radiogroup"
+                              aria-label="Payment provider"
+                            >
+                              <span className="nested-gateway-title">
+                                Pay with:
+                              </span>
+                              <div className="nested-gateway-options">
+                                {onlineGateways.map((g) => (
+                                  <label
+                                    key={g.id}
+                                    className={`gateway-pill ${selectedGateway === g.id ? "is-selected" : ""}`}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name="gatewayProviderC"
+                                      value={g.id}
+                                      checked={selectedGateway === g.id}
+                                      onChange={() => setSelectedGateway(g.id)}
+                                    />
+                                    <span>{g.label}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                      </div>
+                    )}
+
+                    {bankAvailable && (
+                      <div
+                        className={`payment-option-card ${paymentOption === "BANK_TRANSFER" ? "is-selected" : ""}`}
+                      >
+                        <label className="payment-option-header">
+                          <input
+                            type="radio"
+                            name="paymentOption"
+                            value="BANK_TRANSFER"
+                            checked={paymentOption === "BANK_TRANSFER"}
+                            onChange={() => setPaymentOption("BANK_TRANSFER")}
+                          />
+                          <span>
+                            <strong>Bank Transfer</strong>
+                            <small>
+                              Follow the instructions for your selected payment
+                              method.
+                            </small>
+                          </span>
+                        </label>
+                      </div>
+                    )}
+
+                    {codAvailable && (
+                      <div
+                        className={`payment-option-card ${paymentOption === "COD" ? "is-selected" : ""}`}
+                      >
+                        <label className="payment-option-header">
+                          <input
+                            type="radio"
+                            name="paymentOption"
+                            value="COD"
+                            checked={paymentOption === "COD"}
+                            onChange={() => setPaymentOption("COD")}
+                          />
+                          <span>
+                            <strong>Cash on Delivery</strong>
+                            <small>
+                              Pay the courier when your order arrives.
+                            </small>
+                          </span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                  {paymentOption === "BANK_TRANSFER" && payments?.bank && (
+                    <div className="bank-details" style={{ marginTop: "14px" }}>
                       <p>
                         {payments.bank.name} · {payments.bank.branch}
                       </p>
@@ -858,9 +1178,39 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                     </p>
                   )}
                   {validQuote && (
-                    <p className="confirmation-total">
-                      Total payable <strong>{money(quote.total)}</strong>
-                    </p>
+                    <div
+                      className="confirmation-total-block"
+                      style={{ marginBottom: "12px" }}
+                    >
+                      <p className="confirmation-total">
+                        <span>
+                          {paymentOption === "OPTION_A"
+                            ? "Payable now"
+                            : "Total payable"}
+                        </span>
+                        <strong>
+                          {money(
+                            paymentOption === "OPTION_A"
+                              ? quote.shipping
+                              : quote.total,
+                          )}
+                        </strong>
+                      </p>
+                      {paymentOption === "OPTION_A" && (
+                        <p
+                          className="muted small"
+                          style={{ margin: "4px 0 0", textAlign: "right" }}
+                        >
+                          Due on delivery:{" "}
+                          {money(
+                            Math.max(
+                              0,
+                              Number(quote.total) - Number(quote.shipping),
+                            ),
+                          )}
+                        </p>
+                      )}
+                    </div>
                   )}
                   <label className="consent-row">
                     <input type="checkbox" required />{" "}
@@ -875,13 +1225,21 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                     disabled={
                       !validQuote ||
                       locked ||
-                      !payments?.methods.some(
-                        (method) =>
-                          method.enabled && method.id === paymentMethod,
-                      )
+                      !availableOptionIds.includes(paymentOption) ||
+                      ((paymentOption === "OPTION_A" ||
+                        paymentOption === "OPTION_B" ||
+                        paymentOption === "OPTION_C") &&
+                        !selectedGateway)
                     }
                   >
-                    {busy ? "Processing your order…" : "Place Order"}
+                    {busy
+                      ? "Processing your order…"
+                      : paymentOption === "OPTION_A"
+                        ? `Pay BDT ${validQuote ? Number(quote.shipping).toLocaleString("en-BD") : "0"} and place order`
+                        : paymentOption === "OPTION_B" ||
+                            paymentOption === "OPTION_C"
+                          ? `Pay BDT ${validQuote ? Number(quote.total).toLocaleString("en-BD") : "0"} and place order`
+                          : "Place Order"}
                   </button>
                   <p className="muted small">
                     Your final price and stock are checked before the
@@ -941,6 +1299,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                   total={quote.total}
                   discount={quote.discount}
                   coupon={quote.coupon?.code}
+                  onlinePaymentDiscount={quote.onlinePaymentDiscount}
                 />
                 <div className="coupon-section">
                   {appliedCoupon ? (
