@@ -81,6 +81,7 @@ export class ShopCheckoutDto extends OmitType(CreateOrderDto, [
   'paymentMethod',
   'shippingTotal',
 ] as const) {
+  @IsOptional() @IsIn(['MANUAL_BKASH', 'MANUAL_NAGAD', 'BANK_TRANSFER']) manualProvider?: string;
   @IsOptional()
   @IsIn([
     'COD',

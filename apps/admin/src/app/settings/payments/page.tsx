@@ -483,7 +483,7 @@ export default function PaymentSettingsPage() {
                 </h2>
                 <p className="text-xs text-slate-500">
                   Configure customer payment options for checkout (advance
-                  delivery charge, card payment, and full online payment).
+                  delivery charge, full payment, and configured-discount payment). Plans work with enabled manual transfers or API gateways.
                 </p>
               </div>
             </div>
@@ -509,14 +509,14 @@ export default function PaymentSettingsPage() {
                     Option A: Pay delivery charge now, remainder on delivery
                   </h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    Customer pays only the delivery charge online in advance.
+                    Customer pays only the delivery charge in advance using an enabled manual or API payment channel.
                     The remaining order balance is collected in cash upon
                     delivery.
                   </p>
                   <p className="mt-1 text-[11px] text-slate-400">
                     Advance amount automatically equals the order delivery
                     charge from delivery settings (no hardcoded charge).
-                    Automatically hidden when delivery is free.
+                    Automatically hidden when delivery is free or COD is disabled. Manual transfers require admin verification before shipment booking.
                   </p>
                 </div>
                 <label className="relative inline-flex cursor-pointer items-center">
@@ -544,12 +544,10 @@ export default function PaymentSettingsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900">
-                    Option B: Pay full amount online by card
+                    Option B: Pay full amount
                   </h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    Customer pays the entire order balance online using active
-                    payment gateways (cards, internet banking, or mobile
-                    financial services).
+                    Customer pays the entire order balance through an enabled manual transfer or API gateway.
                   </p>
                 </div>
                 <label className="relative inline-flex cursor-pointer items-center">
@@ -577,10 +575,10 @@ export default function PaymentSettingsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900">
-                    Option C: Pay full amount online (optional discount)
+                    Option C: Pay full amount (optional discount)
                   </h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    Customer pays the full order balance online with an optional
+                    Customer pays the full order balance through the selected method with an optional
                     admin-configured discount incentive.
                   </p>
                 </div>
@@ -670,7 +668,7 @@ export default function PaymentSettingsPage() {
                 </div>
                 <p className="mt-2 text-[11px] text-slate-500">
                   If set to 0, no discount is applied. When greater than 0, an
-                  explicit line item &quot;Online payment discount: -BDT{" "}
+                  explicit line item &quot;Payment plan discount: -BDT{" "}
                   {"{amount}"}&quot; appears in the order summary without
                   promotional slogans.
                 </p>

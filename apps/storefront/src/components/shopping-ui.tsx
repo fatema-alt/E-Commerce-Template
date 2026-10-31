@@ -102,7 +102,7 @@ export function PriceSummary({
       )}
       {Number(onlinePaymentDiscount) > 0 && (
         <div className="summary-discount">
-          <dt>Online payment discount</dt>
+          <dt>Payment plan discount</dt>
           <dd>−{money(onlinePaymentDiscount!)}</dd>
         </div>
       )}
@@ -128,8 +128,8 @@ const labels: Record<string, string> = {
   SSLCOMMERZ: "SSLCommerz",
   BANK_TRANSFER: "Bank Transfer",
   OPTION_A: "Pay delivery charge now, rest on delivery",
-  OPTION_B: "Pay full amount online by card",
-  OPTION_C: "Pay full amount online",
+  OPTION_B: "Pay full amount",
+  OPTION_C: "Pay full amount with configured discount",
   RETURN_REQUESTED: "Return requested",
   RETURN_APPROVED: "Return approved",
   PARTIALLY_PAID: "Partially paid",

@@ -21,6 +21,7 @@ import { PromotionsService } from '../promotions/promotions.service.js';
 import { calcShipping, getShippingRates } from './shipping.config.js';
 import { ManualPaymentsService } from './manual-payments.service.js';
 import { isManualProvider } from '../payments/manual-payment.config.js';
+import { usesManualTransfer, manualOutstanding } from '../payments/manual-order.rules.js';
 import type { ManualPaymentSubmissionDto } from './shop.dto.js';
 import type {
   QuoteDto,
@@ -510,14 +511,15 @@ export class ShopService {
       throw new ConflictException(
         'Payment option changed. Review your order again.',
       );
-    const manualAccount = availablePayments.manualTransfers?.find(
-      (account) => account.id === paymentOption,
-    );
-    if (isManualProvider(paymentOption)) {
+    const requestedManual = dto.manualProvider || (isManualProvider(paymentOption) ? paymentOption : undefined);
+    const manualAccount = availablePayments.manualTransfers?.find(account => account.id === requestedManual);
+    if (requestedManual) {
+      if (!isManualProvider(paymentOption) && !['OPTION_A', 'OPTION_B', 'OPTION_C'].includes(paymentOption)) throw new BadRequestException('Select a payment plan for manual transfer');
+      const expectedMethod = paymentOption === 'OPTION_A' ? 'COD' : requestedManual === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'MANUAL';
       if (
         !manualAccount ||
-        dto.paymentMethod !==
-          (paymentOption === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'MANUAL')
+        dto.paymentMethod !== expectedMethod ||
+        (isManualProvider(paymentOption) && paymentOption !== requestedManual)
       )
         throw new BadRequestException(
           'The selected manual payment method is unavailable',
@@ -535,6 +537,11 @@ export class ShopService {
         'Payment method does not match the selected option',
       );
     }
+    if (['OPTION_A', 'OPTION_B', 'OPTION_C'].includes(paymentOption)) {
+      const flag = paymentOption === 'OPTION_A' ? 'optionAEnabled' : paymentOption === 'OPTION_B' ? 'optionBEnabled' : 'optionCEnabled';
+      if (availablePayments.options?.[flag] === false) throw new BadRequestException('The selected payment option is disabled');
+      if (paymentOption === 'OPTION_A' && !availablePayments.methods.some(method => method.id === 'COD' && method.enabled)) throw new BadRequestException('Cash on Delivery must be enabled for the remaining balance');
+    }
     if (
       !manualAccount &&
       !availablePayments.methods.some(
@@ -547,7 +554,7 @@ export class ShopService {
       );
     if (dto.paymentMethod === 'BANK_TRANSFER' && !availablePayments.bank)
       throw new BadRequestException('Bank transfer is not available');
-    const { quoteToken: _quote, ...data } = dto;
+    const { quoteToken: _quote, manualProvider: _manualProvider, ...data } = dto;
     if (paymentOption === 'OPTION_A' && shippingTotal.lessThanOrEqualTo(0)) {
       throw new BadRequestException(
         'Advance delivery payment is not applicable for free delivery orders',
@@ -586,10 +593,8 @@ export class ShopService {
       },
       key ? `shop:${session.id}:${key}` : undefined,
       session.id,
-      { sessionId: session.id, expectedSubtotal: quote.subtotal },
+      { sessionId: session.id, expectedSubtotal: quote.subtotal, ...(manualAccount ? { manualAccount } : {}) },
     );
-    if (manualAccount)
-      await this.manualPayments!.capture(order.id, manualAccount, session.id);
     return this.order(order.id, token);
   }
   private async scope(token?: string) {
@@ -704,13 +709,12 @@ export class ShopService {
       order.paymentStatus === 'PAID'
         ? new Prisma.Decimal(0)
         : Prisma.Decimal.max(new Prisma.Decimal(0), grandTotal.minus(netPaid));
+    const manualDetails = usesManualTransfer(order) && this.manualPayments ? await this.manualPayments.details(id) : null;
     return {
       ...order,
-      amountDueOnDelivery: isManualProvider(order.paymentOption)
-        ? '0.00'
-        : due.toFixed(2),
-      ...(isManualProvider(order.paymentOption) && this.manualPayments
-        ? { manualPayment: await this.manualPayments.details(id) }
+      amountDueOnDelivery: order.paymentOption === 'OPTION_A' ? Prisma.Decimal.max(0, grandTotal.minus(Prisma.Decimal.max(paidTotal, new Prisma.Decimal(order.shippingTotal ?? 0)))).toFixed(2) : usesManualTransfer(order) ? '0.00' : due.toFixed(2),
+      ...(usesManualTransfer(order) && this.manualPayments
+        ? { manualPayment: manualDetails ? { ...manualDetails, amountDue: manualOutstanding({ ...order, grandTotal, paidTotal, shippingTotal: new Prisma.Decimal(order.shippingTotal ?? 0) }).toFixed(2) } : null }
         : {}),
     };
   }

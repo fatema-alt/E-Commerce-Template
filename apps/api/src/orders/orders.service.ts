@@ -1,3 +1,4 @@
+import type { ManualTransfer } from '../payments/manual-payment.config.js';
 import {
   BadRequestException,
   ConflictException,
@@ -185,7 +186,7 @@ export class OrdersService {
         : Prisma.Decimal.max(new Prisma.Decimal(0), grandTotal.minus(netPaid));
     return {
       ...order,
-      amountDueOnDelivery: [
+      amountDueOnDelivery: order.paymentOption === 'OPTION_A' ? Prisma.Decimal.max(0, grandTotal.minus(Prisma.Decimal.max(netPaid, order.shippingTotal))).toFixed(2) : [
         'MANUAL_BKASH',
         'MANUAL_NAGAD',
         'BANK_TRANSFER',
@@ -199,7 +200,7 @@ export class OrdersService {
     dto: CreateOrderDto,
     key: string | undefined,
     actorId: string,
-    storefront?: { sessionId: string; expectedSubtotal: string },
+    storefront?: { sessionId: string; expectedSubtotal: string; manualAccount?: ManualTransfer },
   ) {
     if (
       !key ||
@@ -232,7 +233,7 @@ export class OrdersService {
       ),
     };
     const hash = createHash('sha256')
-      .update(JSON.stringify({ actorId, canonical }))
+      .update(JSON.stringify({ actorId, canonical, manualProvider: storefront?.manualAccount?.id }))
       .digest('hex');
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -553,6 +554,7 @@ export class OrdersService {
               },
               include: { items: true },
             });
+            if (storefront?.manualAccount) await tx.orderEvent.create({ data: { orderId: order.id, action: 'MANUAL_PAYMENT_INSTRUCTIONS', actorType: 'SHOPPER', actorId: storefront.sessionId, after: { ...storefront.manualAccount } } });
             for (const line of lines) {
               const item = order.items.find(
                 (i) =>

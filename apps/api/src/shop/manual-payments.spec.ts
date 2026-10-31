@@ -35,6 +35,7 @@ const order = {
   paymentStatus: 'UNPAID',
   grandTotal: new Prisma.Decimal(110),
   paidTotal: new Prisma.Decimal(0),
+  shippingTotal: new Prisma.Decimal(10),
   refundedTotal: new Prisma.Decimal(0),
   currency: 'BDT',
   shipments: [],
@@ -101,7 +102,7 @@ describe('Manual payment recipient configuration', () => {
     expect(result.manualTransfers.map((item) => item.id)).toEqual([
       'MANUAL_BKASH',
     ]);
-    expect(result.options.optionBEnabled).toBe(false);
+    expect(result.options.optionBEnabled).toBe(true);
     expect(
       result.methods.find((item) => item.id === 'SSLCOMMERZ')?.enabled,
     ).toBe(false);
@@ -163,6 +164,14 @@ describe('Shopper manual transfer claims', () => {
       ),
     ).rejects.toThrow('Order not found');
     expect(tx.orderPaymentTransaction.create).not.toHaveBeenCalled();
+  });
+  it('Option A claims only shipping, then refuses further advance claims after verification', async () => {
+    const { service, tx } = fixture();
+    tx.order.findFirst.mockResolvedValue({ ...order, paymentOption: 'OPTION_A', paymentMethod: 'COD' });
+    await service.submit(orderId, {}, { sender: '01711111111', reference: 'ADVANCE1' }, 'session');
+    expect(tx.orderPaymentTransaction.create.mock.calls[0][0].data.amount.toFixed(2)).toBe('10.00');
+    tx.order.findFirst.mockResolvedValue({ ...order, paymentOption: 'OPTION_A', paymentMethod: 'COD', paidTotal: new Prisma.Decimal(10) });
+    await expect(service.submit(orderId, {}, { sender: '01711111111', reference: 'ADVANCE2' }, 'session')).rejects.toThrow('No payment is due');
   });
   it('repeated same-order reference is idempotent; cross-order reuse is refused', async () => {
     const { service, tx } = fixture();
@@ -374,5 +383,21 @@ describe('Admin manual transfer review', () => {
     ).rejects.toThrow('no longer pending');
     expect(tx.order.update).not.toHaveBeenCalled();
     expect(tx.orderPaymentTransaction.update).not.toHaveBeenCalled();
+  });
+  it('verifies the delivery advance as PARTIALLY_PAID and collects only the product balance as COD', async () => {
+    const advance = { ...order, paymentOption: 'OPTION_A', paymentMethod: 'COD', payments: [{ ...claim, amount: new Prisma.Decimal(10) }] };
+    const { service, tx } = operations(advance);
+    await service.recordPayment(orderId, { version: 1, kind: 'MANUAL_VERIFIED', amount: '10', provider: 'manual_bkash', reference: 'TX123', evidence: 'Receipt checked in account' }, 'advance-key', { id: 'admin' } as any);
+    expect(tx.order.update.mock.calls[0][0].data.paymentStatus).toBe('PARTIALLY_PAID');
+    expect(tx.order.update.mock.calls[0][0].data.paidTotal.toFixed(2)).toBe('10.00');
+    const final = operations({ ...advance, paidTotal: new Prisma.Decimal(10), shipments: [{ id: 'shipment', status: 'DELIVERED' }] } as any);
+    final.tx.orderShipment = { update: vi.fn() };
+    await final.service.recordPayment(orderId, { version: 2, kind: 'COD_COLLECTION', amount: '100', provider: 'courier', reference: 'COD123', evidence: 'Delivery collection verified', shipmentId: 'shipment' }, 'cod-collection-key', { id: 'admin' } as any);
+    expect(final.tx.order.update.mock.calls[0][0].data.paymentStatus).toBe('PAID');
+    expect(final.tx.order.update.mock.calls[0][0].data.paidTotal.toFixed(2)).toBe('110.00');
+  });
+  it('blocks booking an advance COD shipment before its delivery payment is verified', async () => {
+    const { service } = operations({ ...order, paymentOption: 'OPTION_A', paymentMethod: 'COD', status: 'CONFIRMED' });
+    await expect(service.bookManualShipment(orderId, { version: 1, provider: 'courier', trackingNumber: 'TRACK123' } as any, 'shipment-key', { id: 'admin' } as any)).rejects.toThrow('Verify the advance delivery payment');
   });
 });

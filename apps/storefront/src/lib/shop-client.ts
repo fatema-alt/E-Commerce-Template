@@ -69,6 +69,7 @@ export type Shopper = {
 };
 export type Order = {
   manualPayment?: {
+    amountDue?: string;
     account: ManualTransfer;
     submissions: {
       id: string;

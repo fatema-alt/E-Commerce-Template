@@ -289,7 +289,7 @@ export class ReviewsService {
               sku: true,
               images: {
                 take: 1,
-                select: { url: true, alt: true },
+                select: { url: true, altText: true },
               },
             },
           },

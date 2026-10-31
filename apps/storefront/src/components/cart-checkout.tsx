@@ -154,40 +154,35 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       (method.id === "BKASH" || method.id === "SSLCOMMERZ") && method.enabled,
   );
   const hasOnlineGateways = onlineGateways.length > 0;
+  const paymentChannels = [...(payments?.manualTransfers || []).map(method => ({ id: method.id, label: method.label, enabled: true })), ...onlineGateways];
+  const hasPaymentChannels = paymentChannels.length > 0;
   const shippingCharge = quote ? Number(quote.shipping) : 0;
   const isFreeDelivery = quote ? shippingCharge <= 0 : false;
 
   const optionAAvailable =
-    hasOnlineGateways &&
+    hasPaymentChannels &&
     payments?.options?.optionAEnabled !== false &&
-    !isFreeDelivery;
+    !isFreeDelivery && Boolean(payments?.methods.some(method => method.id === 'COD' && method.enabled));
 
   const optionBAvailable =
-    hasOnlineGateways && payments?.options?.optionBEnabled !== false;
+    hasPaymentChannels && payments?.options?.optionBEnabled !== false;
 
   const optionCAvailable =
-    hasOnlineGateways && payments?.options?.optionCEnabled !== false;
-
-  const bankAvailable =
-    Boolean(payments?.bank) &&
-    Boolean(
-      payments?.methods.some((m) => m.id === "BANK_TRANSFER" && m.enabled),
-    );
+    hasPaymentChannels && payments?.options?.optionCEnabled !== false;
 
   const codAvailable =
     (isFreeDelivery || !hasOnlineGateways) &&
     Boolean(payments?.methods.some((m) => m.id === "COD" && m.enabled));
 
-  const availableOptionIds: CheckoutPaymentOption[] = [
-    ...(payments?.manualTransfers
-      ?.filter((method) => method.id !== "BANK_TRANSFER")
-      .map((method) => method.id) || []),
-    optionAAvailable ? ("OPTION_A" as const) : null,
-    optionBAvailable ? ("OPTION_B" as const) : null,
-    optionCAvailable ? ("OPTION_C" as const) : null,
-    bankAvailable ? ("BANK_TRANSFER" as const) : null,
-    codAvailable ? ("COD" as const) : null,
-  ].filter((v): v is CheckoutPaymentOption => v !== null);
+  const candidateOptions: (CheckoutPaymentOption | null)[] = [
+    optionAAvailable ? "OPTION_A" : null,
+    optionBAvailable ? "OPTION_B" : null,
+    optionCAvailable ? "OPTION_C" : null,
+    codAvailable ? "COD" : null,
+  ];
+  const availableOptionIds: CheckoutPaymentOption[] = candidateOptions.filter(
+    (v): v is CheckoutPaymentOption => v !== null,
+  );
 
   const paymentOption: CheckoutPaymentOption =
     selectedOption && availableOptionIds.includes(selectedOption)
@@ -195,9 +190,9 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       : (availableOptionIds[0] ?? "OPTION_A");
 
   const selectedGateway: string =
-    chosenGateway && onlineGateways.some((g) => g.id === chosenGateway)
+    chosenGateway && paymentChannels.some((g) => g.id === chosenGateway)
       ? chosenGateway
-      : (onlineGateways[0]?.id ?? "");
+      : (paymentChannels[0]?.id ?? "");
 
   const setPaymentOption = (opt: CheckoutPaymentOption) => {
     setSelectedOption(opt);
@@ -375,9 +370,9 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
         .then((methods) => {
           if (live) {
             setPayments(methods);
-            const online = (methods.methods || []).filter(
+            const online = [...(methods.manualTransfers || []), ...(methods.methods || []).filter(
               (m) => (m.id === "BKASH" || m.id === "SSLCOMMERZ") && m.enabled,
-            );
+            )];
             if (online.length > 0) {
               setSelectedGateway((curr) =>
                 online.some((g) => g.id === curr) ? curr : online[0].id,
@@ -497,7 +492,8 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       paymentOption === "OPTION_A" ||
       paymentOption === "OPTION_B" ||
       paymentOption === "OPTION_C";
-    const effectivePaymentMethod =
+    const manualChannel = payments?.manualTransfers?.find(method => method.id === selectedGateway);
+    const effectivePaymentMethod = isOnlineOption && manualChannel ? (paymentOption === 'OPTION_A' ? 'COD' : manualChannel.id === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'MANUAL') :
       paymentOption === "BANK_TRANSFER"
         ? "BANK_TRANSFER"
         : paymentOption === "MANUAL_BKASH" || paymentOption === "MANUAL_NAGAD"
@@ -523,6 +519,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       ...(value("email") ? { customerEmail: value("email") } : {}),
       customerPhone: phone,
       paymentMethod: effectivePaymentMethod,
+      ...(isOnlineOption && manualChannel ? { manualProvider: manualChannel.id } : {}),
       paymentOption,
       shippingAddress: {
         recipientName: value("name"),
@@ -947,32 +944,6 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                     role="radiogroup"
                     aria-label="Payment method"
                   >
-                    {payments?.manualTransfers
-                      ?.filter((method) => method.id !== "BANK_TRANSFER")
-                      .map((method) => (
-                        <div
-                          key={method.id}
-                          className={`payment-option-card ${paymentOption === method.id ? "is-selected" : ""}`}
-                        >
-                          <label className="payment-option-header">
-                            <input
-                              type="radio"
-                              name="paymentOption"
-                              value={method.id}
-                              checked={paymentOption === method.id}
-                              onChange={() => setPaymentOption(method.id)}
-                            />
-                            <span>
-                              <strong>{method.label}</strong>
-                              <small>
-                                Transfer after placing your order, then submit
-                                the transaction ID for verification. No
-                                automatic charge.
-                              </small>
-                            </span>
-                          </label>
-                        </div>
-                      ))}
                     {optionAAvailable && (
                       <div
                         className={`payment-option-card ${paymentOption === "OPTION_A" ? "is-selected" : ""}`}
@@ -992,7 +963,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                               {validQuote
                                 ? Number(quote.shipping).toLocaleString("en-BD")
                                 : "0"}{" "}
-                              online now. Pay the remaining BDT{" "}
+                              using your selected method. Pay the remaining BDT{" "}
                               {validQuote
                                 ? Math.max(
                                     0,
@@ -1005,7 +976,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                           </span>
                         </label>
                         {paymentOption === "OPTION_A" &&
-                          onlineGateways.length > 1 && (
+                          paymentChannels.length > 1 && (
                             <div
                               className="nested-gateway-selector"
                               role="radiogroup"
@@ -1015,7 +986,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                                 Pay with:
                               </span>
                               <div className="nested-gateway-options">
-                                {onlineGateways.map((g) => (
+                                {paymentChannels.map((g) => (
                                   <label
                                     key={g.id}
                                     className={`gateway-pill ${selectedGateway === g.id ? "is-selected" : ""}`}
@@ -1049,18 +1020,18 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                             onChange={() => setPaymentOption("OPTION_B")}
                           />
                           <span>
-                            <strong>Pay by card</strong>
+                            <strong>Pay full amount</strong>
                             <small>
                               Pay BDT{" "}
                               {validQuote
                                 ? Number(quote.total).toLocaleString("en-BD")
                                 : "0"}{" "}
-                              online.
+                              using your selected payment method.
                             </small>
                           </span>
                         </label>
                         {paymentOption === "OPTION_B" &&
-                          onlineGateways.length > 1 && (
+                          paymentChannels.length > 1 && (
                             <div
                               className="nested-gateway-selector"
                               role="radiogroup"
@@ -1070,7 +1041,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                                 Pay with:
                               </span>
                               <div className="nested-gateway-options">
-                                {onlineGateways.map((g) => (
+                                {paymentChannels.map((g) => (
                                   <label
                                     key={g.id}
                                     className={`gateway-pill ${selectedGateway === g.id ? "is-selected" : ""}`}
@@ -1104,7 +1075,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                             onChange={() => setPaymentOption("OPTION_C")}
                           />
                           <span>
-                            <strong>Pay full amount online</strong>
+                            <strong>Pay full amount</strong>
                             <small>
                               Pay BDT{" "}
                               {validQuote
@@ -1115,7 +1086,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                           </span>
                         </label>
                         {paymentOption === "OPTION_C" &&
-                          onlineGateways.length > 1 && (
+                          paymentChannels.length > 1 && (
                             <div
                               className="nested-gateway-selector"
                               role="radiogroup"
@@ -1125,7 +1096,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                                 Pay with:
                               </span>
                               <div className="nested-gateway-options">
-                                {onlineGateways.map((g) => (
+                                {paymentChannels.map((g) => (
                                   <label
                                     key={g.id}
                                     className={`gateway-pill ${selectedGateway === g.id ? "is-selected" : ""}`}
@@ -1143,29 +1114,6 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                               </div>
                             </div>
                           )}
-                      </div>
-                    )}
-
-                    {bankAvailable && (
-                      <div
-                        className={`payment-option-card ${paymentOption === "BANK_TRANSFER" ? "is-selected" : ""}`}
-                      >
-                        <label className="payment-option-header">
-                          <input
-                            type="radio"
-                            name="paymentOption"
-                            value="BANK_TRANSFER"
-                            checked={paymentOption === "BANK_TRANSFER"}
-                            onChange={() => setPaymentOption("BANK_TRANSFER")}
-                          />
-                          <span>
-                            <strong>Bank Transfer</strong>
-                            <small>
-                              Follow the instructions for your selected payment
-                              method.
-                            </small>
-                          </span>
-                        </label>
                       </div>
                     )}
 
@@ -1191,9 +1139,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                       </div>
                     )}
                   </div>
-                  {["MANUAL_BKASH", "MANUAL_NAGAD", "BANK_TRANSFER"].includes(
-                    paymentOption,
-                  ) && (
+                  {paymentOption !== 'COD' && payments?.manualTransfers?.some(method => method.id === selectedGateway) && (
                     <div className="bank-details" style={{ marginTop: "14px" }}>
                       <p>
                         Place your order first. Your order page will show the
@@ -1267,6 +1213,8 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                   >
                     {busy
                       ? "Processing your order…"
+                      : paymentOption !== 'COD' && payments?.manualTransfers?.some(method => method.id === selectedGateway)
+                        ? 'Place order, then make manual payment'
                       : paymentOption === "OPTION_A"
                         ? `Pay BDT ${validQuote ? Number(quote.shipping).toLocaleString("en-BD") : "0"} and place order`
                         : paymentOption === "OPTION_B" ||

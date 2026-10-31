@@ -136,12 +136,12 @@ export class PaymentsService implements OnModuleInit {
     const hasOnlineGateway =
       this.bkash.isEnabled() || this.sslcommerz.isEnabled();
 
-    // If no online gateway is configured/enabled, hide Options A, B, and C completely
+    const hasPaymentChannel = hasOnlineGateway || manualTransfers.length > 0;
     const options = {
       ...rawOptions,
-      optionAEnabled: hasOnlineGateway && rawOptions.optionAEnabled,
-      optionBEnabled: hasOnlineGateway && rawOptions.optionBEnabled,
-      optionCEnabled: hasOnlineGateway && rawOptions.optionCEnabled,
+      optionAEnabled: hasPaymentChannel && codEnabled && rawOptions.optionAEnabled,
+      optionBEnabled: hasPaymentChannel && rawOptions.optionBEnabled,
+      optionCEnabled: hasPaymentChannel && rawOptions.optionCEnabled,
     };
 
     return {

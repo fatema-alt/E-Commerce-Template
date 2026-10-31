@@ -11,6 +11,7 @@ import {
   type ManualTransfer,
 } from '../payments/manual-payment.config.js';
 import type { ManualPaymentSubmissionDto } from './shop.dto.js';
+import { usesManualTransfer, manualOutstanding } from '../payments/manual-order.rules.js';
 
 @Injectable()
 export class ManualPaymentsService {
@@ -77,7 +78,7 @@ export class ManualPaymentsService {
             where: { id: orderId, ...scope },
           });
           if (!order) throw new NotFoundException('Order not found');
-          if (!isManualProvider(order.paymentOption))
+          if (!usesManualTransfer(order))
             throw new BadRequestException(
               'This order does not use manual transfer',
             );
@@ -92,7 +93,9 @@ export class ManualPaymentsService {
             throw new ConflictException(
               'Payment instructions are unavailable. Contact our team before transferring.',
             );
-          const provider = order.paymentOption.toLowerCase();
+          const account = snapshot.after as unknown as ManualTransfer;
+          if (!isManualProvider(account.id)) throw new ConflictException('Invalid saved payment instructions');
+          const provider = account.id.toLowerCase();
           const reference = dto.reference
             .trim()
             .replace(/[ -]/g, '')
@@ -120,7 +123,7 @@ export class ManualPaymentsService {
             throw new ConflictException(
               'A payment is already awaiting verification',
             );
-          const amount = order.grandTotal.minus(order.paidTotal);
+          const amount = manualOutstanding(order);
           if (amount.lessThanOrEqualTo(0))
             throw new ConflictException('No payment is due');
           const claim = await tx.orderPaymentTransaction.create({

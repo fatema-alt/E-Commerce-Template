@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { createHash } from 'node:crypto';
+import { manualOutstanding } from '../payments/manual-order.rules.js';
 import { Prisma, OrderStatus } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { OrdersService, orderInclude } from './orders.service.js';
@@ -415,6 +416,7 @@ export class OrderOperationsService extends OrdersService {
       async (tx, order) => {
         if (!['CONFIRMED', 'PROCESSING'].includes(order.status))
           throw new ConflictException('Order must be confirmed or processing');
+        if (order.paymentOption === 'OPTION_A' && order.paymentMethod === 'COD' && manualOutstanding(order).greaterThan(0)) throw new ConflictException('Verify the advance delivery payment before booking a shipment');
         if (order.shipments.some((s) => s.status !== 'CANCELLED'))
           throw new ConflictException('An active shipment already exists');
         if (!dto.provider.trim() || !dto.trackingNumber.trim())
@@ -739,6 +741,30 @@ export class OrderOperationsService extends OrdersService {
           throw new BadRequestException(
             'Provider, unique reference and verification evidence required',
           );
+        const reference = [
+          'manual_bkash',
+          'manual_nagad',
+          'bank_transfer',
+        ].includes(provider)
+          ? dto.reference.trim().replace(/[ -]/g, '').toUpperCase()
+          : dto.reference.trim();
+        const pending =
+          dto.kind === 'MANUAL_VERIFIED'
+            ? order.payments.find(
+                (p) =>
+                  p.provider === provider && p.providerReference === reference,
+              )
+            : undefined;
+        if (
+          pending &&
+          (pending.status !== 'PENDING' ||
+            !pending.amount.equals(amount) ||
+            (pending.metadata as Record<string, unknown> | null)
+              ?.verification !== 'CUSTOMER_CLAIM_PENDING')
+        )
+          throw new ConflictException(
+            'The payment claim is no longer pending or the amount does not match',
+          );
         let paid = order.paidTotal;
         let refunded = order.refundedTotal;
         const fee = parseMoney(dto.fee ?? '0', true);
@@ -791,37 +817,14 @@ export class OrderOperationsService extends OrdersService {
               where: { id: shipment!.id },
               data: { codCollected: { increment: amount } },
             });
-          } else if (order.paymentMethod === 'COD')
+          } else if (order.paymentMethod === 'COD' && !(dto.kind === 'MANUAL_VERIFIED' && order.paymentOption === 'OPTION_A' && pending))
             throw new ConflictException('Use COD collection for COD orders');
+          if (dto.kind === 'MANUAL_VERIFIED' && order.paymentOption === 'OPTION_A' && amount.greaterThan(manualOutstanding(order))) throw new ConflictException('Advance payment exceeds the delivery charge still due');
           paid = paid.plus(amount);
           if (paid.greaterThan(order.grandTotal))
             throw new ConflictException('Payment exceeds order balance');
         }
         // Settlement is a ledger entry, never a second customer payment.
-        const reference = [
-          'manual_bkash',
-          'manual_nagad',
-          'bank_transfer',
-        ].includes(provider)
-          ? dto.reference.trim().replace(/[ -]/g, '').toUpperCase()
-          : dto.reference.trim();
-        const pending =
-          dto.kind === 'MANUAL_VERIFIED'
-            ? order.payments.find(
-                (p) =>
-                  p.provider === provider && p.providerReference === reference,
-              )
-            : undefined;
-        if (
-          pending &&
-          (pending.status !== 'PENDING' ||
-            !pending.amount.equals(amount) ||
-            (pending.metadata as Record<string, unknown> | null)
-              ?.verification !== 'CUSTOMER_CLAIM_PENDING')
-        )
-          throw new ConflictException(
-            'The payment claim is no longer pending or the amount does not match',
-          );
         const entry = {
           orderId: id,
           type:
