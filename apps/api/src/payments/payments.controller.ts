@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { PaymentsService } from './payments.service.js';
-import { InitiatePaymentDto } from './payments.dto.js';
+import { InitiatePaymentDto, SwitchPaymentOptionDto } from './payments.dto.js';
 
 @Controller('payments')
 @SetMetadata('public', true)
@@ -30,7 +30,33 @@ export class PaymentsController {
     @Body() dto: InitiatePaymentDto,
     @Headers('origin') origin: string | undefined,
   ) {
-    return this.paymentsService.initiate(dto.orderId, dto.method, origin);
+    return this.paymentsService.initiate(
+      dto.orderId,
+      dto.method,
+      origin,
+      dto.paymentOption,
+    );
+  }
+
+  @Post('switch-option')
+  async switchOption(
+    @Body() dto: SwitchPaymentOptionDto,
+    @Req() req: Request,
+  ) {
+    const authHeader = req.headers['authorization'];
+    const sessionToken =
+      typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+        ? authHeader.slice(7).trim()
+        : typeof req.headers['x-shopper-session'] === 'string'
+          ? req.headers['x-shopper-session'].trim()
+          : undefined;
+
+    return this.paymentsService.switchPaymentOption(
+      dto.orderId,
+      dto.paymentOption,
+      dto.paymentMethod,
+      sessionToken,
+    );
   }
 
   @Get('bkash/callback')

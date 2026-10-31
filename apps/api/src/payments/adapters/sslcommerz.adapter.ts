@@ -64,20 +64,30 @@ export class SslCommerzAdapter implements PaymentProvider {
       : 'https://sandbox.sslcommerz.com';
   }
 
+  isConfigured(): boolean {
+    return Boolean(this.storeId && this.storePassword);
+  }
+
   isEnabled(): boolean {
     if (this.dynamicConfig?.isEnabled !== undefined) {
-      return this.dynamicConfig.isEnabled;
+      if (!this.dynamicConfig.isEnabled) return false;
     }
-    const configured = Boolean(this.storeId && this.storePassword);
-    const simulationAllowed =
-      process.env.SSLCOMMERZ_SIMULATE === 'true' ||
-      process.env.NODE_ENV !== 'production';
-    return configured || simulationAllowed;
+    if (this.isConfigured()) {
+      return true;
+    }
+    // Fail closed: with missing credentials, only enable if explicitly permitted in non-prod
+    return this.isSimulated();
   }
 
   isSimulated(): boolean {
-    const configured = Boolean(this.storeId && this.storePassword);
-    return !configured || process.env.SSLCOMMERZ_SIMULATE === 'true';
+    // Simulation is NEVER active in production under any circumstances
+    if (process.env.NODE_ENV === 'production') {
+      return false;
+    }
+    const explicitFlag =
+      process.env.ALLOW_SIMULATED_PAYMENTS === 'true' ||
+      process.env.SSLCOMMERZ_SIMULATE === 'true';
+    return explicitFlag && !this.isConfigured();
   }
 
   async testCredentials(creds: {
@@ -262,7 +272,7 @@ export class SslCommerzAdapter implements PaymentProvider {
       };
     }
 
-    if (this.isSimulated() || valId.startsWith('sim_ssl_')) {
+    if (this.isSimulated() || (process.env.NODE_ENV !== 'production' && valId.startsWith('sim_ssl_'))) {
       const isSuccess = status === 'VALID' || status === 'SUCCESS' || !status;
       return {
         success: isSuccess,

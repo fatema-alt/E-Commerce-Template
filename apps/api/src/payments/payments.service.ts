@@ -1,14 +1,17 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   Injectable,
   Logger,
   NotFoundException,
   OnModuleInit,
+  UnauthorizedException,
 } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { calcShipping } from '../shop/shipping.config.js';
 import { BkashAdapter } from './adapters/bkash.adapter.js';
 import { SslCommerzAdapter } from './adapters/sslcommerz.adapter.js';
 import {
@@ -17,6 +20,8 @@ import {
   UpdatePaymentSettingDto,
 } from './payments.dto.js';
 import type { PaymentProvider } from './payment-provider.interface.js';
+
+const digest = (s: string) => createHash('sha256').update(s).digest('hex');
 
 @Injectable()
 export class PaymentsService implements OnModuleInit {
@@ -105,6 +110,17 @@ export class PaymentsService implements OnModuleInit {
       ? bankDb.isEnabled && Boolean(bank)
       : Boolean(bank);
 
+    const rawOptions = await this.getPaymentModelConfig();
+    const hasOnlineGateway = this.bkash.isEnabled() || this.sslcommerz.isEnabled();
+
+    // If no online gateway is configured/enabled, hide Options A, B, and C completely
+    const options = {
+      ...rawOptions,
+      optionAEnabled: hasOnlineGateway && rawOptions.optionAEnabled,
+      optionBEnabled: hasOnlineGateway && rawOptions.optionBEnabled,
+      optionCEnabled: hasOnlineGateway && rawOptions.optionCEnabled,
+    };
+
     return {
       methods: [
         { id: 'COD', label: 'Cash on Delivery', enabled: codEnabled },
@@ -123,6 +139,32 @@ export class PaymentsService implements OnModuleInit {
         },
       ],
       bank,
+      options,
+    };
+  }
+
+  async getPaymentModelConfig(): Promise<{
+    optionAEnabled: boolean;
+    optionBEnabled: boolean;
+    optionCEnabled: boolean;
+    optionCDiscountPercent: number;
+    optionCDiscountFixed: number;
+  }> {
+    let row: any = null;
+    try {
+      row = await this.db.paymentGatewayConfig.findUnique({
+        where: { provider: 'PAYMENT_OPTIONS' },
+      });
+    } catch {
+      // Graceful fallback if table is unavailable during initialization
+    }
+    const cfg = (row?.config as Record<string, any>) || {};
+    return {
+      optionAEnabled: cfg.optionAEnabled !== undefined ? Boolean(cfg.optionAEnabled) : true,
+      optionBEnabled: cfg.optionBEnabled !== undefined ? Boolean(cfg.optionBEnabled) : true,
+      optionCEnabled: cfg.optionCEnabled !== undefined ? Boolean(cfg.optionCEnabled) : true,
+      optionCDiscountPercent: Number(cfg.optionCDiscountPercent) || 0,
+      optionCDiscountFixed: Number(cfg.optionCDiscountFixed) || 0,
     };
   }
 
@@ -300,6 +342,7 @@ export class PaymentsService implements OnModuleInit {
     orderId: string,
     method: OnlinePaymentMethod,
     origin?: string,
+    requestedOption?: string,
   ) {
     const adapter = this.adapters.get(method);
     if (!adapter || !adapter.isEnabled()) {
@@ -321,6 +364,28 @@ export class PaymentsService implements OnModuleInit {
       throw new ConflictException('Order is already paid');
     }
 
+    if (order.status === 'CANCELLED') {
+      throw new ConflictException('Cannot initiate payment for a cancelled order');
+    }
+
+    const paymentOption = requestedOption || order.paymentOption || 'OPTION_B';
+
+    if (paymentOption === 'OPTION_A' && Number(order.shippingTotal) <= 0) {
+      throw new BadRequestException('Advance delivery payment is not applicable for free delivery orders');
+    }
+
+    // Server strictly re-derives payable amount; never trust client amount
+    let payableAmount: number;
+    if (paymentOption === 'OPTION_A') {
+      payableAmount = Number(order.shippingTotal);
+    } else {
+      payableAmount = Number(order.grandTotal);
+    }
+
+    if (!Number.isFinite(payableAmount) || payableAmount <= 0) {
+      throw new BadRequestException('Invalid payable amount for payment initiation');
+    }
+
     const storefrontOrigin =
       origin ||
       process.env.STOREFRONT_ORIGIN ||
@@ -336,7 +401,7 @@ export class PaymentsService implements OnModuleInit {
     const initiateReq = {
       orderId: order.id,
       orderNumber: order.orderNumber,
-      amount: Number(order.grandTotal),
+      amount: payableAmount,
       currency: order.currency,
       customerName: order.customerName,
       customerEmail: order.customerEmail || undefined,
@@ -348,7 +413,7 @@ export class PaymentsService implements OnModuleInit {
 
     const result = await adapter.initiatePayment(initiateReq);
 
-    // Record pending transaction
+    // Record pending transaction with exact payable amount and paymentOption
     const idempotencyKey = `pay:${method}:${order.id}:${randomUUID().slice(0, 16)}`;
     await this.db.orderPaymentTransaction.create({
       data: {
@@ -358,21 +423,199 @@ export class PaymentsService implements OnModuleInit {
         provider: method,
         providerReference: result.transactionReference || result.providerSessionId,
         idempotencyKey,
-        amount: order.grandTotal,
+        amount: new Prisma.Decimal(payableAmount),
         currency: order.currency,
         metadata: {
           ...result.metadata,
+          paymentOption,
+          payableAmount,
           initiateUrl: result.redirectUrl,
           storefrontOrigin,
         },
       },
     });
 
+    if (requestedOption && order.paymentOption !== requestedOption) {
+      await this.db.order.update({
+        where: { id: order.id },
+        data: { paymentOption: requestedOption, paymentMethod: method },
+      });
+    }
+
     return {
       redirectUrl: result.redirectUrl,
       provider: method,
       transactionReference: result.transactionReference,
+      amount: payableAmount,
+      paymentOption,
     };
+  }
+
+  async throttle(
+    operation: string,
+    identity: string,
+    max: number,
+    seconds = 900,
+  ) {
+    try {
+      const bucket = Math.floor(Date.now() / (seconds * 1000));
+      const key = digest(`${operation}:${identity}:${bucket}`);
+      const row = await this.db.storefrontThrottle.upsert({
+        where: { key },
+        create: {
+          key,
+          count: 1,
+          expiresAt: new Date((bucket + 1) * seconds * 1000),
+        },
+        update: { count: { increment: 1 } },
+      });
+      if (row.count > max) {
+        throw new HttpException('Too many requests; retry later', 429);
+      }
+    } catch (err: any) {
+      if (err instanceof HttpException) throw err;
+    }
+  }
+
+  async switchPaymentOption(
+    orderId: string,
+    optionOrDto: string | { paymentOption: string; paymentMethod?: string },
+    methodArg?: string,
+    sessionToken?: string,
+  ) {
+    await this.throttle('switch-payment-option', orderId, 10, 60);
+
+    const newOption = typeof optionOrDto === 'string' ? optionOrDto : optionOrDto.paymentOption;
+    const newMethod = typeof optionOrDto === 'string' ? methodArg : optionOrDto.paymentMethod || methodArg;
+    return await this.db.$transaction(async (tx) => {
+      const order = await tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+        include: { coupon: true, addresses: true },
+      });
+
+      // Verify caller ownership if sessionToken is present
+      if (sessionToken) {
+        const tokenHash = digest(sessionToken);
+        const session = await tx.shopperSession.findFirst({
+          where: { tokenHash, expiresAt: { gt: new Date() } },
+        });
+        if (!session) {
+          throw new UnauthorizedException('Invalid or expired session');
+        }
+        const hasAccess = await tx.order.findFirst({
+          where: {
+            id: orderId,
+            OR: [
+              { shopperAccess: { sessionId: session.id } },
+              ...(session.customerId ? [{ customerId: session.customerId }] : []),
+            ],
+          },
+        });
+        if (!hasAccess) {
+          throw new UnauthorizedException('Access denied to this order');
+        }
+      }
+
+      // Blocked if already paid, partially paid, or an advance has been recorded
+      if (
+        order.paymentStatus === 'PAID' ||
+        order.paymentStatus === 'PARTIALLY_PAID' ||
+        (order.paidTotal && new Prisma.Decimal(order.paidTotal).greaterThan(0))
+      ) {
+        throw new ConflictException(
+          'Cannot switch payment option once a payment or advance has been recorded',
+        );
+      }
+      if (order.status === 'CANCELLED') {
+        throw new ConflictException('Cannot modify a cancelled order');
+      }
+
+      const modelCfg = await this.getPaymentModelConfig();
+
+      // Retrieve original coupon discount if coupon was applied
+      let couponDiscount = new Prisma.Decimal(0);
+      if (order.couponCode) {
+        couponDiscount = order.coupon ? new Prisma.Decimal(order.discountTotal) : new Prisma.Decimal(0);
+      }
+
+      let onlineDiscount = new Prisma.Decimal(0);
+      if (newOption === 'OPTION_C') {
+        if (modelCfg.optionCDiscountPercent > 0) {
+          onlineDiscount = order.subtotal
+            .mul(modelCfg.optionCDiscountPercent)
+            .div(100)
+            .toDecimalPlaces(2);
+        } else if (modelCfg.optionCDiscountFixed > 0) {
+          onlineDiscount = Prisma.Decimal.min(
+            order.subtotal,
+            new Prisma.Decimal(modelCfg.optionCDiscountFixed),
+          ).toDecimalPlaces(2);
+        }
+      }
+
+      // Non-stacking rule with coupon: apply whichever discount is larger
+      let effectiveDiscount = couponDiscount;
+      if (newOption === 'OPTION_C') {
+        effectiveDiscount = Prisma.Decimal.max(couponDiscount, onlineDiscount);
+      } else {
+        effectiveDiscount = couponDiscount;
+      }
+
+      // Recompute post-discount subtotal and shipping
+      const postDiscountSubtotal = Prisma.Decimal.max(
+        new Prisma.Decimal(0),
+        order.subtotal.minus(effectiveDiscount),
+      );
+      const shippingAddress = order.addresses?.[0];
+      const recalculatedShippingFee = calcShipping(
+        postDiscountSubtotal.toNumber(),
+        shippingAddress?.city || undefined,
+        shippingAddress?.district || undefined,
+      );
+      const newShippingTotal = new Prisma.Decimal(recalculatedShippingFee);
+
+      if (newOption === 'OPTION_A' && newShippingTotal.lessThanOrEqualTo(0)) {
+        throw new BadRequestException('Advance delivery payment is not applicable for free delivery orders');
+      }
+
+      const newGrandTotal = postDiscountSubtotal.plus(newShippingTotal).plus(order.taxTotal || 0);
+
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          paymentOption: newOption,
+          ...(newMethod ? { paymentMethod: newMethod as any } : {}),
+          discountTotal: effectiveDiscount,
+          shippingTotal: newShippingTotal,
+          grandTotal: newGrandTotal,
+          version: { increment: 1 },
+        },
+      });
+
+      const dueOnDelivery = newOption === 'OPTION_A'
+        ? Prisma.Decimal.max(new Prisma.Decimal(0), updated.subtotal.minus(updated.discountTotal))
+        : newOption === 'OPTION_B' || newOption === 'OPTION_C'
+          ? new Prisma.Decimal(0)
+          : updated.grandTotal;
+
+      const payableNow = newOption === 'OPTION_A'
+        ? updated.shippingTotal
+        : updated.grandTotal;
+
+      return {
+        id: updated.id,
+        orderNumber: updated.orderNumber,
+        paymentOption: updated.paymentOption,
+        paymentMethod: updated.paymentMethod,
+        subtotal: updated.subtotal.toFixed(2),
+        discountTotal: updated.discountTotal.toFixed(2),
+        shippingTotal: updated.shippingTotal.toFixed(2),
+        grandTotal: updated.grandTotal.toFixed(2),
+        paidTotal: (updated.paidTotal || new Prisma.Decimal(0)).toFixed(2),
+        payableNow: payableNow.toFixed(2),
+        amountDueOnDelivery: dueOnDelivery.toFixed(2),
+      };
+    });
   }
 
   async processCallback(
@@ -385,14 +628,23 @@ export class PaymentsService implements OnModuleInit {
       throw new BadRequestException(`Unsupported provider: ${providerName}`);
     }
 
-    const orderId =
+    let orderId =
       query.orderId ||
       String(body.orderId || '') ||
       String(query.tran_id || body.tran_id || '');
 
+    if (!orderId && (query.paymentID || body.paymentID || query.val_id || body.val_id)) {
+      const ref = String(query.paymentID || body.paymentID || query.val_id || body.val_id);
+      const foundTxn = await this.db.orderPaymentTransaction.findFirst({
+        where: { providerReference: ref },
+        select: { orderId: true },
+      });
+      if (foundTxn) orderId = foundTxn.orderId;
+    }
+
     const order = await this.db.order.findFirst({
       where: {
-        OR: [{ id: orderId }, { orderNumber: orderId }],
+        OR: [{ id: orderId || '' }, { orderNumber: orderId || '' }],
       },
       include: {
         items: true,
@@ -428,37 +680,121 @@ export class PaymentsService implements OnModuleInit {
 
     const verification = await adapter.verifyPayment(body, query);
 
+    const txnRef =
+      verification.transactionReference ||
+      verification.bankTrxId ||
+      query.paymentID ||
+      query.val_id ||
+      body.val_id;
+
     return await this.db.$transaction(async (tx) => {
-      // Re-fetch with lock
+      // Row lock to serialize concurrent redirect + IPN
+      try {
+        await tx.$executeRaw`SELECT 1 FROM "orders" WHERE "id" = ${order.id} FOR UPDATE`;
+      } catch {
+        // Safe fallback in test environments without raw lock support
+      }
+
       const currentOrder = await tx.order.findUniqueOrThrow({
         where: { id: order.id },
         include: { reservations: true, payments: true },
       });
 
-      if (currentOrder.paymentStatus === 'PAID') {
+      // Target transaction resolution by reference or pending status
+      const targetTxn = await tx.orderPaymentTransaction.findFirst({
+        where: {
+          orderId: order.id,
+          provider: providerName,
+          OR: [
+            ...(txnRef ? [{ providerReference: String(txnRef) }] : []),
+            { status: 'PENDING' },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // Idempotency: if THIS transaction already succeeded, return early without crediting again
+      if (targetTxn && targetTxn.status === 'SUCCEEDED') {
         return {
           redirectUrl: `${storefrontOrigin}/orders/${order.id}?payment=success`,
         };
       }
 
-      if (verification.success) {
-        // Mark payment transaction as succeeded
-        const verificationData = JSON.parse(
-          JSON.stringify(verification),
-        ) as Prisma.InputJsonValue;
-
-        if (lastPayment) {
+      if (!verification.success) {
+        this.logger.error(
+          `Payment verification failed for order ${order.id} via ${providerName}: ${verification.errorMessage}`,
+        );
+        if (targetTxn) {
           await tx.orderPaymentTransaction.update({
-            where: { id: lastPayment.id },
+            where: { id: targetTxn.id },
+            data: {
+              status: 'FAILED',
+              processedAt: new Date(),
+              metadata: {
+                ...(targetTxn.metadata as object),
+                verification: JSON.parse(JSON.stringify(verification)),
+                failureReason: verification.errorMessage || 'Verification returned failure',
+              },
+            },
+          });
+        }
+        return {
+          redirectUrl: `${storefrontOrigin}/orders/${order.id}?payment=error&message=${encodeURIComponent(
+            verification.errorMessage || 'Payment could not be verified',
+          )}`,
+        };
+      }
+
+      // Amount and currency validation: must match expected amount and currency
+      const verifiedAmount = new Prisma.Decimal(verification.amount);
+      const expectedAmount = targetTxn ? targetTxn.amount : new Prisma.Decimal(currentOrder.grandTotal);
+      const expectedCurrency = currentOrder.currency;
+
+      if (
+        !verifiedAmount.equals(expectedAmount) ||
+        (verification.currency && verification.currency.toUpperCase() !== expectedCurrency.toUpperCase())
+      ) {
+        this.logger.error(
+          `Payment amount or currency mismatch for order ${order.id}. ` +
+          `Expected: ${expectedAmount.toString()} ${expectedCurrency}, ` +
+          `Verified from gateway: ${verifiedAmount.toString()} ${verification.currency}`,
+        );
+        if (targetTxn) {
+          await tx.orderPaymentTransaction.update({
+            where: { id: targetTxn.id },
+            data: {
+              status: 'FAILED',
+              processedAt: new Date(),
+              metadata: {
+                ...(targetTxn.metadata as object),
+                verification: JSON.parse(JSON.stringify(verification)),
+                failureReason: `Amount/currency mismatch: expected ${expectedAmount.toString()} ${expectedCurrency}, received ${verifiedAmount.toString()} ${String(verification.currency || '')}`,
+              },
+            },
+          });
+        }
+        return {
+          redirectUrl: `${storefrontOrigin}/orders/${order.id}?payment=error&message=Amount+mismatch`,
+        };
+      }
+
+      const creditedAmount = verifiedAmount;
+      const verificationData = JSON.parse(
+        JSON.stringify(verification),
+      ) as Prisma.InputJsonValue;
+
+        if (targetTxn) {
+          await tx.orderPaymentTransaction.update({
+            where: { id: targetTxn.id },
             data: {
               status: 'SUCCEEDED',
               providerReference:
                 verification.transactionReference ||
                 verification.bankTrxId ||
-                lastPayment.providerReference,
+                targetTxn.providerReference,
               processedAt: new Date(),
               metadata: {
-                ...(lastPayment.metadata as object),
+                ...(targetTxn.metadata as object),
                 verification: verificationData,
               },
             },
@@ -473,7 +809,7 @@ export class PaymentsService implements OnModuleInit {
               providerReference:
                 verification.transactionReference || verification.bankTrxId,
               idempotencyKey: `cb:${providerName}:${order.id}:${randomUUID()}`,
-              amount: currentOrder.grandTotal,
+              amount: creditedAmount,
               currency: currentOrder.currency,
               processedAt: new Date(),
               metadata: { verification: verificationData },
@@ -481,17 +817,33 @@ export class PaymentsService implements OnModuleInit {
           });
         }
 
-        // Update order status
+        // Atomically increment paidTotal
+        const updatedOrder = await tx.order.update({
+          where: { id: order.id },
+          data: {
+            paidTotal: { increment: creditedAmount },
+          },
+          select: {
+            id: true,
+            grandTotal: true,
+            paidTotal: true,
+            status: true,
+            confirmedAt: true,
+          },
+        });
+
+        const isFullyPaid = updatedOrder.paidTotal.greaterThanOrEqualTo(updatedOrder.grandTotal);
+        const nextPaymentStatus = isFullyPaid ? 'PAID' : 'PARTIALLY_PAID';
+
         await tx.order.update({
           where: { id: order.id },
           data: {
-            paymentStatus: 'PAID',
+            paymentStatus: nextPaymentStatus,
             status:
-              currentOrder.status === 'PENDING'
+              updatedOrder.status === 'PENDING'
                 ? 'CONFIRMED'
-                : currentOrder.status,
-            confirmedAt: currentOrder.confirmedAt || new Date(),
-            paidTotal: currentOrder.grandTotal,
+                : updatedOrder.status,
+            confirmedAt: updatedOrder.confirmedAt || new Date(),
             version: { increment: 1 },
           },
         });
@@ -505,8 +857,10 @@ export class PaymentsService implements OnModuleInit {
             actorId: providerName,
             after: {
               provider: providerName,
-              trxId: verification.bankTrxId,
-              amount: currentOrder.grandTotal.toString(),
+              trxId: verification.bankTrxId || String(txnRef || ''),
+              amount: creditedAmount.toString(),
+              paymentStatus: nextPaymentStatus,
+              paidTotal: updatedOrder.paidTotal.toString(),
             },
           },
         });
@@ -514,38 +868,6 @@ export class PaymentsService implements OnModuleInit {
         return {
           redirectUrl: `${storefrontOrigin}/orders/${order.id}?payment=success`,
         };
-      } else {
-        // Payment failed or was cancelled
-        if (lastPayment) {
-          await tx.orderPaymentTransaction.update({
-            where: { id: lastPayment.id },
-            data: {
-              status: 'FAILED',
-              metadata: {
-                ...(lastPayment.metadata as object),
-                failureReason: verification.errorMessage || verification.rawStatus,
-              },
-            },
-          });
-        }
-
-        await tx.orderEvent.create({
-          data: {
-            orderId: order.id,
-            action: 'PAYMENT_FAILED',
-            actorType: 'GATEWAY',
-            actorId: providerName,
-            after: {
-              provider: providerName,
-              error: verification.errorMessage || verification.rawStatus,
-            },
-          },
-        });
-
-        return {
-          redirectUrl: `${storefrontOrigin}/orders/${order.id}?payment=failed&reason=${encodeURIComponent(verification.errorMessage || 'Payment was not completed')}`,
-        };
-      }
     });
   }
 
@@ -580,41 +902,130 @@ export class PaymentsService implements OnModuleInit {
     }
 
     await this.db.$transaction(async (tx) => {
+      // Row lock to serialize concurrent redirect + IPN
+      try {
+        await tx.$executeRaw`SELECT 1 FROM "orders" WHERE "id" = ${order.id} FOR UPDATE`;
+      } catch {
+        // Safe fallback in test environments without raw lock support
+      }
+
       const currentOrder = await tx.order.findUniqueOrThrow({
         where: { id: order.id },
       });
 
-      if (currentOrder.paymentStatus === 'PAID') return;
+      const ipnRef = verification.bankTrxId || valId;
+      const existingTxn = await tx.orderPaymentTransaction.findFirst({
+        where: {
+          orderId: order.id,
+          provider: providerName,
+          OR: [
+            ...(ipnRef ? [{ providerReference: String(ipnRef) }] : []),
+            { status: 'PENDING' },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // Idempotency: if this transaction already succeeded, return immediately without double crediting
+      if (existingTxn && existingTxn.status === 'SUCCEEDED') {
+        return;
+      }
+
+      const verifiedAmount = new Prisma.Decimal(verification.amount);
+      const expectedAmount = existingTxn ? existingTxn.amount : new Prisma.Decimal(currentOrder.grandTotal);
+      const expectedCurrency = currentOrder.currency;
+
+      if (
+        !verifiedAmount.equals(expectedAmount) ||
+        (verification.currency && verification.currency.toUpperCase() !== expectedCurrency.toUpperCase())
+      ) {
+        this.logger.error(
+          `IPN amount or currency mismatch for order ${order.id}. ` +
+          `Expected: ${expectedAmount.toString()} ${expectedCurrency}, ` +
+          `Received: ${verifiedAmount.toString()} ${verification.currency}`,
+        );
+        if (existingTxn) {
+          await tx.orderPaymentTransaction.update({
+            where: { id: existingTxn.id },
+            data: {
+              status: 'FAILED',
+              processedAt: new Date(),
+              metadata: {
+                ...(existingTxn.metadata as object),
+                verification: JSON.parse(JSON.stringify(verification)),
+                failureReason: `Amount/currency mismatch: expected ${expectedAmount.toString()} ${expectedCurrency}, received ${verifiedAmount.toString()} ${String(verification.currency || '')}`,
+                source: 'IPN',
+              },
+            },
+          });
+        }
+        return;
+      }
+
+      const creditedAmount = verifiedAmount;
 
       const ipnVerification = JSON.parse(
         JSON.stringify(verification),
       ) as Prisma.InputJsonValue;
 
-      await tx.orderPaymentTransaction.create({
+      if (existingTxn) {
+        await tx.orderPaymentTransaction.update({
+          where: { id: existingTxn.id },
+          data: {
+            status: 'SUCCEEDED',
+            providerReference: ipnRef || existingTxn.providerReference,
+            processedAt: new Date(),
+            metadata: {
+              ...(existingTxn.metadata as object),
+              verification: ipnVerification,
+              source: 'IPN',
+            },
+          },
+        });
+      } else {
+        await tx.orderPaymentTransaction.create({
+          data: {
+            orderId: order.id,
+            type: 'PAYMENT',
+            status: 'SUCCEEDED',
+            provider: providerName,
+            providerReference: ipnRef,
+            idempotencyKey: `ipn:${providerName}:${valId || tranId}`,
+            amount: creditedAmount,
+            currency: currentOrder.currency,
+            processedAt: new Date(),
+            metadata: { verification: ipnVerification, source: 'IPN' },
+          },
+        });
+      }
+
+      // Atomically increment paidTotal
+      const updatedOrder = await tx.order.update({
+        where: { id: order.id },
         data: {
-          orderId: order.id,
-          type: 'PAYMENT',
-          status: 'SUCCEEDED',
-          provider: providerName,
-          providerReference: verification.bankTrxId || valId,
-          idempotencyKey: `ipn:${providerName}:${valId || tranId}`,
-          amount: currentOrder.grandTotal,
-          currency: currentOrder.currency,
-          processedAt: new Date(),
-          metadata: { verification: ipnVerification, source: 'IPN' },
+          paidTotal: { increment: creditedAmount },
+        },
+        select: {
+          id: true,
+          grandTotal: true,
+          paidTotal: true,
+          status: true,
+          confirmedAt: true,
         },
       });
+
+      const isFullyPaid = updatedOrder.paidTotal.greaterThanOrEqualTo(updatedOrder.grandTotal);
+      const nextPaymentStatus = isFullyPaid ? 'PAID' : 'PARTIALLY_PAID';
 
       await tx.order.update({
         where: { id: order.id },
         data: {
-          paymentStatus: 'PAID',
+          paymentStatus: nextPaymentStatus,
           status:
-            currentOrder.status === 'PENDING'
+            updatedOrder.status === 'PENDING'
               ? 'CONFIRMED'
-              : currentOrder.status,
-          confirmedAt: currentOrder.confirmedAt || new Date(),
-          paidTotal: currentOrder.grandTotal,
+              : updatedOrder.status,
+          confirmedAt: updatedOrder.confirmedAt || new Date(),
           version: { increment: 1 },
         },
       });
@@ -628,6 +1039,9 @@ export class PaymentsService implements OnModuleInit {
           after: {
             provider: providerName,
             trxId: verification.bankTrxId,
+            amount: creditedAmount.toString(),
+            paymentStatus: nextPaymentStatus,
+            paidTotal: updatedOrder.paidTotal.toString(),
             source: 'IPN_WEBHOOK',
           },
         },

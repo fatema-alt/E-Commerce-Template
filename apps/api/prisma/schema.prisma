@@ -478,6 +478,7 @@ model Order {
   status OrderStatus @default(PENDING)
   paymentStatus OrderPaymentStatus @default(UNPAID)
   paymentMethod OrderPaymentMethod
+  paymentOption String?
   fulfillmentStatus OrderFulfillmentStatus @default(UNFULFILLED)
   currency String @default("BDT") @db.VarChar(3)
   subtotal Decimal @db.Decimal(14, 2)

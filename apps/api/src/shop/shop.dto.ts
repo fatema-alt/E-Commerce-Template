@@ -48,6 +48,10 @@ export class QuoteDto {
    */
   @IsOptional() @Trim() @IsString() @MaxLength(120) city?: string;
   @IsOptional() @Trim() @IsString() @MaxLength(120) district?: string;
+
+  @IsOptional()
+  @IsIn(['OPTION_A', 'OPTION_B', 'OPTION_C', 'BANK_TRANSFER', 'COD'])
+  paymentOption?: string;
 }
 
 export class ValidateCouponDto {
@@ -77,6 +81,9 @@ export class ShopCheckoutDto extends OmitType(CreateOrderDto, [
     | 'SSLCOMMERZ'
     | 'NAGAD'
     | 'ONLINE' = 'COD';
+  @IsOptional()
+  @IsIn(['OPTION_A', 'OPTION_B', 'OPTION_C', 'BANK_TRANSFER', 'COD'])
+  paymentOption?: string;
   @IsString() @MaxLength(10000) quoteToken!: string;
 }
 export class ChangeShopPasswordDto {

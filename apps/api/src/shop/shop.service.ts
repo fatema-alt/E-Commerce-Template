@@ -316,7 +316,37 @@ export class ShopService {
       };
     }
 
-    const total = subtotal.minus(discount);
+    const paymentModelCfg = this.paymentsService?.getPaymentModelConfig
+      ? await this.paymentsService.getPaymentModelConfig()
+      : { optionCDiscountPercent: 0, optionCDiscountFixed: 0 };
+
+    let onlinePaymentDiscount = new Prisma.Decimal(0);
+    if (dto.paymentOption === 'OPTION_C') {
+      if (paymentModelCfg.optionCDiscountPercent > 0) {
+        onlinePaymentDiscount = subtotal
+          .mul(paymentModelCfg.optionCDiscountPercent)
+          .div(100)
+          .toDecimalPlaces(2);
+      } else if (paymentModelCfg.optionCDiscountFixed > 0) {
+        onlinePaymentDiscount = Prisma.Decimal.min(
+          subtotal,
+          new Prisma.Decimal(paymentModelCfg.optionCDiscountFixed),
+        ).toDecimalPlaces(2);
+      }
+    }
+
+    // Non-stacking rule with coupons: apply whichever gives the larger discount
+    let effectiveDiscount = discount;
+    if (dto.paymentOption === 'OPTION_C') {
+      if (onlinePaymentDiscount.greaterThan(discount)) {
+        effectiveDiscount = onlinePaymentDiscount;
+        appliedCoupon = undefined; // Coupon discount replaced by larger online discount
+      } else {
+        onlinePaymentDiscount = new Prisma.Decimal(0);
+      }
+    }
+
+    const total = subtotal.minus(effectiveDiscount);
 
     // --- Shipping calculation ---
     // city/district are optional hints sent from the storefront address form.
@@ -334,16 +364,30 @@ export class ShopService {
     // Rates config surfaced to the client so the UI can display the rule.
     const rates = getShippingRates();
 
+    let payableNow = grandTotal;
+    let amountDueOnDelivery = new Prisma.Decimal(0);
+    if (dto.paymentOption === 'OPTION_A') {
+      payableNow = shipping;
+      amountDueOnDelivery = total;
+    } else if (dto.paymentOption === 'COD' || dto.paymentOption === 'BANK_TRANSFER') {
+      payableNow = grandTotal;
+      amountDueOnDelivery = grandTotal;
+    } else {
+      payableNow = grandTotal;
+      amountDueOnDelivery = new Prisma.Decimal(0);
+    }
+
     const payload = Buffer.from(
       JSON.stringify({
         sessionId,
         items: dto.items,
         subtotal: subtotal.toFixed(2),
-        discount: discount.toFixed(2),
+        discount: effectiveDiscount.toFixed(2),
         shipping: shipping.toFixed(2),
         city: dto.city,
         district: dto.district,
         couponCode: appliedCoupon?.code,
+        paymentOption: dto.paymentOption,
         expires: Date.now() + 10 * 60000,
       }),
     ).toString('base64url');
@@ -354,11 +398,15 @@ export class ShopService {
     return {
       items,
       subtotal: subtotal.toFixed(2),
-      discount: discount.toFixed(2),
+      discount: effectiveDiscount.toFixed(2),
+      onlinePaymentDiscount: onlinePaymentDiscount.toFixed(2),
       coupon: appliedCoupon,
       shipping: shipping.toFixed(2),
       tax: '0.00',
       total: grandTotal.toFixed(2),
+      payableNow: payableNow.toFixed(2),
+      amountDueOnDelivery: amountDueOnDelivery.toFixed(2),
+      paymentOption: dto.paymentOption,
       currency: 'BDT',
       quoteToken,
       shippingRates: {
@@ -455,12 +503,37 @@ export class ShopService {
     if (dto.paymentMethod === 'BANK_TRANSFER' && !availablePayments.bank)
       throw new BadRequestException('Bank transfer is not available');
     const { quoteToken: _quote, ...data } = dto;
+    const paymentOption = dto.paymentOption || 'OPTION_B';
+    if (paymentOption === 'OPTION_A' && shippingTotal.lessThanOrEqualTo(0)) {
+      throw new BadRequestException('Advance delivery payment is not applicable for free delivery orders');
+    }
+
+    let verifiedOnlineDiscount = new Prisma.Decimal(0);
+    if (paymentOption === 'OPTION_C') {
+      const paymentModelCfg = this.paymentsService?.getPaymentModelConfig
+      ? await this.paymentsService.getPaymentModelConfig()
+      : { optionCDiscountPercent: 0, optionCDiscountFixed: 0 };
+      if (paymentModelCfg.optionCDiscountPercent > 0) {
+        verifiedOnlineDiscount = new Prisma.Decimal(quote.subtotal)
+          .mul(paymentModelCfg.optionCDiscountPercent)
+          .div(100)
+          .toDecimalPlaces(2);
+      } else if (paymentModelCfg.optionCDiscountFixed > 0) {
+        verifiedOnlineDiscount = Prisma.Decimal.min(
+          new Prisma.Decimal(quote.subtotal),
+          new Prisma.Decimal(paymentModelCfg.optionCDiscountFixed),
+        ).toDecimalPlaces(2);
+      }
+    }
+
     const order = await this.orders.create(
       {
         ...data,
         customerId: session.customerId || undefined,
         paymentMethod: dto.paymentMethod || 'COD',
+        paymentOption,
         couponCode: quote.couponCode || dto.couponCode,
+        onlineDiscount: verifiedOnlineDiscount.greaterThan(0) ? verifiedOnlineDiscount.toFixed(2) : undefined,
         shippingTotal: shippingTotal.toFixed(2),
       },
       key ? `shop:${session.id}:${key}` : undefined,
@@ -509,6 +582,9 @@ export class ShopService {
         status: true,
         paymentStatus: true,
         paymentMethod: true,
+        paymentOption: true,
+        paidTotal: true,
+        refundedTotal: true,
         createdAt: true,
         grandTotal: true,
         discountTotal: true,
@@ -547,7 +623,17 @@ export class ShopService {
       },
     });
     if (!order) throw new NotFoundException('Order not found');
-    return order;
+    const grandTotal = new Prisma.Decimal(order.grandTotal ?? 0);
+    const paidTotal = new Prisma.Decimal(order.paidTotal ?? 0);
+    const refundedTotal = new Prisma.Decimal(order.refundedTotal ?? 0);
+    const netPaid = paidTotal.minus(refundedTotal);
+    const due = order.paymentStatus === 'PAID'
+      ? new Prisma.Decimal(0)
+      : Prisma.Decimal.max(new Prisma.Decimal(0), grandTotal.minus(netPaid));
+    return {
+      ...order,
+      amountDueOnDelivery: due.toFixed(2),
+    };
   }
   async subscribe(email: string) {
     await this.db.newsletterSubscription.upsert({

@@ -156,6 +156,8 @@ export class OrdersService {
             status: true,
             paymentStatus: true,
             paymentMethod: true,
+            paymentOption: true,
+            paidTotal: true,
             grandTotal: true,
             createdAt: true,
           },
@@ -173,7 +175,17 @@ export class OrdersService {
       include: orderInclude,
     });
     if (!order) throw new NotFoundException('Order not found');
-    return order;
+    const grandTotal = new Prisma.Decimal(order.grandTotal ?? 0);
+    const paidTotal = new Prisma.Decimal(order.paidTotal ?? 0);
+    const refundedTotal = new Prisma.Decimal(order.refundedTotal ?? 0);
+    const netPaid = paidTotal.minus(refundedTotal);
+    const due = order.paymentStatus === 'PAID'
+      ? new Prisma.Decimal(0)
+      : Prisma.Decimal.max(new Prisma.Decimal(0), grandTotal.minus(netPaid));
+    return {
+      ...order,
+      amountDueOnDelivery: due.toFixed(2),
+    };
   }
 
   async create(
@@ -452,6 +464,13 @@ export class OrdersService {
               appliedCouponCode = coupon.code;
             }
 
+            if (dto.onlineDiscount) {
+              const onlineD = new D(dto.onlineDiscount);
+              if (onlineD.greaterThan(discountTotal)) {
+                discountTotal = onlineD;
+              }
+            }
+
             // Shipping total: passed in from shop.service (already server-verified)
             // or 0 for admin-created orders.
             const shippingTotal = dto.shippingTotal
@@ -468,6 +487,7 @@ export class OrdersService {
                 customerEmail: dto.customerEmail?.trim().toLowerCase(),
                 customerPhone: dto.customerPhone.trim(),
                 paymentMethod: dto.paymentMethod,
+                paymentOption: dto.paymentOption || null,
                 source: storefront ? 'STOREFRONT' : undefined,
                 subtotal,
                 discountTotal,

@@ -82,24 +82,32 @@ export class BkashAdapter implements PaymentProvider {
     );
   }
 
-  isEnabled(): boolean {
-    if (this.dynamicConfig?.isEnabled !== undefined) {
-      return this.dynamicConfig.isEnabled;
-    }
-    const configured = Boolean(
+  isConfigured(): boolean {
+    return Boolean(
       this.appKey && this.appSecret && this.username && this.password,
     );
-    const simulationAllowed =
-      process.env.BKASH_SIMULATE === 'true' ||
-      process.env.NODE_ENV !== 'production';
-    return configured || simulationAllowed;
+  }
+
+  isEnabled(): boolean {
+    if (this.dynamicConfig?.isEnabled !== undefined) {
+      if (!this.dynamicConfig.isEnabled) return false;
+    }
+    if (this.isConfigured()) {
+      return true;
+    }
+    // Fail closed: with missing credentials, only allow if explicitly enabled in non-prod
+    return this.isSimulated();
   }
 
   isSimulated(): boolean {
-    const configured = Boolean(
-      this.appKey && this.appSecret && this.username && this.password,
-    );
-    return !configured || process.env.BKASH_SIMULATE === 'true';
+    // Simulation is NEVER active in production under any circumstances
+    if (process.env.NODE_ENV === 'production') {
+      return false;
+    }
+    const explicitFlag =
+      process.env.ALLOW_SIMULATED_PAYMENTS === 'true' ||
+      process.env.BKASH_SIMULATE === 'true';
+    return explicitFlag && !this.isConfigured();
   }
 
   private async getAuthToken(): Promise<string> {
@@ -311,13 +319,13 @@ export class BkashAdapter implements PaymentProvider {
       };
     }
 
-    if (this.isSimulated() || paymentId.startsWith('sim_bkash_')) {
+    if (this.isSimulated() || (process.env.NODE_ENV !== 'production' && paymentId.startsWith('sim_bkash_'))) {
       const isSuccess = status === 'success' || !status;
       return {
         success: isSuccess,
         provider: this.providerName,
         transactionReference: paymentId,
-        amount: Number(payload.amount ?? 0),
+        amount: Number(payload?.amount ?? queryParams?.amount ?? (payload?.metadata as any)?.amount ?? 0),
         currency: 'BDT',
         rawStatus: isSuccess ? 'Completed' : status.toUpperCase(),
         bankTrxId: `SIM_BKASH_${randomUUID().slice(0, 10).toUpperCase()}`,

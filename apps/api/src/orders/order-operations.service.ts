@@ -379,9 +379,20 @@ export class OrderOperationsService extends OrdersService {
           where: { id },
           data: { status: 'CANCELLED', cancelledAt: new Date() },
         });
+        const hasUnrefundedAdvance = order.paidTotal.greaterThan(order.refundedTotal);
+        if (hasUnrefundedAdvance) {
+          const unrefunded = order.paidTotal.minus(order.refundedTotal);
+          await tx.orderAdminNote.create({
+            data: {
+              orderId: id,
+              body: `Order cancelled with advance/online payment collected. Manual refund required: BDT ${unrefunded.toFixed(2)}`,
+              createdByAdminId: actor.id,
+            },
+          });
+        }
         return {
           status: 'CANCELLED',
-          refundRequired: order.paidTotal.greaterThan(order.refundedTotal),
+          refundRequired: hasUnrefundedAdvance,
         };
       },
     );

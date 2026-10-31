@@ -21,7 +21,23 @@ export class InitiatePaymentDto {
 
   @IsOptional()
   @IsString()
+  paymentOption?: string;
+
+  @IsOptional()
+  @IsString()
   returnUrl?: string;
+}
+
+export class SwitchPaymentOptionDto {
+  @IsUUID()
+  orderId!: string;
+
+  @IsString()
+  paymentOption!: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
 }
 
 export class QueryPaymentDto {
