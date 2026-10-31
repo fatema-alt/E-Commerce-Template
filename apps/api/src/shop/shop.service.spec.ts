@@ -59,6 +59,7 @@ describe('Storefront order access and checkout boundaries', () => {
       orders as never,
       payments as never,
       {} as never,
+      { capture: vi.fn(), details: vi.fn().mockResolvedValue(null) } as never,
     );
     const dto = {
       items,
@@ -146,5 +147,47 @@ describe('Storefront order access and checkout boundaries', () => {
       session.id,
       { sessionId: session.id, expectedSubtotal: '500.00' },
     );
+  });
+  it('creates a manual order only for an enabled matching channel, with no gateway discount', async () => {
+    const { service, payments, orders, dto } = fixture();
+    const account = {
+      id: 'MANUAL_NAGAD',
+      accountNumber: '01700000000',
+      accountName: 'Recipient',
+      accountType: 'personal',
+    };
+    payments.getMethods.mockResolvedValue({
+      methods: [{ id: 'MANUAL_NAGAD', enabled: true }],
+      manualTransfers: [account],
+      bank: null,
+    } as never);
+    dto.paymentMethod = 'MANUAL';
+    dto.paymentOption = 'MANUAL_NAGAD';
+    dto.quoteToken = signed({ paymentOption: 'MANUAL_NAGAD' });
+    await service.checkout(dto, token, 'test-manual-checkout');
+    expect(orders.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentMethod: 'MANUAL',
+        paymentOption: 'MANUAL_NAGAD',
+        onlineDiscount: undefined,
+      }),
+      expect.any(String),
+      session.id,
+      expect.any(Object),
+    );
+  });
+  it('refuses disabled manual methods and changing a signed option to obtain an online discount', async () => {
+    const { service, orders, dto } = fixture();
+    dto.paymentMethod = 'MANUAL';
+    dto.paymentOption = 'MANUAL_BKASH';
+    await expect(
+      service.checkout(dto, token, 'test-manual-checkout'),
+    ).rejects.toThrow('manual payment method is unavailable');
+    dto.quoteToken = signed({ paymentOption: 'MANUAL_BKASH' });
+    dto.paymentOption = 'OPTION_C';
+    await expect(
+      service.checkout(dto, token, 'test-manual-checkout'),
+    ).rejects.toThrow('Payment option changed');
+    expect(orders.create).not.toHaveBeenCalled();
   });
 });

@@ -179,12 +179,19 @@ export class OrdersService {
     const paidTotal = new Prisma.Decimal(order.paidTotal ?? 0);
     const refundedTotal = new Prisma.Decimal(order.refundedTotal ?? 0);
     const netPaid = paidTotal.minus(refundedTotal);
-    const due = order.paymentStatus === 'PAID'
-      ? new Prisma.Decimal(0)
-      : Prisma.Decimal.max(new Prisma.Decimal(0), grandTotal.minus(netPaid));
+    const due =
+      order.paymentStatus === 'PAID'
+        ? new Prisma.Decimal(0)
+        : Prisma.Decimal.max(new Prisma.Decimal(0), grandTotal.minus(netPaid));
     return {
       ...order,
-      amountDueOnDelivery: due.toFixed(2),
+      amountDueOnDelivery: [
+        'MANUAL_BKASH',
+        'MANUAL_NAGAD',
+        'BANK_TRANSFER',
+      ].includes(order.paymentOption || '')
+        ? '0.00'
+        : due.toFixed(2),
     };
   }
 
@@ -392,7 +399,9 @@ export class OrdersService {
                 where: { code },
               });
               if (!coupon || !coupon.isActive) {
-                throw new BadRequestException('Invalid or inactive coupon code');
+                throw new BadRequestException(
+                  'Invalid or inactive coupon code',
+                );
               }
               const now = new Date();
               if (coupon.startsAt && coupon.startsAt > now) {
@@ -424,7 +433,9 @@ export class OrdersService {
                 customerConditions.push({ customerId: dto.customerId });
               }
               if (dto.customerPhone) {
-                customerConditions.push({ customerPhone: dto.customerPhone.trim() });
+                customerConditions.push({
+                  customerPhone: dto.customerPhone.trim(),
+                });
               }
               if (dto.customerEmail) {
                 customerConditions.push({
@@ -477,7 +488,9 @@ export class OrdersService {
               ? new D(dto.shippingTotal)
               : new D(0);
 
-            const grandTotal = subtotal.minus(discountTotal).plus(shippingTotal);
+            const grandTotal = subtotal
+              .minus(discountTotal)
+              .plus(shippingTotal);
 
             const order = await tx.order.create({
               data: {

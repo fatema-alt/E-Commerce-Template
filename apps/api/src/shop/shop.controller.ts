@@ -20,6 +20,7 @@ import { SHOP_COOKIE, ShopService } from './shop.service.js';
 import {
   ChangeShopPasswordDto,
   LoginShopperDto,
+  ManualPaymentSubmissionDto,
   NewsletterPreferenceDto,
   QuoteDto,
   RegisterShopperDto,
@@ -145,6 +146,19 @@ export class ShopController {
     if (page < 1 || page > 100000)
       throw new BadRequestException('Invalid page');
     return this.shop.listOrders(this.cookie(req), page);
+  }
+  @Post('orders/:id/manual-payment') async manualPayment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request,
+    @Body() dto: ManualPaymentSubmissionDto,
+  ) {
+    await this.shop.throttle(
+      'manual-payment-session',
+      this.cookie(req) || req.ip || 'unknown',
+      20,
+      3600,
+    );
+    return this.shop.submitManualPayment(id, this.cookie(req), dto);
   }
   @Get('orders/:id') @Header('Cache-Control', 'no-store') order(
     @Param('id', ParseUUIDPipe) id: string,

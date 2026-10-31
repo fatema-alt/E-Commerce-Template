@@ -31,6 +31,7 @@ function Field({
   max,
   step,
   maxLength = 500,
+  minLength,
 }: {
   name: string;
   label: string;
@@ -40,6 +41,7 @@ function Field({
   max?: number;
   step?: string;
   maxLength?: number;
+  minLength?: number;
 }) {
   return (
     <label className="block text-sm text-slate-600">
@@ -52,6 +54,7 @@ function Field({
         max={max}
         step={step}
         maxLength={maxLength}
+        minLength={minLength}
         className={inputClass}
       />
     </label>
@@ -385,6 +388,85 @@ export function PaymentWorkflow({
   );
   return (
     <Panel title="Payment and COD accounting">
+      {order.payments
+        .filter(
+          (payment) =>
+            payment.status === "PENDING" &&
+            payment.metadata?.verification === "CUSTOMER_CLAIM_PENDING",
+        )
+        .map((payment) => (
+          <section
+            key={payment.id}
+            className="space-y-3 rounded-lg border border-amber-300 p-3"
+            aria-label="Pending manual transfer"
+          >
+            <h3 className="font-semibold">
+              Customer transfer — awaiting verification
+            </h3>
+            <p className="break-all text-sm">
+              {payment.provider} · {payment.providerReference} ·{" "}
+              {formatMoney(payment.amount)}
+            </p>
+            <p className="break-all text-sm">
+              Sender: {payment.metadata?.sender}
+            </p>
+            {financial && (
+              <>
+                <form
+                  className="space-y-2"
+                  onSubmit={(event) => {
+                    const form = event.currentTarget;
+                    const values = data(event);
+                    if (
+                      !window.confirm(
+                        "Confirm you independently verified receipt in your bank/mobile account? A transaction ID alone is not proof of payment.",
+                      )
+                    )
+                      return;
+                    void act(`/orders/${order.id}/payments`, {
+                      kind: "MANUAL_VERIFIED",
+                      provider: payment.provider,
+                      reference: payment.providerReference,
+                      amount: String(payment.amount),
+                      evidence: text(values, "evidence"),
+                    }).then((ok) => {
+                      if (ok) form.reset();
+                    });
+                  }}
+                >
+                  <Field
+                    name="evidence"
+                    label="Independent verification evidence (min 10 characters; no secrets)"
+                    minLength={10}
+                    maxLength={500}
+                  />
+                  <Submit busy={busy}>Confirm verified transfer</Submit>
+                </form>
+                <form
+                  className="space-y-2"
+                  onSubmit={(event) => {
+                    const form = event.currentTarget;
+                    const values = data(event);
+                    void act(
+                      `/orders/${order.id}/payments/${payment.id}/reject`,
+                      { note: text(values, "note") },
+                    ).then((ok) => {
+                      if (ok) form.reset();
+                    });
+                  }}
+                >
+                  <Field
+                    name="note"
+                    label="Rejection reason (shown to customer)"
+                    minLength={5}
+                    maxLength={500}
+                  />
+                  <Submit busy={busy}>Reject payment claim</Submit>
+                </form>
+              </>
+            )}
+          </section>
+        ))}
       <p className="text-sm">
         {order.paymentMethod}
         {order.paymentOption ? ` (${order.paymentOption})` : ""} ·{" "}

@@ -90,9 +90,12 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
     | "OPTION_B"
     | "OPTION_C"
     | "BANK_TRANSFER"
+    | "MANUAL_BKASH"
+    | "MANUAL_NAGAD"
     | "COD";
-  const [selectedOption, setSelectedOption] =
-    useState<CheckoutPaymentOption | "">("");
+  const [selectedOption, setSelectedOption] = useState<
+    CheckoutPaymentOption | ""
+  >("");
   const [chosenGateway, setChosenGateway] = useState<string>("");
   const [user, setUser] = useState<Shopper | null>(null);
   const [placed, setPlaced] = useState("");
@@ -176,6 +179,9 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
     Boolean(payments?.methods.some((m) => m.id === "COD" && m.enabled));
 
   const availableOptionIds: CheckoutPaymentOption[] = [
+    ...(payments?.manualTransfers
+      ?.filter((method) => method.id !== "BANK_TRANSFER")
+      .map((method) => method.id) || []),
     optionAAvailable ? ("OPTION_A" as const) : null,
     optionBAvailable ? ("OPTION_B" as const) : null,
     optionCAvailable ? ("OPTION_C" as const) : null,
@@ -244,7 +250,8 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
 
   const beginCheckoutFired = useRef(false);
   useEffect(() => {
-    if (!checkout || cart.lines.length === 0 || beginCheckoutFired.current) return;
+    if (!checkout || cart.lines.length === 0 || beginCheckoutFired.current)
+      return;
     beginCheckoutFired.current = true;
 
     try {
@@ -493,9 +500,11 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
     const effectivePaymentMethod =
       paymentOption === "BANK_TRANSFER"
         ? "BANK_TRANSFER"
-        : paymentOption === "COD"
-          ? "COD"
-          : selectedGateway;
+        : paymentOption === "MANUAL_BKASH" || paymentOption === "MANUAL_NAGAD"
+          ? "MANUAL"
+          : paymentOption === "COD"
+            ? "COD"
+            : selectedGateway;
 
     if (
       !validQuote ||
@@ -938,6 +947,32 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                     role="radiogroup"
                     aria-label="Payment method"
                   >
+                    {payments?.manualTransfers
+                      ?.filter((method) => method.id !== "BANK_TRANSFER")
+                      .map((method) => (
+                        <div
+                          key={method.id}
+                          className={`payment-option-card ${paymentOption === method.id ? "is-selected" : ""}`}
+                        >
+                          <label className="payment-option-header">
+                            <input
+                              type="radio"
+                              name="paymentOption"
+                              value={method.id}
+                              checked={paymentOption === method.id}
+                              onChange={() => setPaymentOption(method.id)}
+                            />
+                            <span>
+                              <strong>{method.label}</strong>
+                              <small>
+                                Transfer after placing your order, then submit
+                                the transaction ID for verification. No
+                                automatic charge.
+                              </small>
+                            </span>
+                          </label>
+                        </div>
+                      ))}
                     {optionAAvailable && (
                       <div
                         className={`payment-option-card ${paymentOption === "OPTION_A" ? "is-selected" : ""}`}
@@ -961,7 +996,8 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                               {validQuote
                                 ? Math.max(
                                     0,
-                                    Number(quote.total) - Number(quote.shipping),
+                                    Number(quote.total) -
+                                      Number(quote.shipping),
                                   ).toLocaleString("en-BD")
                                 : "0"}{" "}
                               in cash when the order is delivered.
@@ -1155,18 +1191,15 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                       </div>
                     )}
                   </div>
-                  {paymentOption === "BANK_TRANSFER" && payments?.bank && (
+                  {["MANUAL_BKASH", "MANUAL_NAGAD", "BANK_TRANSFER"].includes(
+                    paymentOption,
+                  ) && (
                     <div className="bank-details" style={{ marginTop: "14px" }}>
                       <p>
-                        {payments.bank.name} · {payments.bank.branch}
-                      </p>
-                      <p>
-                        {payments.bank.accountName} ·{" "}
-                        {payments.bank.accountNumber}
-                      </p>
-                      <p>
-                        Use your order number as the transfer reference. Payment
-                        remains pending until the store verifies the transfer.
+                        Place your order first. Your order page will show the
+                        recipient details, exact amount and a form to submit
+                        your transaction reference. Payment stays unpaid until
+                        our team verifies the transfer.
                       </p>
                     </div>
                   )}
@@ -1242,8 +1275,8 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                           : "Place Order"}
                   </button>
                   <p className="muted small">
-                    Your final price and stock are checked before the
-                    order is created.
+                    Your final price and stock are checked before the order is
+                    created.
                   </p>
                 </SectionCard>
               </fieldset>
@@ -1352,8 +1385,8 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                   )}
                 </div>
                 <p className="muted small">
-                  Review delivery charges and available payment methods at checkout.
-                  Your final total is checked when placing the order.
+                  Review delivery charges and available payment methods at
+                  checkout. Your final total is checked when placing the order.
                 </p>
                 {validQuote && quote.shippingRates && (
                   <p className="muted small" style={{ marginTop: "4px" }}>

@@ -9,6 +9,7 @@ import {
   Length,
   MaxLength,
   MinLength,
+  Matches,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -50,7 +51,15 @@ export class QuoteDto {
   @IsOptional() @Trim() @IsString() @MaxLength(120) district?: string;
 
   @IsOptional()
-  @IsIn(['OPTION_A', 'OPTION_B', 'OPTION_C', 'BANK_TRANSFER', 'COD'])
+  @IsIn([
+    'OPTION_A',
+    'OPTION_B',
+    'OPTION_C',
+    'BANK_TRANSFER',
+    'COD',
+    'MANUAL_BKASH',
+    'MANUAL_NAGAD',
+  ])
   paymentOption?: string;
 }
 
@@ -73,18 +82,42 @@ export class ShopCheckoutDto extends OmitType(CreateOrderDto, [
   'shippingTotal',
 ] as const) {
   @IsOptional()
-  @IsIn(['COD', 'BANK_TRANSFER', 'BKASH', 'SSLCOMMERZ', 'NAGAD', 'ONLINE'])
+  @IsIn([
+    'COD',
+    'BANK_TRANSFER',
+    'MANUAL',
+    'BKASH',
+    'SSLCOMMERZ',
+    'NAGAD',
+    'ONLINE',
+  ])
   paymentMethod:
     | 'COD'
     | 'BANK_TRANSFER'
+    | 'MANUAL'
     | 'BKASH'
     | 'SSLCOMMERZ'
     | 'NAGAD'
     | 'ONLINE' = 'COD';
   @IsOptional()
-  @IsIn(['OPTION_A', 'OPTION_B', 'OPTION_C', 'BANK_TRANSFER', 'COD'])
+  @IsIn([
+    'OPTION_A',
+    'OPTION_B',
+    'OPTION_C',
+    'BANK_TRANSFER',
+    'COD',
+    'MANUAL_BKASH',
+    'MANUAL_NAGAD',
+  ])
   paymentOption?: string;
   @IsString() @MaxLength(10000) quoteToken!: string;
+}
+export class ManualPaymentSubmissionDto {
+  @Trim()
+  @IsString()
+  @Matches(/^[A-Za-z0-9][A-Za-z0-9 -]{2,99}$/)
+  reference!: string;
+  @Trim() @IsString() @Length(3, 120) sender!: string;
 }
 export class ChangeShopPasswordDto {
   @IsString() @MaxLength(256) currentPassword!: string;

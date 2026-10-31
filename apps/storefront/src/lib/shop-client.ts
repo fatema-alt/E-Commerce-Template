@@ -68,6 +68,17 @@ export type Shopper = {
   phone?: string;
 };
 export type Order = {
+  manualPayment?: {
+    account: ManualTransfer;
+    submissions: {
+      id: string;
+      reference: string;
+      status: string;
+      amount: string;
+      createdAt: string;
+      rejectionReason?: string;
+    }[];
+  } | null;
   id: string;
   orderNumber: string;
   status: string;
@@ -105,9 +116,26 @@ export type Order = {
     district?: string;
     postalCode?: string;
   }[];
-  shipments: { provider?: string; trackingNumber?: string; status: string; shippedAt?: string | null; deliveredAt?: string | null }[];
+  shipments: {
+    provider?: string;
+    trackingNumber?: string;
+    status: string;
+    shippedAt?: string | null;
+    deliveredAt?: string | null;
+  }[];
+};
+export type ManualTransfer = {
+  id: "MANUAL_BKASH" | "MANUAL_NAGAD" | "BANK_TRANSFER";
+  label: string;
+  accountName: string;
+  accountNumber: string;
+  accountType: string;
+  instructions: string;
+  bankName?: string;
+  branch?: string;
 };
 export type Payments = {
+  manualTransfers?: ManualTransfer[];
   methods: { id: string; label: string; enabled: boolean }[];
   bank: {
     name: string;

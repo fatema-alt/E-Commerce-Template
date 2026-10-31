@@ -70,3 +70,6 @@ export class PaymentRecordDto extends OrderMutationDto {
   @IsOptional() @IsUUID() shipmentId?: string;
   @IsOptional() @IsNumberString({ no_symbols: false }) fee?: string;
 }
+export class ManualPaymentRejectionDto extends OrderMutationDto {
+  @Trim() @IsString() @Length(5, 500) note!: string;
+}

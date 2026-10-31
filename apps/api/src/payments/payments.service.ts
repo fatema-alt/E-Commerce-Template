@@ -20,6 +20,10 @@ import {
   UpdatePaymentSettingDto,
 } from './payments.dto.js';
 import type { PaymentProvider } from './payment-provider.interface.js';
+import {
+  manualTransfer,
+  type ManualTransfer,
+} from './manual-payment.config.js';
 
 const digest = (s: string) => createHash('sha256').update(s).digest('hex');
 
@@ -95,6 +99,7 @@ export class PaymentsService implements OnModuleInit {
             accountName: bankConfig.accountName || '',
             accountNumber: bankConfig.accountNumber,
             branch: bankConfig.branch || '',
+            instructions: bankConfig.instructions || '',
           }
         : process.env.BANK_NAME && process.env.BANK_ACCOUNT_NUMBER
           ? {
@@ -102,6 +107,7 @@ export class PaymentsService implements OnModuleInit {
               accountName: process.env.BANK_ACCOUNT_NAME || '',
               accountNumber: process.env.BANK_ACCOUNT_NUMBER,
               branch: process.env.BANK_BRANCH || '',
+              instructions: '',
             }
           : null;
 
@@ -111,7 +117,24 @@ export class PaymentsService implements OnModuleInit {
       : Boolean(bank);
 
     const rawOptions = await this.getPaymentModelConfig();
-    const hasOnlineGateway = this.bkash.isEnabled() || this.sslcommerz.isEnabled();
+    const manualTransfers: ManualTransfer[] = [];
+    for (const provider of ['MANUAL_BKASH', 'MANUAL_NAGAD']) {
+      const row = await this.db.paymentGatewayConfig.findUnique({
+        where: { provider },
+      });
+      const details = row?.isEnabled
+        ? manualTransfer(
+            provider,
+            (row.config || {}) as Record<string, unknown>,
+          )
+        : null;
+      if (details) manualTransfers.push(details);
+    }
+    const bankDetails =
+      bankEnabled && bank ? manualTransfer('BANK_TRANSFER', bank) : null;
+    if (bankDetails) manualTransfers.push(bankDetails);
+    const hasOnlineGateway =
+      this.bkash.isEnabled() || this.sslcommerz.isEnabled();
 
     // If no online gateway is configured/enabled, hide Options A, B, and C completely
     const options = {
@@ -123,8 +146,19 @@ export class PaymentsService implements OnModuleInit {
 
     return {
       methods: [
+        ...manualTransfers
+          .filter((method) => method.id !== 'BANK_TRANSFER')
+          .map((method) => ({
+            id: method.id,
+            label: method.label,
+            enabled: true,
+          })),
         { id: 'COD', label: 'Cash on Delivery', enabled: codEnabled },
-        { id: 'BANK_TRANSFER', label: 'Bank Transfer', enabled: bankEnabled },
+        {
+          id: 'BANK_TRANSFER',
+          label: 'Bank Transfer',
+          enabled: Boolean(bankDetails),
+        },
         {
           id: 'BKASH',
           label: 'bKash',
@@ -139,6 +173,7 @@ export class PaymentsService implements OnModuleInit {
         },
       ],
       bank,
+      manualTransfers,
       options,
     };
   }
@@ -160,9 +195,12 @@ export class PaymentsService implements OnModuleInit {
     }
     const cfg = (row?.config as Record<string, any>) || {};
     return {
-      optionAEnabled: cfg.optionAEnabled !== undefined ? Boolean(cfg.optionAEnabled) : true,
-      optionBEnabled: cfg.optionBEnabled !== undefined ? Boolean(cfg.optionBEnabled) : true,
-      optionCEnabled: cfg.optionCEnabled !== undefined ? Boolean(cfg.optionCEnabled) : true,
+      optionAEnabled:
+        cfg.optionAEnabled !== undefined ? Boolean(cfg.optionAEnabled) : true,
+      optionBEnabled:
+        cfg.optionBEnabled !== undefined ? Boolean(cfg.optionBEnabled) : true,
+      optionCEnabled:
+        cfg.optionCEnabled !== undefined ? Boolean(cfg.optionCEnabled) : true,
       optionCDiscountPercent: Number(cfg.optionCDiscountPercent) || 0,
       optionCDiscountFixed: Number(cfg.optionCDiscountFixed) || 0,
     };
@@ -175,7 +213,8 @@ export class PaymentsService implements OnModuleInit {
 
     const bkashRow = configsMap.get('BKASH');
     const bkashCfg = (bkashRow?.config as Record<string, any>) || {};
-    const bkashAppSecret = bkashCfg.appSecret || process.env.BKASH_APP_SECRET || '';
+    const bkashAppSecret =
+      bkashCfg.appSecret || process.env.BKASH_APP_SECRET || '';
     const bkashPassword = bkashCfg.password || process.env.BKASH_PASSWORD || '';
 
     const sslRow = configsMap.get('SSLCOMMERZ');
@@ -195,6 +234,24 @@ export class PaymentsService implements OnModuleInit {
 
     return {
       gateways: [
+        ...(['MANUAL_BKASH', 'MANUAL_NAGAD'] as const).map((provider) => {
+          const row = configsMap.get(provider);
+          const config = (row?.config || {}) as Record<string, unknown>;
+          return {
+            provider,
+            title:
+              provider === 'MANUAL_BKASH' ? 'bKash (manual)' : 'Nagad (manual)',
+            isEnabled: row?.isEnabled ?? false,
+            isSandbox: false,
+            config: {
+              accountName: config.accountName || '',
+              accountNumber: config.accountNumber || '',
+              accountType: config.accountType || 'personal',
+              instructions: config.instructions || '',
+            },
+            updatedAt: row?.updatedAt,
+          };
+        }),
         {
           provider: 'COD',
           title: 'Cash on Delivery (COD)',
@@ -248,6 +305,7 @@ export class PaymentsService implements OnModuleInit {
             accountNumber:
               bankCfg.accountNumber || process.env.BANK_ACCOUNT_NUMBER || '',
             branch: bankCfg.branch || process.env.BANK_BRANCH || '',
+            instructions: bankCfg.instructions || '',
           },
           updatedAt: bankRow?.updatedAt,
         },
@@ -276,6 +334,19 @@ export class PaymentsService implements OnModuleInit {
     dto: UpdatePaymentSettingDto,
     actorId?: string,
   ) {
+    if (
+      ![
+        'COD',
+        'BKASH',
+        'SSLCOMMERZ',
+        'BANK_TRANSFER',
+        'PAYMENT_OPTIONS',
+        'MANUAL_BKASH',
+        'MANUAL_NAGAD',
+      ].includes(provider)
+    ) {
+      throw new BadRequestException('Unknown payment provider');
+    }
     const existing = await this.db.paymentGatewayConfig.findUnique({
       where: { provider },
     });
@@ -290,6 +361,38 @@ export class PaymentsService implements OnModuleInit {
       }
       if (v !== '' && v !== undefined) {
         mergedConfig[k] = v;
+      }
+    }
+    if (['MANUAL_BKASH', 'MANUAL_NAGAD', 'BANK_TRANSFER'].includes(provider)) {
+      for (const [key, value] of Object.entries(newCfg)) {
+        if (
+          !(
+            provider === 'BANK_TRANSFER'
+              ? [
+                  'accountName',
+                  'accountNumber',
+                  'name',
+                  'branch',
+                  'instructions',
+                ]
+              : ['accountName', 'accountNumber', 'accountType', 'instructions']
+          ).includes(key) ||
+          typeof value !== 'string' ||
+          value.length > (key === 'instructions' ? 1000 : 120)
+        ) {
+          throw new BadRequestException('Invalid manual payment settings');
+        }
+        mergedConfig[key] = value.trim();
+      }
+      if (
+        (dto.isEnabled ?? existing?.isEnabled) &&
+        !manualTransfer(provider, mergedConfig)
+      ) {
+        throw new BadRequestException(
+          provider === 'BANK_TRANSFER'
+            ? 'Set the bank name, account name and account number before enabling'
+            : 'Set a valid recipient name, Bangladesh mobile number and personal/merchant account type before enabling',
+        );
       }
     }
 
@@ -322,12 +425,20 @@ export class PaymentsService implements OnModuleInit {
     const inputConfig = dto.config || {};
 
     if (provider === 'BKASH') {
-      const appKey = inputConfig.appKey || savedConfig.appKey || process.env.BKASH_APP_KEY || '';
+      const appKey =
+        inputConfig.appKey ||
+        savedConfig.appKey ||
+        process.env.BKASH_APP_KEY ||
+        '';
       let appSecret = inputConfig.appSecret;
       if (!appSecret || appSecret.startsWith('••••')) {
         appSecret = savedConfig.appSecret || process.env.BKASH_APP_SECRET || '';
       }
-      const username = inputConfig.username || savedConfig.username || process.env.BKASH_USERNAME || '';
+      const username =
+        inputConfig.username ||
+        savedConfig.username ||
+        process.env.BKASH_USERNAME ||
+        '';
       let password = inputConfig.password;
       if (!password || password.startsWith('••••')) {
         password = savedConfig.password || process.env.BKASH_PASSWORD || '';
@@ -343,10 +454,17 @@ export class PaymentsService implements OnModuleInit {
     }
 
     if (provider === 'SSLCOMMERZ') {
-      const storeId = inputConfig.storeId || savedConfig.storeId || process.env.SSLCOMMERZ_STORE_ID || '';
+      const storeId =
+        inputConfig.storeId ||
+        savedConfig.storeId ||
+        process.env.SSLCOMMERZ_STORE_ID ||
+        '';
       let storePassword = inputConfig.storePassword;
       if (!storePassword || storePassword.startsWith('••••')) {
-        storePassword = savedConfig.storePassword || process.env.SSLCOMMERZ_STORE_PASSWORD || '';
+        storePassword =
+          savedConfig.storePassword ||
+          process.env.SSLCOMMERZ_STORE_PASSWORD ||
+          '';
       }
 
       return this.sslcommerz.testCredentials({
@@ -367,7 +485,9 @@ export class PaymentsService implements OnModuleInit {
   ) {
     const adapter = this.adapters.get(method);
     if (!adapter || !adapter.isEnabled()) {
-      throw new BadRequestException(`Payment method ${method} is not available`);
+      throw new BadRequestException(
+        `Payment method ${method} is not available`,
+      );
     }
 
     const order = await this.db.order.findUnique({
@@ -386,13 +506,17 @@ export class PaymentsService implements OnModuleInit {
     }
 
     if (order.status === 'CANCELLED') {
-      throw new ConflictException('Cannot initiate payment for a cancelled order');
+      throw new ConflictException(
+        'Cannot initiate payment for a cancelled order',
+      );
     }
 
     const paymentOption = requestedOption || order.paymentOption || 'OPTION_B';
 
     if (paymentOption === 'OPTION_A' && Number(order.shippingTotal) <= 0) {
-      throw new BadRequestException('Advance delivery payment is not applicable for free delivery orders');
+      throw new BadRequestException(
+        'Advance delivery payment is not applicable for free delivery orders',
+      );
     }
 
     // Server strictly re-derives payable amount; never trust client amount
@@ -404,13 +528,13 @@ export class PaymentsService implements OnModuleInit {
     }
 
     if (!Number.isFinite(payableAmount) || payableAmount <= 0) {
-      throw new BadRequestException('Invalid payable amount for payment initiation');
+      throw new BadRequestException(
+        'Invalid payable amount for payment initiation',
+      );
     }
 
     const storefrontOrigin =
-      origin ||
-      process.env.STOREFRONT_ORIGIN ||
-      'http://localhost:3000';
+      origin || process.env.STOREFRONT_ORIGIN || 'http://localhost:3000';
 
     const apiPublicUrl =
       process.env.API_PUBLIC_URL ||
@@ -442,7 +566,8 @@ export class PaymentsService implements OnModuleInit {
         type: 'PAYMENT',
         status: 'PENDING',
         provider: method,
-        providerReference: result.transactionReference || result.providerSessionId,
+        providerReference:
+          result.transactionReference || result.providerSessionId,
         idempotencyKey,
         amount: new Prisma.Decimal(payableAmount),
         currency: order.currency,
@@ -506,8 +631,12 @@ export class PaymentsService implements OnModuleInit {
   ) {
     await this.throttle('switch-payment-option', orderId, 10, 60);
 
-    const newOption = typeof optionOrDto === 'string' ? optionOrDto : optionOrDto.paymentOption;
-    const newMethod = typeof optionOrDto === 'string' ? methodArg : optionOrDto.paymentMethod || methodArg;
+    const newOption =
+      typeof optionOrDto === 'string' ? optionOrDto : optionOrDto.paymentOption;
+    const newMethod =
+      typeof optionOrDto === 'string'
+        ? methodArg
+        : optionOrDto.paymentMethod || methodArg;
     return await this.db.$transaction(async (tx) => {
       const order = await tx.order.findUniqueOrThrow({
         where: { id: orderId },
@@ -528,7 +657,9 @@ export class PaymentsService implements OnModuleInit {
             id: orderId,
             OR: [
               { shopperAccess: { sessionId: session.id } },
-              ...(session.customerId ? [{ customerId: session.customerId }] : []),
+              ...(session.customerId
+                ? [{ customerId: session.customerId }]
+                : []),
             ],
           },
         });
@@ -556,7 +687,9 @@ export class PaymentsService implements OnModuleInit {
       // Retrieve original coupon discount if coupon was applied
       let couponDiscount = new Prisma.Decimal(0);
       if (order.couponCode) {
-        couponDiscount = order.coupon ? new Prisma.Decimal(order.discountTotal) : new Prisma.Decimal(0);
+        couponDiscount = order.coupon
+          ? new Prisma.Decimal(order.discountTotal)
+          : new Prisma.Decimal(0);
       }
 
       let onlineDiscount = new Prisma.Decimal(0);
@@ -596,10 +729,14 @@ export class PaymentsService implements OnModuleInit {
       const newShippingTotal = new Prisma.Decimal(recalculatedShippingFee);
 
       if (newOption === 'OPTION_A' && newShippingTotal.lessThanOrEqualTo(0)) {
-        throw new BadRequestException('Advance delivery payment is not applicable for free delivery orders');
+        throw new BadRequestException(
+          'Advance delivery payment is not applicable for free delivery orders',
+        );
       }
 
-      const newGrandTotal = postDiscountSubtotal.plus(newShippingTotal).plus(order.taxTotal || 0);
+      const newGrandTotal = postDiscountSubtotal
+        .plus(newShippingTotal)
+        .plus(order.taxTotal || 0);
 
       const updated = await tx.order.update({
         where: { id: orderId },
@@ -613,15 +750,18 @@ export class PaymentsService implements OnModuleInit {
         },
       });
 
-      const dueOnDelivery = newOption === 'OPTION_A'
-        ? Prisma.Decimal.max(new Prisma.Decimal(0), updated.subtotal.minus(updated.discountTotal))
-        : newOption === 'OPTION_B' || newOption === 'OPTION_C'
-          ? new Prisma.Decimal(0)
-          : updated.grandTotal;
+      const dueOnDelivery =
+        newOption === 'OPTION_A'
+          ? Prisma.Decimal.max(
+              new Prisma.Decimal(0),
+              updated.subtotal.minus(updated.discountTotal),
+            )
+          : newOption === 'OPTION_B' || newOption === 'OPTION_C'
+            ? new Prisma.Decimal(0)
+            : updated.grandTotal;
 
-      const payableNow = newOption === 'OPTION_A'
-        ? updated.shippingTotal
-        : updated.grandTotal;
+      const payableNow =
+        newOption === 'OPTION_A' ? updated.shippingTotal : updated.grandTotal;
 
       return {
         id: updated.id,
@@ -654,8 +794,13 @@ export class PaymentsService implements OnModuleInit {
       String(body.orderId || '') ||
       String(query.tran_id || body.tran_id || '');
 
-    if (!orderId && (query.paymentID || body.paymentID || query.val_id || body.val_id)) {
-      const ref = String(query.paymentID || body.paymentID || query.val_id || body.val_id);
+    if (
+      !orderId &&
+      (query.paymentID || body.paymentID || query.val_id || body.val_id)
+    ) {
+      const ref = String(
+        query.paymentID || body.paymentID || query.val_id || body.val_id,
+      );
       const foundTxn = await this.db.orderPaymentTransaction.findFirst({
         where: { providerReference: ref },
         select: { orderId: true },
@@ -754,7 +899,8 @@ export class PaymentsService implements OnModuleInit {
               metadata: {
                 ...(targetTxn.metadata as object),
                 verification: JSON.parse(JSON.stringify(verification)),
-                failureReason: verification.errorMessage || 'Verification returned failure',
+                failureReason:
+                  verification.errorMessage || 'Verification returned failure',
               },
             },
           });
@@ -768,17 +914,21 @@ export class PaymentsService implements OnModuleInit {
 
       // Amount and currency validation: must match expected amount and currency
       const verifiedAmount = new Prisma.Decimal(verification.amount);
-      const expectedAmount = targetTxn ? targetTxn.amount : new Prisma.Decimal(currentOrder.grandTotal);
+      const expectedAmount = targetTxn
+        ? targetTxn.amount
+        : new Prisma.Decimal(currentOrder.grandTotal);
       const expectedCurrency = currentOrder.currency;
 
       if (
         !verifiedAmount.equals(expectedAmount) ||
-        (verification.currency && verification.currency.toUpperCase() !== expectedCurrency.toUpperCase())
+        (verification.currency &&
+          verification.currency.toUpperCase() !==
+            expectedCurrency.toUpperCase())
       ) {
         this.logger.error(
           `Payment amount or currency mismatch for order ${order.id}. ` +
-          `Expected: ${expectedAmount.toString()} ${expectedCurrency}, ` +
-          `Verified from gateway: ${verifiedAmount.toString()} ${verification.currency}`,
+            `Expected: ${expectedAmount.toString()} ${expectedCurrency}, ` +
+            `Verified from gateway: ${verifiedAmount.toString()} ${verification.currency}`,
         );
         if (targetTxn) {
           await tx.orderPaymentTransaction.update({
@@ -804,95 +954,100 @@ export class PaymentsService implements OnModuleInit {
         JSON.stringify(verification),
       ) as Prisma.InputJsonValue;
 
-        if (targetTxn) {
-          await tx.orderPaymentTransaction.update({
-            where: { id: targetTxn.id },
-            data: {
-              status: 'SUCCEEDED',
-              providerReference:
-                verification.transactionReference ||
-                verification.bankTrxId ||
-                targetTxn.providerReference,
-              processedAt: new Date(),
-              metadata: {
-                ...(targetTxn.metadata as object),
-                verification: verificationData,
-              },
-            },
-          });
-        } else {
-          await tx.orderPaymentTransaction.create({
-            data: {
-              orderId: order.id,
-              type: 'PAYMENT',
-              status: 'SUCCEEDED',
-              provider: providerName,
-              providerReference:
-                verification.transactionReference || verification.bankTrxId,
-              idempotencyKey: `cb:${providerName}:${order.id}:${randomUUID()}`,
-              amount: creditedAmount,
-              currency: currentOrder.currency,
-              processedAt: new Date(),
-              metadata: { verification: verificationData },
-            },
-          });
-        }
-
-        // Atomically increment paidTotal
-        const updatedOrder = await tx.order.update({
-          where: { id: order.id },
+      if (targetTxn) {
+        await tx.orderPaymentTransaction.update({
+          where: { id: targetTxn.id },
           data: {
-            paidTotal: { increment: creditedAmount },
-          },
-          select: {
-            id: true,
-            grandTotal: true,
-            paidTotal: true,
-            status: true,
-            confirmedAt: true,
+            status: 'SUCCEEDED',
+            providerReference:
+              verification.transactionReference ||
+              verification.bankTrxId ||
+              targetTxn.providerReference,
+            processedAt: new Date(),
+            metadata: {
+              ...(targetTxn.metadata as object),
+              verification: verificationData,
+            },
           },
         });
-
-        const isFullyPaid = updatedOrder.paidTotal.greaterThanOrEqualTo(updatedOrder.grandTotal);
-        const nextPaymentStatus = isFullyPaid ? 'PAID' : 'PARTIALLY_PAID';
-
-        await tx.order.update({
-          where: { id: order.id },
-          data: {
-            paymentStatus: nextPaymentStatus,
-            status:
-              updatedOrder.status === 'PENDING'
-                ? 'CONFIRMED'
-                : updatedOrder.status,
-            confirmedAt: updatedOrder.confirmedAt || new Date(),
-            version: { increment: 1 },
-          },
-        });
-
-        // Audit event
-        await tx.orderEvent.create({
+      } else {
+        await tx.orderPaymentTransaction.create({
           data: {
             orderId: order.id,
-            action: 'PAYMENT_CONFIRMED',
-            actorType: 'GATEWAY',
-            actorId: providerName,
-            after: {
-              provider: providerName,
-              trxId: verification.bankTrxId || String(txnRef || ''),
-              amount: creditedAmount.toString(),
-              paymentStatus: nextPaymentStatus,
-              paidTotal: updatedOrder.paidTotal.toString(),
-            },
+            type: 'PAYMENT',
+            status: 'SUCCEEDED',
+            provider: providerName,
+            providerReference:
+              verification.transactionReference || verification.bankTrxId,
+            idempotencyKey: `cb:${providerName}:${order.id}:${randomUUID()}`,
+            amount: creditedAmount,
+            currency: currentOrder.currency,
+            processedAt: new Date(),
+            metadata: { verification: verificationData },
           },
         });
+      }
 
-        return {
-          redirectUrl: `${storefrontOrigin}/orders/${order.id}?payment=success`,
-        };
+      // Atomically increment paidTotal
+      const updatedOrder = await tx.order.update({
+        where: { id: order.id },
+        data: {
+          paidTotal: { increment: creditedAmount },
+        },
+        select: {
+          id: true,
+          grandTotal: true,
+          paidTotal: true,
+          status: true,
+          confirmedAt: true,
+        },
+      });
+
+      const isFullyPaid = updatedOrder.paidTotal.greaterThanOrEqualTo(
+        updatedOrder.grandTotal,
+      );
+      const nextPaymentStatus = isFullyPaid ? 'PAID' : 'PARTIALLY_PAID';
+
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          paymentStatus: nextPaymentStatus,
+          status:
+            updatedOrder.status === 'PENDING'
+              ? 'CONFIRMED'
+              : updatedOrder.status,
+          confirmedAt: updatedOrder.confirmedAt || new Date(),
+          version: { increment: 1 },
+        },
+      });
+
+      // Audit event
+      await tx.orderEvent.create({
+        data: {
+          orderId: order.id,
+          action: 'PAYMENT_CONFIRMED',
+          actorType: 'GATEWAY',
+          actorId: providerName,
+          after: {
+            provider: providerName,
+            trxId: verification.bankTrxId || String(txnRef || ''),
+            amount: creditedAmount.toString(),
+            paymentStatus: nextPaymentStatus,
+            paidTotal: updatedOrder.paidTotal.toString(),
+          },
+        },
+      });
+
+      return {
+        redirectUrl: `${storefrontOrigin}/orders/${order.id}?payment=success`,
+      };
     });
   }
 
-  async processIpn(providerName: 'SSLCOMMERZ', payload: Record<string, unknown>) {
+  async processIpn(
+    providerName: 'SSLCOMMERZ',
+    payload: Record<string, unknown>,
+  ) {
     this.logger.log(`Received IPN from ${providerName}`, payload);
     const tranId = String(payload.tran_id || '');
     const valId = String(payload.val_id || '');
@@ -918,7 +1073,9 @@ export class PaymentsService implements OnModuleInit {
 
     const verification = await this.sslcommerz.verifyPayment(payload);
     if (!verification.success) {
-      this.logger.warn(`IPN verification failed for order ${order.orderNumber}`);
+      this.logger.warn(
+        `IPN verification failed for order ${order.orderNumber}`,
+      );
       return { status: 'FAILED', reason: verification.errorMessage };
     }
 
@@ -953,17 +1110,21 @@ export class PaymentsService implements OnModuleInit {
       }
 
       const verifiedAmount = new Prisma.Decimal(verification.amount);
-      const expectedAmount = existingTxn ? existingTxn.amount : new Prisma.Decimal(currentOrder.grandTotal);
+      const expectedAmount = existingTxn
+        ? existingTxn.amount
+        : new Prisma.Decimal(currentOrder.grandTotal);
       const expectedCurrency = currentOrder.currency;
 
       if (
         !verifiedAmount.equals(expectedAmount) ||
-        (verification.currency && verification.currency.toUpperCase() !== expectedCurrency.toUpperCase())
+        (verification.currency &&
+          verification.currency.toUpperCase() !==
+            expectedCurrency.toUpperCase())
       ) {
         this.logger.error(
           `IPN amount or currency mismatch for order ${order.id}. ` +
-          `Expected: ${expectedAmount.toString()} ${expectedCurrency}, ` +
-          `Received: ${verifiedAmount.toString()} ${verification.currency}`,
+            `Expected: ${expectedAmount.toString()} ${expectedCurrency}, ` +
+            `Received: ${verifiedAmount.toString()} ${verification.currency}`,
         );
         if (existingTxn) {
           await tx.orderPaymentTransaction.update({
@@ -1035,7 +1196,9 @@ export class PaymentsService implements OnModuleInit {
         },
       });
 
-      const isFullyPaid = updatedOrder.paidTotal.greaterThanOrEqualTo(updatedOrder.grandTotal);
+      const isFullyPaid = updatedOrder.paidTotal.greaterThanOrEqualTo(
+        updatedOrder.grandTotal,
+      );
       const nextPaymentStatus = isFullyPaid ? 'PAID' : 'PARTIALLY_PAID';
 
       await tx.order.update({

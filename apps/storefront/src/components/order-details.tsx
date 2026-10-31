@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ManualPayment } from "./manual-payment";
 import type { ReactNode } from "react";
 import { money, type Order } from "../lib/shop-client";
 import {
@@ -75,6 +76,15 @@ export function OrderDetails({
       </header>
       <div className="checkout-grid order-details-grid">
         <div className="shopping-stack">
+          <ManualPayment
+            key={
+              order.id +
+              order.paidTotal +
+              order.paymentStatus +
+              order.manualPayment?.submissions.length
+            }
+            order={order}
+          />
           <SectionCard title="Order Progress">
             <ol className="order-timeline">
               {events.map((event, i) => (

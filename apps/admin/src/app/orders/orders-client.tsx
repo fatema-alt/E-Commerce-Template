@@ -107,7 +107,13 @@ export type OrderDetail = OrderRow & {
     amount: string | number;
     provider: string;
     providerReference?: string;
-    metadata?: { kind?: string; verification?: string; fee?: string };
+    metadata?: {
+      kind?: string;
+      verification?: string;
+      fee?: string;
+      sender?: string;
+      rejectionReason?: string;
+    };
     createdAt: string;
   }>;
 };
@@ -216,7 +222,18 @@ export default function OrdersClient() {
           setLoadedKey(filterKey);
         }
       });
-  }, [page, status, search, paymentStatus, paymentMethod, from, to, sort, setError, filterKey]);
+  }, [
+    page,
+    status,
+    search,
+    paymentStatus,
+    paymentMethod,
+    from,
+    to,
+    sort,
+    setError,
+    filterKey,
+  ]);
   useEffect(() => {
     void load();
   }, [load]);

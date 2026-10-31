@@ -28,6 +28,7 @@ import {
   ReturnDecisionDto,
   ReturnReceiveDto,
   PaymentRecordDto,
+  ManualPaymentRejectionDto,
 } from './dto/order-operations.dto.js';
 import type { Response } from 'express';
 
@@ -197,5 +198,22 @@ export class OrdersController {
     @Req() req: AdminRequest,
   ) {
     return this.orders.recordPayment(id, dto, key, req.admin!);
+  }
+  @Post(':id/payments/:transactionId/reject')
+  @SetMetadata('roles', ['SUPER_ADMIN'])
+  rejectManualPayment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('transactionId', ParseUUIDPipe) transactionId: string,
+    @Body() dto: ManualPaymentRejectionDto,
+    @Headers('idempotency-key') key: string | undefined,
+    @Req() req: AdminRequest,
+  ) {
+    return this.orders.rejectManualPayment(
+      id,
+      transactionId,
+      dto,
+      key,
+      req.admin!,
+    );
   }
 }

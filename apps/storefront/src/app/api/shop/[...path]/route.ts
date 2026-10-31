@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { isStorefrontRequest } from "../../../../lib/request-origin";
 const api = (
   process.env.STOREFRONT_API_BASE_URL || "http://localhost:4000/api/v1"
@@ -11,7 +11,7 @@ async function proxy(
   const allowed =
     req.method === "GET"
       ? /^(me|newsletter|payment-methods|orders(?:\/[a-f0-9-]{36})?|payments\/methods|payments\/status\/[a-f0-9-]{36}|products\/[a-f0-9-]{36}\/(?:reviews|reviews\/summary|qa))$/
-      : /^(register|login|logout|password|quote|orders|coupons\/validate|payments\/(?:initiate|switch-option)|newsletter(?:\/preferences)?|products\/[a-f0-9-]{36}\/(?:reviews|qa)|reviews\/[a-f0-9-]{36}\/helpful)$/;
+      : /^(register|login|logout|password|quote|orders(?:\/[a-f0-9-]{36}\/manual-payment)?|coupons\/validate|payments\/(?:initiate|switch-option)|newsletter(?:\/preferences)?|products\/[a-f0-9-]{36}\/(?:reviews|qa)|reviews\/[a-f0-9-]{36}\/helpful)$/;
   if (!allowed.test(path))
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   let body: string | undefined;

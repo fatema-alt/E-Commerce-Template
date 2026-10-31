@@ -145,7 +145,8 @@ describe('Payments Module Unit Tests', () => {
         currency: 'BDT',
         customerName: 'Karim Ullah',
         customerPhone: '01811000000',
-        callbackUrl: 'http://localhost:4000/api/v1/payments/sslcommerz/callback',
+        callbackUrl:
+          'http://localhost:4000/api/v1/payments/sslcommerz/callback',
         ipnUrl: 'http://localhost:4000/api/v1/payments/sslcommerz/ipn',
         storefrontOrigin: 'http://localhost:3000',
       });
@@ -200,7 +201,9 @@ describe('Payments Module Unit Tests', () => {
           findMany: vi.fn().mockResolvedValue([]),
           findUnique: vi.fn().mockResolvedValue(null),
           findFirst: vi.fn().mockResolvedValue(null),
-          upsert: vi.fn().mockImplementation((args) => Promise.resolve(args.create)),
+          upsert: vi
+            .fn()
+            .mockImplementation((args) => Promise.resolve(args.create)),
         },
         shopperSession: {
           findFirst: vi.fn(),
@@ -232,8 +235,19 @@ describe('Payments Module Unit Tests', () => {
 
     it('returns and updates admin payment settings and checkout payment options', async () => {
       const settings = await service.getAdminSettings();
-      expect(settings.gateways.length).toBe(4);
-      expect(settings.gateways.find((g) => g.provider === 'BKASH')).toBeDefined();
+      expect(settings.gateways.map((gateway) => gateway.provider)).toEqual(
+        expect.arrayContaining([
+          'COD',
+          'BKASH',
+          'SSLCOMMERZ',
+          'BANK_TRANSFER',
+          'MANUAL_BKASH',
+          'MANUAL_NAGAD',
+        ]),
+      );
+      expect(
+        settings.gateways.find((g) => g.provider === 'BKASH'),
+      ).toBeDefined();
       expect(settings.paymentOptions).toBeDefined();
       expect(settings.paymentOptions.optionAEnabled).toBe(true);
 
@@ -350,7 +364,9 @@ describe('Payments Module Unit Tests', () => {
           'http://localhost:3000',
           'OPTION_A',
         ),
-      ).rejects.toThrow('Advance delivery payment is not applicable for free delivery orders');
+      ).rejects.toThrow(
+        'Advance delivery payment is not applicable for free delivery orders',
+      );
     });
 
     it('rejects initiation if order is already PAID', async () => {
@@ -437,7 +453,9 @@ describe('Payments Module Unit Tests', () => {
         { paymentID: 'sim_bkash_part', status: 'success', amount: 100 },
       );
 
-      expect(result.redirectUrl).toContain('/orders/order-part-1?payment=success');
+      expect(result.redirectUrl).toContain(
+        '/orders/order-part-1?payment=success',
+      );
       // Second update sets paymentStatus to PARTIALLY_PAID
       expect(mockDb.order.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -529,7 +547,9 @@ describe('Payments Module Unit Tests', () => {
         { paymentID: 'sim_bkash_done', status: 'success' },
       );
 
-      expect(result.redirectUrl).toContain('/orders/order-dup-1?payment=success');
+      expect(result.redirectUrl).toContain(
+        '/orders/order-dup-1?payment=success',
+      );
       // Must NOT update order.paidTotal
       expect(mockDb.order.update).not.toHaveBeenCalled();
     });
@@ -549,7 +569,9 @@ describe('Payments Module Unit Tests', () => {
       const txn = {
         id: 'txn-concur-1',
         orderId: 'order-concur-1',
-        get status() { return txnStatus; },
+        get status() {
+          return txnStatus;
+        },
         amount: new Prisma.Decimal('1000.00'),
         provider: 'BKASH',
         providerReference: 'sim_bkash_concur',
@@ -572,8 +594,16 @@ describe('Payments Module Unit Tests', () => {
 
       // Fire callback twice concurrently
       const [res1, res2] = await Promise.all([
-        service.processCallback(OnlinePaymentMethod.BKASH, { orderId: order.id }, { paymentID: 'sim_bkash_concur', status: 'success', amount: 1000 }),
-        service.processCallback(OnlinePaymentMethod.BKASH, { orderId: order.id }, { paymentID: 'sim_bkash_concur', status: 'success', amount: 1000 }),
+        service.processCallback(
+          OnlinePaymentMethod.BKASH,
+          { orderId: order.id },
+          { paymentID: 'sim_bkash_concur', status: 'success', amount: 1000 },
+        ),
+        service.processCallback(
+          OnlinePaymentMethod.BKASH,
+          { orderId: order.id },
+          { paymentID: 'sim_bkash_concur', status: 'success', amount: 1000 },
+        ),
       ]);
 
       expect(res1.redirectUrl).toBeDefined();
@@ -670,7 +700,9 @@ describe('Payments Module Unit Tests', () => {
         { paymentID: 'sim_bkash_mismatch', status: 'success', amount: 500 },
       );
 
-      expect(result.redirectUrl).toContain('payment=error&message=Amount+mismatch');
+      expect(result.redirectUrl).toContain(
+        'payment=error&message=Amount+mismatch',
+      );
       // Must NOT credit paidTotal
       expect(mockDb.order.update).not.toHaveBeenCalled();
       // Transaction updated to FAILED
@@ -710,6 +742,7 @@ describe('Payments Module Unit Tests', () => {
         success: true,
         provider: 'BKASH',
         transactionReference: 'sim_bkash_cur',
+        rawStatus: 'Completed',
         amount: 1000,
         currency: 'USD',
       });
@@ -720,7 +753,9 @@ describe('Payments Module Unit Tests', () => {
         { paymentID: 'sim_bkash_cur', status: 'success' },
       );
 
-      expect(result.redirectUrl).toContain('payment=error&message=Amount+mismatch');
+      expect(result.redirectUrl).toContain(
+        'payment=error&message=Amount+mismatch',
+      );
       expect(mockDb.order.update).not.toHaveBeenCalled();
       expect(mockDb.orderPaymentTransaction.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -746,7 +781,9 @@ describe('Payments Module Unit Tests', () => {
 
       await expect(
         service.switchPaymentOption('order-paid-partial', 'OPTION_B'),
-      ).rejects.toThrow('Cannot switch payment option once a payment or advance has been recorded');
+      ).rejects.toThrow(
+        'Cannot switch payment option once a payment or advance has been recorded',
+      );
     });
 
     it('switchPaymentOption rejects unauthorized caller session', async () => {
@@ -767,7 +804,12 @@ describe('Payments Module Unit Tests', () => {
       mockDb.shopperSession.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.switchPaymentOption('order-unauth-1', 'OPTION_A', undefined, 'invalid-token'),
+        service.switchPaymentOption(
+          'order-unauth-1',
+          'OPTION_A',
+          undefined,
+          'invalid-token',
+        ),
       ).rejects.toThrow('Invalid or expired session');
     });
 
@@ -813,7 +855,10 @@ describe('Payments Module Unit Tests', () => {
         paymentOption: 'OPTION_C',
       });
 
-      const switched = await service.switchPaymentOption('order-boundary-1', 'OPTION_C');
+      const switched = await service.switchPaymentOption(
+        'order-boundary-1',
+        'OPTION_C',
+      );
       expect(switched.discountTotal).toBe('100.00');
       expect(switched.shippingTotal).toBe('80.00');
       expect(switched.grandTotal).toBe('2030.00');

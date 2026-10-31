@@ -379,7 +379,9 @@ export class OrderOperationsService extends OrdersService {
           where: { id },
           data: { status: 'CANCELLED', cancelledAt: new Date() },
         });
-        const hasUnrefundedAdvance = order.paidTotal.greaterThan(order.refundedTotal);
+        const hasUnrefundedAdvance = order.paidTotal.greaterThan(
+          order.refundedTotal,
+        );
         if (hasUnrefundedAdvance) {
           const unrefunded = order.paidTotal.minus(order.refundedTotal);
           await tx.orderAdminNote.create({
@@ -796,32 +798,64 @@ export class OrderOperationsService extends OrdersService {
             throw new ConflictException('Payment exceeds order balance');
         }
         // Settlement is a ledger entry, never a second customer payment.
-        const transaction = await tx.orderPaymentTransaction.create({
-          data: {
-            orderId: id,
-            type:
-              dto.kind === 'REFUND_RECORDED'
-                ? 'REFUND'
-                : dto.kind === 'COD_SETTLEMENT'
-                  ? 'CAPTURE'
-                  : 'PAYMENT',
-            status: 'SUCCEEDED',
-            provider,
-            providerReference: dto.reference.trim(),
-            idempotencyKey: key!,
-            amount,
-            metadata: {
-              kind: dto.kind,
-              verification: 'ADMIN_MANUAL_EVIDENCE',
-              evidence: dto.evidence.trim(),
-              actorId: actor.id,
-              shipmentId: dto.shipmentId ?? null,
-              fee: fee.toFixed(2),
-              externalTransferExecuted: false,
-            },
-            processedAt: new Date(),
+        const reference = [
+          'manual_bkash',
+          'manual_nagad',
+          'bank_transfer',
+        ].includes(provider)
+          ? dto.reference.trim().replace(/[ -]/g, '').toUpperCase()
+          : dto.reference.trim();
+        const pending =
+          dto.kind === 'MANUAL_VERIFIED'
+            ? order.payments.find(
+                (p) =>
+                  p.provider === provider && p.providerReference === reference,
+              )
+            : undefined;
+        if (
+          pending &&
+          (pending.status !== 'PENDING' ||
+            !pending.amount.equals(amount) ||
+            (pending.metadata as Record<string, unknown> | null)
+              ?.verification !== 'CUSTOMER_CLAIM_PENDING')
+        )
+          throw new ConflictException(
+            'The payment claim is no longer pending or the amount does not match',
+          );
+        const entry = {
+          orderId: id,
+          type:
+            dto.kind === 'REFUND_RECORDED'
+              ? 'REFUND'
+              : dto.kind === 'COD_SETTLEMENT'
+                ? 'CAPTURE'
+                : 'PAYMENT',
+          status: 'SUCCEEDED',
+          provider,
+          providerReference: reference,
+          idempotencyKey: key!,
+          amount,
+          metadata: {
+            ...((pending?.metadata || {}) as Record<
+              string,
+              Prisma.InputJsonValue
+            >),
+            kind: dto.kind,
+            verification: 'ADMIN_MANUAL_EVIDENCE',
+            evidence: dto.evidence.trim(),
+            actorId: actor.id,
+            shipmentId: dto.shipmentId ?? null,
+            fee: fee.toFixed(2),
+            externalTransferExecuted: false,
           },
-        });
+          processedAt: new Date(),
+        } as const;
+        const transaction = pending
+          ? await tx.orderPaymentTransaction.update({
+              where: { id: pending.id },
+              data: entry,
+            })
+          : await tx.orderPaymentTransaction.create({ data: entry });
         await tx.order.update({
           where: { id },
           data: {
@@ -839,6 +873,51 @@ export class OrderOperationsService extends OrdersService {
           verification: 'ADMIN_MANUAL_EVIDENCE',
           externalTransferExecuted: false,
         };
+      },
+    );
+  }
+  async rejectManualPayment(
+    id: string,
+    transactionId: string,
+    dto: import('./dto/order-operations.dto.js').ManualPaymentRejectionDto,
+    key: string | undefined,
+    actor: Actor,
+  ) {
+    return this.mutate(
+      id,
+      dto,
+      key,
+      actor,
+      'MANUAL_PAYMENT_REJECTED',
+      async (tx, order) => {
+        const claim = order.payments.find(
+          (payment) => payment.id === transactionId,
+        );
+        if (
+          !claim ||
+          claim.status !== 'PENDING' ||
+          (claim.metadata as Record<string, unknown> | null)?.verification !==
+            'CUSTOMER_CLAIM_PENDING'
+        )
+          throw new ConflictException(
+            'This payment claim is no longer awaiting verification',
+          );
+        await tx.orderPaymentTransaction.update({
+          where: { id: claim.id },
+          data: {
+            status: 'FAILED',
+            processedAt: new Date(),
+            metadata: {
+              ...((claim.metadata || {}) as Record<
+                string,
+                Prisma.InputJsonValue
+              >),
+              rejectionReason: dto.note.trim(),
+              reviewedBy: actor.id,
+            },
+          },
+        });
+        return { transactionId, status: 'FAILED', note: dto.note.trim() };
       },
     );
   }

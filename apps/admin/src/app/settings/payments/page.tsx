@@ -19,7 +19,13 @@ import {
 } from "lucide-react";
 
 interface GatewayConfig {
-  provider: "COD" | "BKASH" | "SSLCOMMERZ" | "BANK_TRANSFER";
+  provider:
+    | "COD"
+    | "BKASH"
+    | "SSLCOMMERZ"
+    | "BANK_TRANSFER"
+    | "MANUAL_BKASH"
+    | "MANUAL_NAGAD";
   title: string;
   isEnabled: boolean;
   isSandbox: boolean;
@@ -121,11 +127,7 @@ export default function PaymentSettingsPage() {
     }, 2500);
   };
 
-  const updateGatewayField = (
-    provider: string,
-    field: string,
-    value: any,
-  ) => {
+  const updateGatewayField = (provider: string, field: string, value: any) => {
     setGateways((prev) => {
       const current = prev[provider];
       if (!current) return prev;
@@ -262,7 +264,10 @@ export default function PaymentSettingsPage() {
       if (result.ok) {
         setTestResults((p) => ({
           ...p,
-          [provider]: { ok: true, message: result.message || "Connection verified successfully!" },
+          [provider]: {
+            ok: true,
+            message: result.message || "Connection verified successfully!",
+          },
         }));
       } else {
         setTestResults((p) => ({
@@ -312,13 +317,117 @@ export default function PaymentSettingsPage() {
   return (
     <div className="space-y-8 pb-12">
       {/* Header */}
+      <section className="space-y-4" aria-label="Manual mobile payments">
+        <h2 className="text-xl font-semibold">Manual bKash &amp; Nagad</h2>
+        <p className="text-sm text-slate-500">
+          No API subscription required. Customers place an order, transfer to
+          your account and submit a transaction ID. A SUPER_ADMIN must
+          independently verify it in Orders before recording payment. Keep API
+          gateways disabled until you have credentials.
+        </p>
+        <div className="grid gap-4 md:grid-cols-2">
+          {(["MANUAL_BKASH", "MANUAL_NAGAD"] as const).map((provider) => {
+            const gateway = gateways[provider];
+            if (!gateway) return null;
+            return (
+              <form
+                key={provider}
+                className="space-y-3 rounded-xl border border-slate-200 p-5"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void handleSave(provider);
+                }}
+              >
+                <h3 className="font-semibold">{gateway.title}</h3>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={gateway.isEnabled}
+                    onChange={(event) =>
+                      setGateways((current) => ({
+                        ...current,
+                        [provider]: {
+                          ...current[provider],
+                          isEnabled: event.target.checked,
+                        },
+                      }))
+                    }
+                  />
+                  Enabled at checkout
+                </label>
+                {(["accountName", "accountNumber"] as const).map((field) => (
+                  <label key={field} className="block text-sm">
+                    {field === "accountName"
+                      ? "Recipient account name"
+                      : "Recipient mobile number"}
+                    <input
+                      className="mt-1 block w-full min-w-0 rounded-lg border p-2"
+                      value={String(gateway.config[field] || "")}
+                      onChange={(event) =>
+                        updateGatewayField(provider, field, event.target.value)
+                      }
+                      required={gateway.isEnabled}
+                      maxLength={field === "accountNumber" ? 11 : 120}
+                      inputMode={field === "accountNumber" ? "tel" : "text"}
+                      pattern={
+                        field === "accountNumber"
+                          ? "01[3-9][0-9]{8}"
+                          : undefined
+                      }
+                    />
+                  </label>
+                ))}
+                <label className="block text-sm">
+                  Account type
+                  <select
+                    className="mt-1 block w-full rounded-lg border p-2"
+                    value={String(gateway.config.accountType || "personal")}
+                    onChange={(event) =>
+                      updateGatewayField(
+                        provider,
+                        "accountType",
+                        event.target.value,
+                      )
+                    }
+                  >
+                    <option value="personal">Personal — Send Money</option>
+                    <option value="merchant">Merchant — Payment</option>
+                  </select>
+                </label>
+                <label className="block text-sm">
+                  Additional instructions
+                  <textarea
+                    className="mt-1 block w-full rounded-lg border p-2"
+                    maxLength={1000}
+                    value={String(gateway.config.instructions || "")}
+                    onChange={(event) =>
+                      updateGatewayField(
+                        provider,
+                        "instructions",
+                        event.target.value,
+                      )
+                    }
+                  />
+                </label>
+                <button
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+                  disabled={saving[provider]}
+                >
+                  {saving[provider] ? "Saving…" : `Save ${gateway.title}`}
+                </button>
+              </form>
+            );
+          })}
+        </div>
+      </section>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
             Payment Gateways
           </h1>
           <p className="text-sm text-slate-500">
-            Configure local Bangladesh payment processors, Cash on Delivery, and direct bank transfers.
+            Configure local Bangladesh payment processors, Cash on Delivery, and
+            direct bank transfers.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -373,7 +482,8 @@ export default function PaymentSettingsPage() {
                   Checkout Payment Options
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Configure customer payment options for checkout (advance delivery charge, card payment, and full online payment).
+                  Configure customer payment options for checkout (advance
+                  delivery charge, card payment, and full online payment).
                 </p>
               </div>
             </div>
@@ -384,7 +494,9 @@ export default function PaymentSettingsPage() {
               className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
             >
               <Save size={14} />
-              <span>{savingOptions ? "Saving..." : "Save Payment Options"}</span>
+              <span>
+                {savingOptions ? "Saving..." : "Save Payment Options"}
+              </span>
             </button>
           </div>
 
@@ -397,10 +509,14 @@ export default function PaymentSettingsPage() {
                     Option A: Pay delivery charge now, remainder on delivery
                   </h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    Customer pays only the delivery charge online in advance. The remaining order balance is collected in cash upon delivery.
+                    Customer pays only the delivery charge online in advance.
+                    The remaining order balance is collected in cash upon
+                    delivery.
                   </p>
                   <p className="mt-1 text-[11px] text-slate-400">
-                    Advance amount automatically equals the order delivery charge from delivery settings (no hardcoded charge). Automatically hidden when delivery is free.
+                    Advance amount automatically equals the order delivery
+                    charge from delivery settings (no hardcoded charge).
+                    Automatically hidden when delivery is free.
                   </p>
                 </div>
                 <label className="relative inline-flex cursor-pointer items-center">
@@ -431,7 +547,9 @@ export default function PaymentSettingsPage() {
                     Option B: Pay full amount online by card
                   </h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    Customer pays the entire order balance online using active payment gateways (cards, internet banking, or mobile financial services).
+                    Customer pays the entire order balance online using active
+                    payment gateways (cards, internet banking, or mobile
+                    financial services).
                   </p>
                 </div>
                 <label className="relative inline-flex cursor-pointer items-center">
@@ -462,7 +580,8 @@ export default function PaymentSettingsPage() {
                     Option C: Pay full amount online (optional discount)
                   </h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    Customer pays the full order balance online with an optional admin-configured discount incentive.
+                    Customer pays the full order balance online with an optional
+                    admin-configured discount incentive.
                   </p>
                 </div>
                 <label className="relative inline-flex cursor-pointer items-center">
@@ -496,7 +615,8 @@ export default function PaymentSettingsPage() {
                       onChange={(e) =>
                         setPaymentOptions((prev) => ({
                           ...prev,
-                          optionCDiscountType: e.target.value as "percent" | "fixed",
+                          optionCDiscountType: e.target.value as
+                            "percent" | "fixed",
                         }))
                       }
                       className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -514,8 +634,16 @@ export default function PaymentSettingsPage() {
                     <input
                       type="number"
                       min={0}
-                      max={paymentOptions.optionCDiscountType === "percent" ? 100 : 100000}
-                      step={paymentOptions.optionCDiscountType === "percent" ? "0.1" : "1"}
+                      max={
+                        paymentOptions.optionCDiscountType === "percent"
+                          ? 100
+                          : 100000
+                      }
+                      step={
+                        paymentOptions.optionCDiscountType === "percent"
+                          ? "0.1"
+                          : "1"
+                      }
                       value={
                         paymentOptions.optionCDiscountType === "percent"
                           ? paymentOptions.optionCDiscountPercent
@@ -526,8 +654,14 @@ export default function PaymentSettingsPage() {
                         setPaymentOptions((prev) => ({
                           ...prev,
                           ...(prev.optionCDiscountType === "percent"
-                            ? { optionCDiscountPercent: val, optionCDiscountFixed: 0 }
-                            : { optionCDiscountFixed: val, optionCDiscountPercent: 0 }),
+                            ? {
+                                optionCDiscountPercent: val,
+                                optionCDiscountFixed: 0,
+                              }
+                            : {
+                                optionCDiscountFixed: val,
+                                optionCDiscountPercent: 0,
+                              }),
                         }));
                       }}
                       className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-xs shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -535,7 +669,10 @@ export default function PaymentSettingsPage() {
                   </div>
                 </div>
                 <p className="mt-2 text-[11px] text-slate-500">
-                  If set to 0, no discount is applied. When greater than 0, an explicit line item &quot;Online payment discount: -BDT {'{amount}'}&quot; appears in the order summary without promotional slogans.
+                  If set to 0, no discount is applied. When greater than 0, an
+                  explicit line item &quot;Online payment discount: -BDT{" "}
+                  {"{amount}"}&quot; appears in the order summary without
+                  promotional slogans.
                 </p>
               </div>
             </div>
@@ -555,7 +692,8 @@ export default function PaymentSettingsPage() {
                     Cash on Delivery (COD)
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Accept cash payment upon courier parcel delivery anywhere across Bangladesh.
+                    Accept cash payment upon courier parcel delivery anywhere
+                    across Bangladesh.
                   </p>
                 </div>
               </div>
@@ -586,7 +724,8 @@ export default function PaymentSettingsPage() {
               </div>
             </div>
             <div className="pt-4 text-xs text-slate-600">
-              Cash on Delivery requires no API credentials. When enabled, shoppers will see "Cash on Delivery" as an option on checkout.
+              Cash on Delivery requires no API credentials. When enabled,
+              shoppers will see "Cash on Delivery" as an option on checkout.
             </div>
           </div>
         )}
@@ -615,7 +754,8 @@ export default function PaymentSettingsPage() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500">
-                    Direct automated bKash Payment Gateway API (Tokenized Checkout v1.2.0-beta).
+                    Direct automated bKash Payment Gateway API (Tokenized
+                    Checkout v1.2.0-beta).
                   </p>
                 </div>
               </div>
@@ -639,7 +779,9 @@ export default function PaymentSettingsPage() {
                     />
                     <div className="peer h-5 w-9 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-pink-600 peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
                   </label>
-                  <span className="text-xs font-semibold text-slate-700">Live</span>
+                  <span className="text-xs font-semibold text-slate-700">
+                    Live
+                  </span>
                 </div>
 
                 {/* Enable Toggle */}
@@ -648,11 +790,7 @@ export default function PaymentSettingsPage() {
                     type="checkbox"
                     checked={bkash.isEnabled}
                     onChange={(e) =>
-                      updateGatewayField(
-                        "BKASH",
-                        "isEnabled",
-                        e.target.checked,
-                      )
+                      updateGatewayField("BKASH", "isEnabled", e.target.checked)
                     }
                     className="peer sr-only"
                   />
@@ -871,7 +1009,8 @@ export default function PaymentSettingsPage() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500">
-                    Supports 30+ payment channels: Visa, MasterCard, Amex, Nagad, Rocket, Upay, and Net Banking.
+                    Supports 30+ payment channels: Visa, MasterCard, Amex,
+                    Nagad, Rocket, Upay, and Net Banking.
                   </p>
                 </div>
               </div>
@@ -895,7 +1034,9 @@ export default function PaymentSettingsPage() {
                     />
                     <div className="peer h-5 w-9 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
                   </label>
-                  <span className="text-xs font-semibold text-slate-700">Live</span>
+                  <span className="text-xs font-semibold text-slate-700">
+                    Live
+                  </span>
                 </div>
 
                 {/* Enable Toggle */}
@@ -1024,7 +1165,8 @@ export default function PaymentSettingsPage() {
                 {storeUrl}/api/shop/payments/sslcommerz/ipn
               </code>
               <p className="mt-1.5 text-[11px] text-slate-500">
-                Configure this URL under your SSLCommerz Merchant Panel &gt; IPN Settings for real-time background order reconciliation.
+                Configure this URL under your SSLCommerz Merchant Panel &gt; IPN
+                Settings for real-time background order reconciliation.
               </p>
             </div>
 
@@ -1069,7 +1211,8 @@ export default function PaymentSettingsPage() {
                     Bank Transfer (Direct BDT Deposit)
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Customers deposit BDT directly into your corporate bank account via BEFTN/NPSB.
+                    Customers deposit BDT directly into your corporate bank
+                    account via BEFTN/NPSB.
                   </p>
                 </div>
               </div>
@@ -1171,6 +1314,21 @@ export default function PaymentSettingsPage() {
               </div>
             </div>
 
+            <label className="mt-4 block text-sm">
+              Bank transfer instructions
+              <textarea
+                className="mt-1 block w-full rounded-lg border p-2"
+                maxLength={1000}
+                value={bank.config.instructions || ""}
+                onChange={(event) =>
+                  updateGatewayField(
+                    "BANK_TRANSFER",
+                    "instructions",
+                    event.target.value,
+                  )
+                }
+              />
+            </label>
             {/* Action Buttons */}
             <div className="mt-5 flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
               <button

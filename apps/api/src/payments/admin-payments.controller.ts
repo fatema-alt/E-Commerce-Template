@@ -6,12 +6,14 @@ import {
   Post,
   Put,
   Req,
+  SetMetadata,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { PaymentsService } from './payments.service.js';
 import { TestGatewayDto, UpdatePaymentSettingDto } from './payments.dto.js';
 
 @Controller('admin/payments')
+@SetMetadata('roles', ['SUPER_ADMIN'])
 export class AdminPaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
