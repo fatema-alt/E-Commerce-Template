@@ -8,7 +8,9 @@
     "build": "turbo build",
     "lint": "node scripts/check-mojibake.mjs && turbo lint",
     "check:mojibake": "node scripts/check-mojibake.mjs",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "seed:dashboard": "pnpm --filter api seed:dashboard",
+    "seed:dashboard:clean": "pnpm --filter api seed:dashboard:clean"
   },
   "devDependencies": {
     "turbo": "^2.0.0",

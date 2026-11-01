@@ -304,7 +304,7 @@ export class DashboardService {
           COALESCE(p.id, i."productId", '') AS id,
           i."nameSnapshot" AS name,
           i."skuSnapshot" AS sku,
-          (SELECT url FROM product_images WHERE "productId"=p.id AND "deletedAt" IS NULL ORDER BY "isPrimary" DESC, position ASC LIMIT 1) AS image,
+          (SELECT url FROM product_images WHERE "productId"=p.id ORDER BY "isPrimary" DESC, "sortOrder" ASC LIMIT 1) AS image,
           SUM(i.quantity)::bigint AS units,
           SUM(i."lineTotal") AS revenue
         FROM order_items i
@@ -388,14 +388,23 @@ export class DashboardService {
       this.db.$queryRaw<
         { district: string; orders: bigint; revenue: Prisma.Decimal }[]
       >(
-        Prisma.sql`SELECT
-          COALESCE(NULLIF(TRIM(a.district), ''), NULLIF(TRIM(a.city), ''), 'Unknown') AS district,
-          COUNT(DISTINCT o.id)::bigint AS orders,
-          SUM(CASE WHEN o.status<>'CANCELLED' THEN o."grandTotal" ELSE 0 END) AS revenue
-        FROM orders o
-        JOIN order_addresses a ON a."orderId"=o.id AND a.type='SHIPPING'
-        WHERE o."createdAt">=${start} AND o."createdAt"<${end}
-        GROUP BY district ORDER BY orders DESC, revenue DESC LIMIT 6`,
+        Prisma.sql`WITH geo AS (
+          SELECT
+            o.id,
+            o."grandTotal",
+            o.status,
+            COALESCE(NULLIF(TRIM(a.district), ''), NULLIF(TRIM(a.city), ''), 'Unknown') AS district
+          FROM orders o
+          JOIN order_addresses a ON a."orderId"=o.id AND a.type='SHIPPING'
+          WHERE o."createdAt">=${start} AND o."createdAt"<${end}
+        )
+        SELECT
+          district,
+          COUNT(DISTINCT id)::bigint AS orders,
+          SUM(CASE WHEN status<>'CANCELLED' THEN "grandTotal" ELSE 0 END) AS revenue
+        FROM geo
+        GROUP BY district
+        ORDER BY orders DESC, revenue DESC LIMIT 6`,
       ),
 
       // 12. Recent orders
