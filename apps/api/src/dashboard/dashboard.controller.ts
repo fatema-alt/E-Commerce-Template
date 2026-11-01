@@ -7,30 +7,56 @@ import {
   Headers,
   Patch,
   Post,
+  Query,
   Req,
   SetMetadata,
+  Sse,
 } from '@nestjs/common';
-import { IsIn, IsUUID, Matches } from 'class-validator';
 import { timingSafeEqual } from 'node:crypto';
+import type { Observable } from 'rxjs';
 import type { AdminRequest } from '../auth/auth.guard.js';
+import {
+  AnalyticsEventDto,
+  DashboardLayoutDto,
+  DashboardQueryDto,
+  DashboardTargetDto,
+} from './dashboard.dto.js';
 import { DashboardService } from './dashboard.service.js';
 
-export class DashboardTargetDto {
-  @Matches(/^(0|[1-9]\d{0,9})(\.\d{1,2})?$/) amount!: string;
-}
-export class AnalyticsEventDto {
-  @IsUUID('4') id!: string;
-  @IsUUID('4') sessionId!: string;
-  @IsIn(['PAGE_VIEW', 'PRODUCT_VIEW', 'ADD_TO_CART', 'CHECKOUT', 'CHECKOUT_START']) kind!: string;
-  @IsIn(['direct', 'organic', 'social', 'referral', 'email', 'paid']) source!: string;
-}
+export { AnalyticsEventDto, DashboardLayoutDto, DashboardQueryDto, DashboardTargetDto };
 
 @Controller('dashboard')
 export class DashboardController {
   constructor(private readonly dashboard: DashboardService) {}
-  @Get() @Header('Cache-Control', 'no-store') overview() {
-    return this.dashboard.overview();
+
+  @Get()
+  @Header('Cache-Control', 'no-store')
+  overview(@Query() query: DashboardQueryDto, @Req() req: AdminRequest) {
+    const role = req.admin?.role ?? 'ADMIN';
+    return this.dashboard.overview(query, role);
   }
+
+  @Sse('stream')
+  stream(): Observable<{ data: string }> {
+    return this.dashboard.eventStream();
+  }
+
+  @Get('layout')
+  @Header('Cache-Control', 'no-store')
+  getLayout(@Req() req: AdminRequest) {
+    return this.dashboard.getLayout(req.admin!.id);
+  }
+
+  @Patch('layout')
+  saveLayout(@Body() dto: DashboardLayoutDto, @Req() req: AdminRequest) {
+    return this.dashboard.saveLayout(req.admin!.id, dto.layout);
+  }
+
+  @Post('layout/reset')
+  resetLayout(@Req() req: AdminRequest) {
+    return this.dashboard.resetLayout(req.admin!.id);
+  }
+
   @Patch('target')
   @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
   target(@Body() dto: DashboardTargetDto, @Req() req: AdminRequest) {
@@ -41,6 +67,7 @@ export class DashboardController {
 @Controller('shop/analytics')
 export class AnalyticsController {
   constructor(private readonly dashboard: DashboardService) {}
+
   @Post()
   @SetMetadata('public', true)
   track(
