@@ -53,6 +53,7 @@ export const ModelName = {
   AnalyticsEvent: 'AnalyticsEvent',
   DashboardTarget: 'DashboardTarget',
   AdminUser: 'AdminUser',
+  DashboardLayout: 'DashboardLayout',
   AdminSession: 'AdminSession',
   Category: 'Category',
   Product: 'Product',
@@ -151,6 +152,16 @@ export const AdminUserScalarFieldEnum = {
 } as const
 
 export type AdminUserScalarFieldEnum = (typeof AdminUserScalarFieldEnum)[keyof typeof AdminUserScalarFieldEnum]
+
+
+export const DashboardLayoutScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  layout: 'layout',
+  updatedAt: 'updatedAt'
+} as const
+
+export type DashboardLayoutScalarFieldEnum = (typeof DashboardLayoutScalarFieldEnum)[keyof typeof DashboardLayoutScalarFieldEnum]
 
 
 export const AdminSessionScalarFieldEnum = {
@@ -866,14 +877,6 @@ export const QueryMode = {
 export type QueryMode = (typeof QueryMode)[keyof typeof QueryMode]
 
 
-export const NullsOrder = {
-  first: 'first',
-  last: 'last'
-} as const
-
-export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
-
-
 export const JsonNullValueFilter = {
   DbNull: DbNull,
   JsonNull: JsonNull,
@@ -881,4 +884,12 @@ export const JsonNullValueFilter = {
 } as const
 
 export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
+
+
+export const NullsOrder = {
+  first: 'first',
+  last: 'last'
+} as const
+
+export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
 

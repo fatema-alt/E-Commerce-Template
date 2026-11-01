@@ -394,6 +394,7 @@ export const ModelName = {
   AnalyticsEvent: 'AnalyticsEvent',
   DashboardTarget: 'DashboardTarget',
   AdminUser: 'AdminUser',
+  DashboardLayout: 'DashboardLayout',
   AdminSession: 'AdminSession',
   Category: 'Category',
   Product: 'Product',
@@ -450,7 +451,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "analyticsSession" | "analyticsEvent" | "dashboardTarget" | "adminUser" | "adminSession" | "category" | "product" | "productImage" | "productVariant" | "inventory" | "inventoryMovement" | "catalogAuditLog" | "catalogRedirect" | "catalogSku" | "customer" | "customerAddress" | "customerNote" | "customerAuditEvent" | "order" | "orderItem" | "orderAddress" | "orderPaymentTransaction" | "orderShipment" | "orderReturn" | "orderReturnItem" | "orderEvent" | "orderAdminNote" | "orderStockReservation" | "orderIdempotencyKey" | "cmsDocument" | "cmsVersion" | "cmsAuditEvent" | "cmsMediaAsset" | "cmsAssetReference" | "cmsPublicationEvent" | "shopperAccount" | "shopperSession" | "shopperOrderAccess" | "newsletterSubscription" | "storefrontThrottle" | "coupon" | "couponUsage" | "paymentGatewayConfig" | "productReview" | "productQuestion"
+    modelProps: "analyticsSession" | "analyticsEvent" | "dashboardTarget" | "adminUser" | "dashboardLayout" | "adminSession" | "category" | "product" | "productImage" | "productVariant" | "inventory" | "inventoryMovement" | "catalogAuditLog" | "catalogRedirect" | "catalogSku" | "customer" | "customerAddress" | "customerNote" | "customerAuditEvent" | "order" | "orderItem" | "orderAddress" | "orderPaymentTransaction" | "orderShipment" | "orderReturn" | "orderReturnItem" | "orderEvent" | "orderAdminNote" | "orderStockReservation" | "orderIdempotencyKey" | "cmsDocument" | "cmsVersion" | "cmsAuditEvent" | "cmsMediaAsset" | "cmsAssetReference" | "cmsPublicationEvent" | "shopperAccount" | "shopperSession" | "shopperOrderAccess" | "newsletterSubscription" | "storefrontThrottle" | "coupon" | "couponUsage" | "paymentGatewayConfig" | "productReview" | "productQuestion"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -747,6 +748,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.AdminUserCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.AdminUserCountAggregateOutputType> | number
+        }
+      }
+    }
+    DashboardLayout: {
+      payload: Prisma.$DashboardLayoutPayload<ExtArgs>
+      fields: Prisma.DashboardLayoutFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DashboardLayoutFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardLayoutPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DashboardLayoutFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardLayoutPayload>
+        }
+        findFirst: {
+          args: Prisma.DashboardLayoutFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardLayoutPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DashboardLayoutFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardLayoutPayload>
+        }
+        findMany: {
+          args: Prisma.DashboardLayoutFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardLayoutPayload>[]
+        }
+        create: {
+          args: Prisma.DashboardLayoutCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardLayoutPayload>
+        }
+        createMany: {
+          args: Prisma.DashboardLayoutCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.DashboardLayoutCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardLayoutPayload>[]
+        }
+        delete: {
+          args: Prisma.DashboardLayoutDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardLayoutPayload>
+        }
+        update: {
+          args: Prisma.DashboardLayoutUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardLayoutPayload>
+        }
+        deleteMany: {
+          args: Prisma.DashboardLayoutDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DashboardLayoutUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DashboardLayoutUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardLayoutPayload>[]
+        }
+        upsert: {
+          args: Prisma.DashboardLayoutUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DashboardLayoutPayload>
+        }
+        aggregate: {
+          args: Prisma.DashboardLayoutAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDashboardLayout>
+        }
+        groupBy: {
+          args: Prisma.DashboardLayoutGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DashboardLayoutGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DashboardLayoutCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DashboardLayoutCountAggregateOutputType> | number
         }
       }
     }
@@ -3864,6 +3939,16 @@ export const AdminUserScalarFieldEnum = {
 export type AdminUserScalarFieldEnum = (typeof AdminUserScalarFieldEnum)[keyof typeof AdminUserScalarFieldEnum]
 
 
+export const DashboardLayoutScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  layout: 'layout',
+  updatedAt: 'updatedAt'
+} as const
+
+export type DashboardLayoutScalarFieldEnum = (typeof DashboardLayoutScalarFieldEnum)[keyof typeof DashboardLayoutScalarFieldEnum]
+
+
 export const AdminSessionScalarFieldEnum = {
   id: 'id',
   tokenHash: 'tokenHash',
@@ -4577,14 +4662,6 @@ export const QueryMode = {
 export type QueryMode = (typeof QueryMode)[keyof typeof QueryMode]
 
 
-export const NullsOrder = {
-  first: 'first',
-  last: 'last'
-} as const
-
-export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
-
-
 export const JsonNullValueFilter = {
   DbNull: DbNull,
   JsonNull: JsonNull,
@@ -4592,6 +4669,14 @@ export const JsonNullValueFilter = {
 } as const
 
 export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
+
+
+export const NullsOrder = {
+  first: 'first',
+  last: 'last'
+} as const
+
+export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
 
 
 
@@ -4664,6 +4749,20 @@ export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel,
 
 
 /**
+ * Reference to a field of type 'Json'
+ */
+export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
+    
+
+
+/**
+ * Reference to a field of type 'QueryMode'
+ */
+export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
+    
+
+
+/**
  * Reference to a field of type 'Int'
  */
 export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
@@ -4702,20 +4801,6 @@ export type EnumProductStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$Pr
  * Reference to a field of type 'ProductStatus[]'
  */
 export type ListEnumProductStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ProductStatus[]'>
-    
-
-
-/**
- * Reference to a field of type 'Json'
- */
-export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
-    
-
-
-/**
- * Reference to a field of type 'QueryMode'
- */
-export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
     
 
 
@@ -5047,6 +5132,7 @@ export type GlobalOmitConfig = {
   analyticsEvent?: Prisma.AnalyticsEventOmit
   dashboardTarget?: Prisma.DashboardTargetOmit
   adminUser?: Prisma.AdminUserOmit
+  dashboardLayout?: Prisma.DashboardLayoutOmit
   adminSession?: Prisma.AdminSessionOmit
   category?: Prisma.CategoryOmit
   product?: Prisma.ProductOmit

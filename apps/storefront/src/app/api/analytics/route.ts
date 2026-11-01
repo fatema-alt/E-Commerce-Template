@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { isStorefrontRequest } from "../../../lib/request-origin";
+import { trafficSource } from "../../../lib/analytics";
 
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -24,14 +25,33 @@ export async function POST(req: NextRequest) {
       !data ||
       typeof data !== "object" ||
       !uuid.test(data.id) ||
-      !["PAGE_VIEW", "PRODUCT_VIEW", "ADD_TO_CART", "CHECKOUT"].includes(
+      !["PAGE_VIEW", "PRODUCT_VIEW", "ADD_TO_CART", "CHECKOUT", "CHECKOUT_START"].includes(
         data.kind,
-      ) ||
-      !["direct", "organic", "social", "referral", "email"].includes(
-        data.source,
       )
     )
       return NextResponse.json({ ok: false }, { status: 400 });
+
+    const rawKind = data.kind === "CHECKOUT_START" ? "CHECKOUT" : data.kind;
+    const computedSource =
+      typeof data.referrer === "string" || typeof data.search === "string"
+        ? trafficSource(
+            data.referrer ?? req.headers.get("referer") ?? "",
+            process.env.STOREFRONT_ORIGIN ?? "",
+            data.search ?? "",
+          )
+        : data.source;
+
+    const source = [
+      "direct",
+      "organic",
+      "social",
+      "referral",
+      "email",
+      "paid",
+    ].includes(computedSource)
+      ? computedSource
+      : "direct";
+
     const cookie = req.cookies.get("commerce_analytics")?.value ?? "";
     const sessionId = uuid.test(cookie) ? cookie : randomUUID();
     const api = (
@@ -50,8 +70,8 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         id: data.id,
         sessionId,
-        kind: data.kind,
-        source: data.source,
+        kind: rawKind,
+        source,
       }),
     });
     const response = NextResponse.json(

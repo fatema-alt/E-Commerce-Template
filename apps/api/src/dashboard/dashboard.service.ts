@@ -215,7 +215,7 @@ export class DashboardService {
         update: {},
       });
       await tx.analyticsEvent.createMany({
-        data: [{ id: dto.id, sessionId: dto.sessionId, kind: dto.kind }],
+        data: [{ id: dto.id, sessionId: dto.sessionId, kind: dto.kind === 'CHECKOUT_START' ? 'CHECKOUT' : dto.kind }],
         skipDuplicates: true,
       });
       return { ok: true };

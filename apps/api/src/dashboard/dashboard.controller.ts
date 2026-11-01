@@ -21,8 +21,8 @@ export class DashboardTargetDto {
 export class AnalyticsEventDto {
   @IsUUID('4') id!: string;
   @IsUUID('4') sessionId!: string;
-  @IsIn(['PAGE_VIEW', 'PRODUCT_VIEW', 'ADD_TO_CART', 'CHECKOUT']) kind!: string;
-  @IsIn(['direct', 'organic', 'social', 'referral', 'email']) source!: string;
+  @IsIn(['PAGE_VIEW', 'PRODUCT_VIEW', 'ADD_TO_CART', 'CHECKOUT', 'CHECKOUT_START']) kind!: string;
+  @IsIn(['direct', 'organic', 'social', 'referral', 'email', 'paid']) source!: string;
 }
 
 @Controller('dashboard')

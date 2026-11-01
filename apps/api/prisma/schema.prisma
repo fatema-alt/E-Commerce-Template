@@ -31,6 +31,7 @@ model AnalyticsEvent {
   createdAt DateTime @default(now())
   @@index([createdAt, kind, sessionId])
   @@index([sessionId, createdAt])
+  @@index([sessionId, kind, createdAt])
   @@map("analytics_events")
 }
 
@@ -54,9 +55,20 @@ model AdminUser {
   role         AdminRole @default(STAFF)
   isActive     Boolean @default(true)
   sessions     AdminSession[]
+  dashboardLayout DashboardLayout?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   @@map("admin_users")
+}
+
+model DashboardLayout {
+  id        String    @id @default(uuid())
+  userId    String    @unique
+  user      AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  layout    Json
+  updatedAt DateTime  @updatedAt
+
+  @@map("dashboard_layouts")
 }
 
 model AdminSession {
@@ -514,6 +526,7 @@ model Order {
   couponUsages CouponUsage[]
   @@index([customerId, createdAt])
   @@index([status, createdAt])
+  @@index([createdAt, status])
   @@index([paymentStatus, createdAt])
   @@index([customerPhone, createdAt])
   @@index([createdAt, id])
@@ -562,6 +575,7 @@ model OrderAddress {
   countryCode String @default("BD") @db.VarChar(2)
   createdAt DateTime @default(now())
   @@unique([orderId, type])
+  @@index([district])
   @@map("order_addresses")
 }
 

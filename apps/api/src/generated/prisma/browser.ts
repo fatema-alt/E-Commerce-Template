@@ -38,6 +38,11 @@ export type DashboardTarget = Prisma.DashboardTargetModel
  */
 export type AdminUser = Prisma.AdminUserModel
 /**
+ * Model DashboardLayout
+ * 
+ */
+export type DashboardLayout = Prisma.DashboardLayoutModel
+/**
  * Model AdminSession
  * 
  */

@@ -199,6 +199,7 @@ export type AdminUserWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"AdminUser"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"AdminUser"> | Date | string
   sessions?: Prisma.AdminSessionListRelationFilter
+  dashboardLayout?: Prisma.XOR<Prisma.DashboardLayoutNullableScalarRelationFilter, Prisma.DashboardLayoutWhereInput> | null
 }
 
 export type AdminUserOrderByWithRelationInput = {
@@ -210,6 +211,7 @@ export type AdminUserOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   sessions?: Prisma.AdminSessionOrderByRelationAggregateInput
+  dashboardLayout?: Prisma.DashboardLayoutOrderByWithRelationInput
 }
 
 export type AdminUserWhereUniqueInput = Prisma.AtLeast<{
@@ -224,6 +226,7 @@ export type AdminUserWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"AdminUser"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"AdminUser"> | Date | string
   sessions?: Prisma.AdminSessionListRelationFilter
+  dashboardLayout?: Prisma.XOR<Prisma.DashboardLayoutNullableScalarRelationFilter, Prisma.DashboardLayoutWhereInput> | null
 }, "id" | "email">
 
 export type AdminUserOrderByWithAggregationInput = {
@@ -261,6 +264,7 @@ export type AdminUserCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   sessions?: Prisma.AdminSessionCreateNestedManyWithoutUserInput
+  dashboardLayout?: Prisma.DashboardLayoutCreateNestedOneWithoutUserInput
 }
 
 export type AdminUserUncheckedCreateInput = {
@@ -272,6 +276,7 @@ export type AdminUserUncheckedCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   sessions?: Prisma.AdminSessionUncheckedCreateNestedManyWithoutUserInput
+  dashboardLayout?: Prisma.DashboardLayoutUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type AdminUserUpdateInput = {
@@ -283,6 +288,7 @@ export type AdminUserUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessions?: Prisma.AdminSessionUpdateManyWithoutUserNestedInput
+  dashboardLayout?: Prisma.DashboardLayoutUpdateOneWithoutUserNestedInput
 }
 
 export type AdminUserUncheckedUpdateInput = {
@@ -294,6 +300,7 @@ export type AdminUserUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessions?: Prisma.AdminSessionUncheckedUpdateManyWithoutUserNestedInput
+  dashboardLayout?: Prisma.DashboardLayoutUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type AdminUserCreateManyInput = {
@@ -369,6 +376,20 @@ export type BoolFieldUpdateOperationsInput = {
   set?: boolean
 }
 
+export type AdminUserCreateNestedOneWithoutDashboardLayoutInput = {
+  create?: Prisma.XOR<Prisma.AdminUserCreateWithoutDashboardLayoutInput, Prisma.AdminUserUncheckedCreateWithoutDashboardLayoutInput>
+  connectOrCreate?: Prisma.AdminUserCreateOrConnectWithoutDashboardLayoutInput
+  connect?: Prisma.AdminUserWhereUniqueInput
+}
+
+export type AdminUserUpdateOneRequiredWithoutDashboardLayoutNestedInput = {
+  create?: Prisma.XOR<Prisma.AdminUserCreateWithoutDashboardLayoutInput, Prisma.AdminUserUncheckedCreateWithoutDashboardLayoutInput>
+  connectOrCreate?: Prisma.AdminUserCreateOrConnectWithoutDashboardLayoutInput
+  upsert?: Prisma.AdminUserUpsertWithoutDashboardLayoutInput
+  connect?: Prisma.AdminUserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AdminUserUpdateToOneWithWhereWithoutDashboardLayoutInput, Prisma.AdminUserUpdateWithoutDashboardLayoutInput>, Prisma.AdminUserUncheckedUpdateWithoutDashboardLayoutInput>
+}
+
 export type AdminUserCreateNestedOneWithoutSessionsInput = {
   create?: Prisma.XOR<Prisma.AdminUserCreateWithoutSessionsInput, Prisma.AdminUserUncheckedCreateWithoutSessionsInput>
   connectOrCreate?: Prisma.AdminUserCreateOrConnectWithoutSessionsInput
@@ -383,6 +404,66 @@ export type AdminUserUpdateOneRequiredWithoutSessionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.AdminUserUpdateToOneWithWhereWithoutSessionsInput, Prisma.AdminUserUpdateWithoutSessionsInput>, Prisma.AdminUserUncheckedUpdateWithoutSessionsInput>
 }
 
+export type AdminUserCreateWithoutDashboardLayoutInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  role?: $Enums.AdminRole
+  isActive?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  sessions?: Prisma.AdminSessionCreateNestedManyWithoutUserInput
+}
+
+export type AdminUserUncheckedCreateWithoutDashboardLayoutInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  role?: $Enums.AdminRole
+  isActive?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  sessions?: Prisma.AdminSessionUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type AdminUserCreateOrConnectWithoutDashboardLayoutInput = {
+  where: Prisma.AdminUserWhereUniqueInput
+  create: Prisma.XOR<Prisma.AdminUserCreateWithoutDashboardLayoutInput, Prisma.AdminUserUncheckedCreateWithoutDashboardLayoutInput>
+}
+
+export type AdminUserUpsertWithoutDashboardLayoutInput = {
+  update: Prisma.XOR<Prisma.AdminUserUpdateWithoutDashboardLayoutInput, Prisma.AdminUserUncheckedUpdateWithoutDashboardLayoutInput>
+  create: Prisma.XOR<Prisma.AdminUserCreateWithoutDashboardLayoutInput, Prisma.AdminUserUncheckedCreateWithoutDashboardLayoutInput>
+  where?: Prisma.AdminUserWhereInput
+}
+
+export type AdminUserUpdateToOneWithWhereWithoutDashboardLayoutInput = {
+  where?: Prisma.AdminUserWhereInput
+  data: Prisma.XOR<Prisma.AdminUserUpdateWithoutDashboardLayoutInput, Prisma.AdminUserUncheckedUpdateWithoutDashboardLayoutInput>
+}
+
+export type AdminUserUpdateWithoutDashboardLayoutInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  role?: Prisma.EnumAdminRoleFieldUpdateOperationsInput | $Enums.AdminRole
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sessions?: Prisma.AdminSessionUpdateManyWithoutUserNestedInput
+}
+
+export type AdminUserUncheckedUpdateWithoutDashboardLayoutInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  role?: Prisma.EnumAdminRoleFieldUpdateOperationsInput | $Enums.AdminRole
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sessions?: Prisma.AdminSessionUncheckedUpdateManyWithoutUserNestedInput
+}
+
 export type AdminUserCreateWithoutSessionsInput = {
   id?: string
   email: string
@@ -391,6 +472,7 @@ export type AdminUserCreateWithoutSessionsInput = {
   isActive?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
+  dashboardLayout?: Prisma.DashboardLayoutCreateNestedOneWithoutUserInput
 }
 
 export type AdminUserUncheckedCreateWithoutSessionsInput = {
@@ -401,6 +483,7 @@ export type AdminUserUncheckedCreateWithoutSessionsInput = {
   isActive?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
+  dashboardLayout?: Prisma.DashboardLayoutUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type AdminUserCreateOrConnectWithoutSessionsInput = {
@@ -427,6 +510,7 @@ export type AdminUserUpdateWithoutSessionsInput = {
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  dashboardLayout?: Prisma.DashboardLayoutUpdateOneWithoutUserNestedInput
 }
 
 export type AdminUserUncheckedUpdateWithoutSessionsInput = {
@@ -437,6 +521,7 @@ export type AdminUserUncheckedUpdateWithoutSessionsInput = {
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  dashboardLayout?: Prisma.DashboardLayoutUncheckedUpdateOneWithoutUserNestedInput
 }
 
 
@@ -479,6 +564,7 @@ export type AdminUserSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   createdAt?: boolean
   updatedAt?: boolean
   sessions?: boolean | Prisma.AdminUser$sessionsArgs<ExtArgs>
+  dashboardLayout?: boolean | Prisma.AdminUser$dashboardLayoutArgs<ExtArgs>
   _count?: boolean | Prisma.AdminUserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["adminUser"]>
 
@@ -515,6 +601,7 @@ export type AdminUserSelectScalar = {
 export type AdminUserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "passwordHash" | "role" | "isActive" | "createdAt" | "updatedAt", ExtArgs["result"]["adminUser"]>
 export type AdminUserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   sessions?: boolean | Prisma.AdminUser$sessionsArgs<ExtArgs>
+  dashboardLayout?: boolean | Prisma.AdminUser$dashboardLayoutArgs<ExtArgs>
   _count?: boolean | Prisma.AdminUserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type AdminUserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -524,6 +611,7 @@ export type $AdminUserPayload<ExtArgs extends runtime.Types.Extensions.InternalA
   name: "AdminUser"
   objects: {
     sessions: Prisma.$AdminSessionPayload<ExtArgs>[]
+    dashboardLayout: Prisma.$DashboardLayoutPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -928,6 +1016,7 @@ readonly fields: AdminUserFieldRefs;
 export interface Prisma__AdminUserClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   sessions<T extends Prisma.AdminUser$sessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AdminUser$sessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AdminSessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  dashboardLayout<T extends Prisma.AdminUser$dashboardLayoutArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AdminUser$dashboardLayoutArgs<ExtArgs>>): Prisma.Prisma__DashboardLayoutClient<runtime.Types.Result.GetResult<Prisma.$DashboardLayoutPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1373,6 +1462,25 @@ export type AdminUser$sessionsArgs<ExtArgs extends runtime.Types.Extensions.Inte
   take?: number
   skip?: number
   distinct?: Prisma.AdminSessionScalarFieldEnum | Prisma.AdminSessionScalarFieldEnum[]
+}
+
+/**
+ * AdminUser.dashboardLayout
+ */
+export type AdminUser$dashboardLayoutArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the DashboardLayout
+   */
+  select?: Prisma.DashboardLayoutSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the DashboardLayout
+   */
+  omit?: Prisma.DashboardLayoutOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.DashboardLayoutInclude<ExtArgs> | null
+  where?: Prisma.DashboardLayoutWhereInput
 }
 
 /**

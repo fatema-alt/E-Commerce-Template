@@ -2,10 +2,23 @@ export function trafficSource(
   referrer: string,
   origin: string,
   search: string,
-) {
+): "direct" | "organic" | "social" | "referral" | "email" | "paid" {
   const params = new URLSearchParams(search);
   const medium = (params.get("utm_medium") ?? "").toLowerCase();
   const source = (params.get("utm_source") ?? "").toLowerCase();
+  const campaign = (params.get("utm_campaign") ?? "").toLowerCase();
+
+  // Paid traffic
+  if (
+    params.has("gclid") ||
+    params.has("fbclid") ||
+    params.has("ttclid") ||
+    params.has("msclkid") ||
+    /cpc|ppc|paid|ads|sem/.test(`${medium} ${source} ${campaign}`)
+  ) {
+    return "paid";
+  }
+
   if (/email|newsletter/.test(medium + " " + source)) return "email";
   if (
     /social|facebook|instagram|tiktok|youtube|twitter|linkedin/.test(
@@ -37,7 +50,7 @@ export function trafficSource(
 
 let queue = Promise.resolve();
 export function trackEvent(
-  kind: "PAGE_VIEW" | "PRODUCT_VIEW" | "ADD_TO_CART" | "CHECKOUT",
+  kind: "PAGE_VIEW" | "PRODUCT_VIEW" | "ADD_TO_CART" | "CHECKOUT" | "CHECKOUT_START",
 ) {
   if (typeof window === "undefined" || navigator.doNotTrack === "1") return;
   try {
@@ -45,6 +58,8 @@ export function trackEvent(
     const body = JSON.stringify({
       id: crypto.randomUUID(),
       kind,
+      referrer: document.referrer,
+      search: location.search,
       source: trafficSource(
         document.referrer,
         location.origin,
