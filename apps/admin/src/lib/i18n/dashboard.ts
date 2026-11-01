@@ -221,7 +221,8 @@ export const dashboardDictionary = {
   },
 } as const;
 
-export type DashboardDictionary = typeof dashboardDictionary['en'];
+export type DashboardDictionaryKey = keyof typeof dashboardDictionary['en'];
+export type DashboardDictionary = Record<DashboardDictionaryKey, string>;
 
 export function getDashboardDictionary(locale: Locale): DashboardDictionary {
   return dashboardDictionary[locale] ?? dashboardDictionary.en;
