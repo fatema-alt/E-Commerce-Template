@@ -313,8 +313,6 @@ export function OrderHistory({ id }: { id?: string }) {
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [paying, setPaying] = useState(false);
-  const paymentLock = useRef(false);
   useEffect(() => {
     let live = true;
     const load = async () => {
@@ -413,8 +411,7 @@ export function OrderHistory({ id }: { id?: string }) {
           {
             phone: order.customerPhone,
             firstName: customerName.split(" ")[0] || customerName,
-            lastName:
-              customerName.split(" ").slice(1).join(" ") || undefined,
+            lastName: customerName.split(" ").slice(1).join(" ") || undefined,
             city: customerCity,
           },
           consentState,
@@ -498,8 +495,8 @@ export function OrderHistory({ id }: { id?: string }) {
           className="shop-error"
           style={{ marginBottom: "1rem" }}
         >
-          Payment could not be completed. Review your payment status and retry
-          below if payment is still due.
+          Payment could not be completed. Review your payment status and contact
+          the store if payment is still due.
         </div>
       )}
       {order && order.id === id && (
@@ -511,41 +508,9 @@ export function OrderHistory({ id }: { id?: string }) {
             (order.paymentMethod === "BKASH" ||
               order.paymentMethod === "SSLCOMMERZ") && (
               <div style={{ margin: "1rem 0" }}>
-                <button
-                  type="button"
-                  className="primary-button"
-                  disabled={paying}
-                  onClick={async () => {
-                    if (paymentLock.current) return;
-                    paymentLock.current = true;
-                    setPaying(true);
-                    try {
-                      const res = await shopRequest<{ redirectUrl: string }>(
-                        "payments/initiate",
-                        {
-                          orderId: order.id,
-                          method: order.paymentMethod,
-                          ...(order.paymentOption ? { paymentOption: order.paymentOption } : {}),
-                        },
-                      );
-                      if (res.redirectUrl) {
-                        window.location.href = res.redirectUrl;
-                      }
-                    } catch (payErr) {
-                      setError(
-                        (payErr as Error).message ||
-                          "Payment initiation failed",
-                      );
-                    } finally {
-                      paymentLock.current = false;
-                      setPaying(false);
-                    }
-                  }}
-                >
-                  {paying
-                    ? "Connecting to gateway…"
-                    : `Complete Payment with ${order.paymentMethod === "BKASH" ? "bKash" : "SSLCommerz"} (${money(order.paymentOption === "OPTION_A" ? order.shippingTotal : order.grandTotal)})`}
-                </button>
+                <p>
+                  Please contact the store to complete payment for this order.
+                </p>
               </div>
             )
           }

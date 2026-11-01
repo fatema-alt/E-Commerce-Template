@@ -71,7 +71,13 @@ export function OrderDetails({
         </div>
         <div>
           <span className="small muted">Order status </span>
-          <StatusBadge status={order.status} />
+          <StatusBadge
+            status={
+              order.manualPayments?.[0]?.status === "awaiting_verification"
+                ? "AWAITING_VERIFICATION"
+                : order.status
+            }
+          />
         </div>
       </header>
       <div className="checkout-grid order-details-grid">
@@ -81,6 +87,8 @@ export function OrderDetails({
               order.id +
               order.paidTotal +
               order.paymentStatus +
+              order.manualPayments?.[0]?.status +
+              order.manualPayments?.length +
               order.manualPayment?.submissions.length
             }
             order={order}
@@ -176,6 +184,12 @@ export function OrderDetails({
               tax={order.taxTotal}
               total={order.grandTotal}
               discount={order.discountTotal}
+              couponDiscount={
+                order.paymentPlan ? order.couponDiscount : undefined
+              }
+              onlinePaymentDiscount={
+                order.paymentPlan ? order.prepaidDiscount : undefined
+              }
               coupon={order.couponCode}
             />
             <dl className="summary-details payment-details">

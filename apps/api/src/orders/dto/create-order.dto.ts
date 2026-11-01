@@ -5,6 +5,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsEmail,
+  IsDefined,
   IsEnum,
   IsInt,
   IsNotEmpty,
@@ -49,13 +50,17 @@ export class CreateOrderDto {
   @ValidateNested({ each: true })
   @Type(() => OrderLineDto)
   items!: OrderLineDto[];
+  @IsDefined()
   @ValidateNested()
   @Type(() => CheckoutAddressDto)
   shippingAddress!: CheckoutAddressDto;
   @IsOptional() @Trim() @IsString() @Length(0, 2000) customerNote?: string;
   @IsOptional() @Trim() @IsString() @Length(2, 32) couponCode?: string;
   @IsOptional() @IsString() paymentOption?: string;
-  @IsOptional() @IsString() @Matches(/^\d{1,10}(\.\d{1,2})?$/) onlineDiscount?: string;
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{1,10}(\.\d{1,2})?$/)
+  onlineDiscount?: string;
   /**
    * Pre-calculated shipping fee (BDT) verified server-side before being passed
    * to orders.service. Not exposed to the public API — only injected internally

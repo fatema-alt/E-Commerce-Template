@@ -490,6 +490,10 @@ model Order {
   status OrderStatus @default(PENDING)
   paymentStatus OrderPaymentStatus @default(UNPAID)
   paymentMethod OrderPaymentMethod
+  paymentPlan PaymentPlan?
+  couponDiscount Decimal @default(0) @db.Decimal(14, 2)
+  prepaidDiscount Decimal @default(0) @db.Decimal(14, 2)
+  manualPayments ManualOrderPayment[]
   paymentOption String?
   fulfillmentStatus OrderFulfillmentStatus @default(UNFULFILLED)
   currency String @default("BDT") @db.VarChar(3)
@@ -876,6 +880,7 @@ enum CouponType {
 }
 
 model Coupon {
+  combineWithPrepaidDiscount Boolean @default(false)
   id                String        @id @default(uuid())
   code              String        @unique
   description       String?
@@ -991,3 +996,75 @@ model ProductQuestion {
   @@map("product_questions")
 }
 
+
+enum PaymentMethodType {
+  mobile_banking
+  bank
+  gateway
+}
+enum PaymentPlan {
+  FULL_PAYMENT
+  PARTIAL_ADVANCE
+  COD
+}
+enum ManualPaymentStatus {
+  awaiting_verification
+  confirmed
+  rejected
+}
+model PaymentSettings {
+  id String @id @default("default")
+  fullEnabled Boolean @default(true)
+  discountType String @default("percentage")
+  discountValue Decimal @default(0) @db.Decimal(14, 2)
+  maxDiscountCap Decimal? @db.Decimal(14, 2)
+  partialEnabled Boolean @default(true)
+  advanceType String @default("delivery_charge_only")
+  advanceValue Decimal @default(0) @db.Decimal(14, 2)
+  codEnabled Boolean @default(false)
+  codMin Decimal? @db.Decimal(14, 2)
+  codMax Decimal? @db.Decimal(14, 2)
+  allowStacking Boolean @default(false)
+  maxTotalDiscountPercent Decimal? @db.Decimal(5, 2)
+  updatedAt DateTime @updatedAt
+  @@map("payment_settings")
+}
+model PaymentMethod {
+  id String @id @default(uuid())
+  type PaymentMethodType
+  name String
+  logo String?
+  details Json
+  instruction String @default("")
+  isEnabled Boolean @default(false)
+  sortOrder Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  payments ManualOrderPayment[]
+  @@index([deletedAt, isEnabled, sortOrder])
+  @@map("payment_methods")
+}
+model ManualOrderPayment {
+  id String @id @default(uuid())
+  orderId String
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  plan PaymentPlan
+  paymentMethodId String
+  paymentMethod PaymentMethod @relation(fields: [paymentMethodId], references: [id], onDelete: Restrict)
+  methodSnapshot Json
+  amountDueNow Decimal @db.Decimal(14, 2)
+  amountDueOnDelivery Decimal @db.Decimal(14, 2)
+  senderInfo String
+  reference String @unique
+  status ManualPaymentStatus @default(awaiting_verification)
+  rejectReason String?
+  verifiedBy String?
+  verifiedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([paymentMethodId, reference])
+  @@index([orderId, createdAt])
+  @@index([status, createdAt])
+  @@map("order_payments")
+}

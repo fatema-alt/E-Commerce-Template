@@ -13,7 +13,11 @@ export function reportCte(
   const clauses: Prisma.Sql[] = [Prisma.sql`TRUE`];
   if (filters.status)
     clauses.push(Prisma.sql`o."status"::text = ${filters.status}`);
-  if (filters.paymentStatus)
+  if (filters.paymentStatus === 'AWAITING_VERIFICATION')
+    clauses.push(
+      Prisma.sql`EXISTS (SELECT 1 FROM order_payments mp WHERE mp."orderId"=o.id AND mp.status='awaiting_verification')`,
+    );
+  else if (filters.paymentStatus)
     clauses.push(
       Prisma.sql`o."paymentStatus"::text = ${filters.paymentStatus}`,
     );

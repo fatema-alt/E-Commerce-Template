@@ -94,7 +94,10 @@ export const ModelName = {
   CouponUsage: 'CouponUsage',
   PaymentGatewayConfig: 'PaymentGatewayConfig',
   ProductReview: 'ProductReview',
-  ProductQuestion: 'ProductQuestion'
+  ProductQuestion: 'ProductQuestion',
+  PaymentSettings: 'PaymentSettings',
+  PaymentMethod: 'PaymentMethod',
+  ManualOrderPayment: 'ManualOrderPayment'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -429,6 +432,9 @@ export const OrderScalarFieldEnum = {
   status: 'status',
   paymentStatus: 'paymentStatus',
   paymentMethod: 'paymentMethod',
+  paymentPlan: 'paymentPlan',
+  couponDiscount: 'couponDiscount',
+  prepaidDiscount: 'prepaidDiscount',
   paymentOption: 'paymentOption',
   fulfillmentStatus: 'fulfillmentStatus',
   currency: 'currency',
@@ -756,6 +762,7 @@ export type StorefrontThrottleScalarFieldEnum = (typeof StorefrontThrottleScalar
 
 
 export const CouponScalarFieldEnum = {
+  combineWithPrepaidDiscount: 'combineWithPrepaidDiscount',
   id: 'id',
   code: 'code',
   description: 'description',
@@ -844,6 +851,64 @@ export const ProductQuestionScalarFieldEnum = {
 } as const
 
 export type ProductQuestionScalarFieldEnum = (typeof ProductQuestionScalarFieldEnum)[keyof typeof ProductQuestionScalarFieldEnum]
+
+
+export const PaymentSettingsScalarFieldEnum = {
+  id: 'id',
+  fullEnabled: 'fullEnabled',
+  discountType: 'discountType',
+  discountValue: 'discountValue',
+  maxDiscountCap: 'maxDiscountCap',
+  partialEnabled: 'partialEnabled',
+  advanceType: 'advanceType',
+  advanceValue: 'advanceValue',
+  codEnabled: 'codEnabled',
+  codMin: 'codMin',
+  codMax: 'codMax',
+  allowStacking: 'allowStacking',
+  maxTotalDiscountPercent: 'maxTotalDiscountPercent',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PaymentSettingsScalarFieldEnum = (typeof PaymentSettingsScalarFieldEnum)[keyof typeof PaymentSettingsScalarFieldEnum]
+
+
+export const PaymentMethodScalarFieldEnum = {
+  id: 'id',
+  type: 'type',
+  name: 'name',
+  logo: 'logo',
+  details: 'details',
+  instruction: 'instruction',
+  isEnabled: 'isEnabled',
+  sortOrder: 'sortOrder',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  deletedAt: 'deletedAt'
+} as const
+
+export type PaymentMethodScalarFieldEnum = (typeof PaymentMethodScalarFieldEnum)[keyof typeof PaymentMethodScalarFieldEnum]
+
+
+export const ManualOrderPaymentScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  plan: 'plan',
+  paymentMethodId: 'paymentMethodId',
+  methodSnapshot: 'methodSnapshot',
+  amountDueNow: 'amountDueNow',
+  amountDueOnDelivery: 'amountDueOnDelivery',
+  senderInfo: 'senderInfo',
+  reference: 'reference',
+  status: 'status',
+  rejectReason: 'rejectReason',
+  verifiedBy: 'verifiedBy',
+  verifiedAt: 'verifiedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ManualOrderPaymentScalarFieldEnum = (typeof ManualOrderPaymentScalarFieldEnum)[keyof typeof ManualOrderPaymentScalarFieldEnum]
 
 
 export const SortOrder = {

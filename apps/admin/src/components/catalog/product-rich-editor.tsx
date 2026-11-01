@@ -8,10 +8,14 @@ export default function ProductRichEditor({
   value,
   onChange,
   disabled = false,
+  label = "Full Description",
+  maxLength = 50000,
 }: {
   value: string;
   onChange: (html: string) => void;
   disabled?: boolean;
+  label?: string;
+  maxLength?: number;
 }) {
   const id = useId();
   const [linkOpen, setLinkOpen] = useState(false);
@@ -36,7 +40,7 @@ export default function ProductRichEditor({
     editorProps: {
       attributes: {
         role: "textbox",
-        "aria-label": "Full Description",
+        "aria-label": label,
         "aria-multiline": "true",
         "aria-describedby": id,
         class: "product-rich-content",
@@ -79,7 +83,7 @@ export default function ProductRichEditor({
   );
   return (
     <div className="product-rich-editor full" aria-busy={!editor}>
-      <p className="product-rich-label">Full Description</p>
+      <p className="product-rich-label">{label}</p>
       <div
         className="product-rich-toolbar"
         role="toolbar"
@@ -210,13 +214,14 @@ export default function ProductRichEditor({
       )}
       <p
         className={
-          length > 50000 ? "product-rich-error" : "product-editor-help"
+          length > maxLength ? "product-rich-error" : "product-editor-help"
         }
         id={id}
-        role={length > 50000 ? "alert" : undefined}
+        role={length > maxLength ? "alert" : undefined}
       >
-        {length.toLocaleString()} / 50,000 HTML characters. Bengali, English and
-        emojis supported. Links and formatting are sanitized on save.
+        {length.toLocaleString()} / {maxLength.toLocaleString()} HTML
+        characters. Bengali, English and emojis supported. Links and formatting
+        are sanitized on save.
       </p>
     </div>
   );

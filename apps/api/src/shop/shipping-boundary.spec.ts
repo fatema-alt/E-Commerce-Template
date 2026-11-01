@@ -1,5 +1,6 @@
 import { Prisma } from '../generated/prisma/client.js';
 import { ShopService } from './shop.service.js';
+import { defaultPlanSettings } from '../payments/plan-pricing.js';
 import { getShippingRates } from './shipping.config.js';
 
 describe('Quoted free-delivery eligibility after discounts', () => {
@@ -13,22 +14,45 @@ describe('Quoted free-delivery eligibility after discounts', () => {
 
   async function quote(subtotal: number, couponDiscount = 0) {
     const db = {
-      product: { findFirst: vi.fn().mockResolvedValue({
-        id: 'boundary-product', type: 'SIMPLE', name: 'Boundary product',
-        slug: 'boundary-product', categoryId: 'category', currency: 'BDT',
-        price: new Prisma.Decimal(subtotal), salePrice: null,
-        trackInventory: false, variants: [], images: [],
-      }) },
+      product: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'boundary-product',
+          type: 'SIMPLE',
+          name: 'Boundary product',
+          slug: 'boundary-product',
+          categoryId: 'category',
+          currency: 'BDT',
+          price: new Prisma.Decimal(subtotal),
+          salePrice: null,
+          trackInventory: false,
+          variants: [],
+          images: [],
+        }),
+      },
       $queryRaw: vi.fn().mockResolvedValue([{ count: 0n }]),
     };
-    const promotions = { evaluateCoupon: vi.fn().mockResolvedValue({
-      code: 'BOUNDARY', discountAmount: new Prisma.Decimal(couponDiscount),
-    }) };
-    const service = new ShopService(db as never, {} as never, {} as never, promotions as never);
-    const result = await service.quote({
-      items: [{ productId: 'boundary-product', quantity: 1 }], city: 'Dhaka',
-      ...(couponDiscount ? { couponCode: 'BOUNDARY' } : {}),
-    }, 'boundary-session');
+    const promotions = {
+      evaluateCoupon: vi.fn().mockResolvedValue({
+        code: 'BOUNDARY',
+        type: 'FIXED_AMOUNT',
+        value: couponDiscount,
+        discountAmount: new Prisma.Decimal(couponDiscount),
+      }),
+    };
+    const service = new ShopService(
+      db as never,
+      {} as never,
+      { settings: vi.fn().mockResolvedValue(defaultPlanSettings) } as never,
+      promotions as never,
+    );
+    const result = await service.quote(
+      {
+        items: [{ productId: 'boundary-product', quantity: 1 }],
+        city: 'Dhaka',
+        ...(couponDiscount ? { couponCode: 'BOUNDARY' } : {}),
+      },
+      'boundary-session',
+    );
     if (couponDiscount) expect(promotions.evaluateCoupon).toHaveBeenCalled();
     return result;
   }
@@ -41,7 +65,9 @@ describe('Quoted free-delivery eligibility after discounts', () => {
   });
   it('charges delivery one unit below the configured threshold', async () => {
     const rates = getShippingRates();
-    expect((await quote(rates.freeAbove - 1)).shipping).toBe(rates.insideDhaka.toFixed(2));
+    expect((await quote(rates.freeAbove - 1)).shipping).toBe(
+      rates.insideDhaka.toFixed(2),
+    );
   });
   it('uses the post-coupon subtotal: below threshold costs delivery, exactly at it is free', async () => {
     const rates = getShippingRates();
@@ -49,6 +75,8 @@ describe('Quoted free-delivery eligibility after discounts', () => {
     const below = await quote(rates.freeAbove, discount);
     expect(below.discount).toBe(discount.toFixed(2));
     expect(below.shipping).toBe(rates.insideDhaka.toFixed(2));
-    expect((await quote(rates.freeAbove + discount, discount)).shipping).toBe('0.00');
+    expect((await quote(rates.freeAbove + discount, discount)).shipping).toBe(
+      '0.00',
+    );
   });
 });

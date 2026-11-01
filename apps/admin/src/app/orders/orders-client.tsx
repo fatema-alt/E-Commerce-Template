@@ -30,6 +30,44 @@ export type OrderRow = {
   createdAt: string;
 };
 export type OrderDetail = OrderRow & {
+  updatedAt?: string;
+  source?: string | null;
+  campaign?: unknown;
+  outstandingBalance?: string;
+  amountDueNow?: string;
+  customerHistory?: {
+    total: number;
+    delivered: number;
+    cancelled: number;
+    returned: number;
+  };
+  idempotencyKeys?: Array<{
+    id: string;
+    key: string;
+    operation: string;
+    createdAt: string;
+  }>;
+  paymentPlan?: string | null;
+  couponDiscount?: string;
+  prepaidDiscount?: string;
+  manualPayments?: Array<{
+    id: string;
+    status: string;
+    methodSnapshot: {
+      name: string;
+      type: string;
+      details: Record<string, string>;
+    };
+    amountDueNow: string;
+    amountDueOnDelivery: string;
+    senderInfo: string;
+    reference: string;
+    rejectReason?: string;
+    verifiedBy?: string;
+    verifiedAt?: string;
+    createdAt?: string;
+  }>;
+
   version: number;
   refundedTotal: string;
   refundableBalance: string;
@@ -65,6 +103,11 @@ export type OrderDetail = OrderRow & {
     quantity: number;
     unitPrice: string | number;
     lineTotal: string | number;
+    product?: {
+      slug: string;
+      category?: { name: string };
+      images: Array<{ url: string; altText?: string | null }>;
+    } | null;
   }>;
   addresses: Array<{
     id: string;
@@ -113,6 +156,7 @@ export type OrderDetail = OrderRow & {
       fee?: string;
       sender?: string;
       rejectionReason?: string;
+      manualPaymentId?: string;
     };
     createdAt: string;
   }>;
@@ -329,6 +373,7 @@ export default function OrdersClient() {
               {[
                 "UNPAID",
                 "PARTIALLY_PAID",
+                "AWAITING_VERIFICATION",
                 "PAID",
                 "PARTIALLY_REFUNDED",
                 "REFUNDED",

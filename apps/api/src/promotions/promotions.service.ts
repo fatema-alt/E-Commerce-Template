@@ -17,6 +17,9 @@ export interface CustomerIdentity {
 }
 
 export interface CouponEvaluationResult {
+  value: Prisma.Decimal;
+  maxDiscountAmount?: Prisma.Decimal | null;
+  combineWithPrepaidDiscount?: boolean;
   couponId: string;
   code: string;
   type: CouponType;
@@ -112,8 +115,13 @@ export class PromotionsService {
       throw new ConflictException(`Coupon code "${code}" already exists`);
     }
 
-    if (dto.type === CouponType.PERCENTAGE && (dto.value <= 0 || dto.value > 100)) {
-      throw new BadRequestException('Percentage coupon value must be between 1 and 100');
+    if (
+      dto.type === CouponType.PERCENTAGE &&
+      (dto.value <= 0 || dto.value > 100)
+    ) {
+      throw new BadRequestException(
+        'Percentage coupon value must be between 1 and 100',
+      );
     }
 
     const startsAt = dto.startsAt ? new Date(dto.startsAt) : undefined;
@@ -126,6 +134,7 @@ export class PromotionsService {
     return this.db.coupon.create({
       data: {
         code,
+        combineWithPrepaidDiscount: dto.combineWithPrepaidDiscount ?? false,
         description: dto.description?.trim(),
         type: dto.type,
         value: new D(dto.value),
@@ -158,7 +167,9 @@ export class PromotionsService {
     const value = dto.value !== undefined ? dto.value : Number(coupon.value);
 
     if (type === CouponType.PERCENTAGE && (value <= 0 || value > 100)) {
-      throw new BadRequestException('Percentage discount must be between 1 and 100');
+      throw new BadRequestException(
+        'Percentage discount must be between 1 and 100',
+      );
     }
 
     const startsAt =
@@ -181,6 +192,9 @@ export class PromotionsService {
     return this.db.coupon.update({
       where: { id },
       data: {
+        ...(dto.combineWithPrepaidDiscount !== undefined
+          ? { combineWithPrepaidDiscount: dto.combineWithPrepaidDiscount }
+          : {}),
         ...(code ? { code } : {}),
         ...(dto.description !== undefined
           ? { description: dto.description?.trim() || null }
@@ -258,7 +272,9 @@ export class PromotionsService {
     const now = new Date();
 
     if (coupon.startsAt && coupon.startsAt > now) {
-      throw new BadRequestException('This coupon promotion has not started yet');
+      throw new BadRequestException(
+        'This coupon promotion has not started yet',
+      );
     }
 
     if (coupon.expiresAt && coupon.expiresAt < now) {
@@ -270,7 +286,9 @@ export class PromotionsService {
       coupon.usageLimit !== undefined &&
       coupon.usageCount >= coupon.usageLimit
     ) {
-      throw new BadRequestException('This coupon has reached its total usage limit');
+      throw new BadRequestException(
+        'This coupon has reached its total usage limit',
+      );
     }
 
     if (coupon.minOrderAmount && subtotal.lessThan(coupon.minOrderAmount)) {
@@ -280,7 +298,10 @@ export class PromotionsService {
     }
 
     // Customer usage check
-    if (customer && (customer.customerId || customer.customerPhone || customer.customerEmail)) {
+    if (
+      customer &&
+      (customer.customerId || customer.customerPhone || customer.customerEmail)
+    ) {
       const customerConditions: Prisma.CouponUsageWhereInput[] = [];
       if (customer.customerId) {
         customerConditions.push({ customerId: customer.customerId });
@@ -314,7 +335,10 @@ export class PromotionsService {
 
     if (coupon.type === CouponType.PERCENTAGE) {
       discount = subtotal.mul(coupon.value).div(100).toDecimalPlaces(2);
-      if (coupon.maxDiscountAmount && discount.greaterThan(coupon.maxDiscountAmount)) {
+      if (
+        coupon.maxDiscountAmount &&
+        discount.greaterThan(coupon.maxDiscountAmount)
+      ) {
         discount = coupon.maxDiscountAmount;
       }
     } else if (coupon.type === CouponType.FIXED_AMOUNT) {
@@ -325,6 +349,9 @@ export class PromotionsService {
     }
 
     return {
+      value: coupon.value,
+      maxDiscountAmount: coupon.maxDiscountAmount,
+      combineWithPrepaidDiscount: coupon.combineWithPrepaidDiscount,
       couponId: coupon.id,
       code: coupon.code,
       type: coupon.type,

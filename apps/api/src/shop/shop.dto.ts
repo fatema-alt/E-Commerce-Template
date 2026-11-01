@@ -6,6 +6,7 @@ import {
   IsArray,
   IsEmail,
   IsString,
+  IsUUID,
   Length,
   MaxLength,
   MinLength,
@@ -51,15 +52,7 @@ export class QuoteDto {
   @IsOptional() @Trim() @IsString() @MaxLength(120) district?: string;
 
   @IsOptional()
-  @IsIn([
-    'OPTION_A',
-    'OPTION_B',
-    'OPTION_C',
-    'BANK_TRANSFER',
-    'COD',
-    'MANUAL_BKASH',
-    'MANUAL_NAGAD',
-  ])
+  @IsIn(['FULL_PAYMENT', 'PARTIAL_ADVANCE', 'COD'])
   paymentOption?: string;
 }
 
@@ -80,37 +73,16 @@ export class ShopCheckoutDto extends OmitType(CreateOrderDto, [
   'customerId',
   'paymentMethod',
   'shippingTotal',
+  'onlineDiscount',
 ] as const) {
-  @IsOptional() @IsIn(['MANUAL_BKASH', 'MANUAL_NAGAD', 'BANK_TRANSFER']) manualProvider?: string;
   @IsOptional()
-  @IsIn([
-    'COD',
-    'BANK_TRANSFER',
-    'MANUAL',
-    'BKASH',
-    'SSLCOMMERZ',
-    'NAGAD',
-    'ONLINE',
-  ])
-  paymentMethod:
-    | 'COD'
-    | 'BANK_TRANSFER'
-    | 'MANUAL'
-    | 'BKASH'
-    | 'SSLCOMMERZ'
-    | 'NAGAD'
-    | 'ONLINE' = 'COD';
-  @IsOptional()
-  @IsIn([
-    'OPTION_A',
-    'OPTION_B',
-    'OPTION_C',
-    'BANK_TRANSFER',
-    'COD',
-    'MANUAL_BKASH',
-    'MANUAL_NAGAD',
-  ])
-  paymentOption?: string;
+  @IsIn(['COD', 'BANK_TRANSFER', 'MANUAL'])
+  paymentMethod: 'COD' | 'BANK_TRANSFER' | 'MANUAL' = 'COD';
+  @IsIn(['FULL_PAYMENT', 'PARTIAL_ADVANCE', 'COD'])
+  paymentOption!: string;
+  @IsOptional() @IsUUID() paymentMethodId?: string;
+  @IsOptional() @Trim() @IsString() @Length(3, 120) senderInfo?: string;
+  @IsOptional() @Trim() @IsString() @Length(3, 100) reference?: string;
   @IsString() @MaxLength(10000) quoteToken!: string;
 }
 export class ManualPaymentSubmissionDto {

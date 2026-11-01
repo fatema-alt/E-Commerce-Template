@@ -1,3 +1,5 @@
+import { CheckoutPaymentsService } from '../payments/checkout-payments.service.js';
+import { pricePlan, publicPrice, type Plan } from '../payments/plan-pricing.js';
 import {
   BadRequestException,
   ConflictException,
@@ -16,12 +18,13 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
 import { OrdersService } from '../orders/orders.service.js';
-import { PaymentsService } from '../payments/payments.service.js';
 import { PromotionsService } from '../promotions/promotions.service.js';
 import { calcShipping, getShippingRates } from './shipping.config.js';
 import { ManualPaymentsService } from './manual-payments.service.js';
-import { isManualProvider } from '../payments/manual-payment.config.js';
-import { usesManualTransfer, manualOutstanding } from '../payments/manual-order.rules.js';
+import {
+  usesManualTransfer,
+  manualOutstanding,
+} from '../payments/manual-order.rules.js';
 import type { ManualPaymentSubmissionDto } from './shop.dto.js';
 import type {
   QuoteDto,
@@ -51,12 +54,12 @@ const publicUser = {
 @Injectable()
 export class ShopService {
   async payments() {
-    return this.paymentsService.getMethods();
+    return this.checkoutPayments.publicConfig();
   }
   constructor(
     private readonly db: PrismaService,
     private readonly orders: OrdersService,
-    private readonly paymentsService: PaymentsService,
+    private readonly checkoutPayments: CheckoutPaymentsService,
     private readonly promotionsService: PromotionsService,
     private readonly manualPayments?: ManualPaymentsService,
   ) {}
@@ -303,81 +306,38 @@ export class ShopService {
       });
     }
 
-    let discount = new Prisma.Decimal(0);
-    let appliedCoupon:
-      | { code: string; discount: string; description?: string | null }
-      | undefined;
-
-    if (dto.couponCode) {
-      const evalRes = await this.promotionsService.evaluateCoupon(
-        dto.couponCode,
-        subtotal,
-      );
-      discount = evalRes.discountAmount;
-      appliedCoupon = {
-        code: evalRes.code,
-        discount: discount.toFixed(2),
-        description: evalRes.description,
-      };
-    }
-
-    const paymentModelCfg = this.paymentsService?.getPaymentModelConfig
-      ? await this.paymentsService.getPaymentModelConfig()
-      : { optionCDiscountPercent: 0, optionCDiscountFixed: 0 };
-
-    let onlinePaymentDiscount = new Prisma.Decimal(0);
-    if (dto.paymentOption === 'OPTION_C') {
-      if (paymentModelCfg.optionCDiscountPercent > 0) {
-        onlinePaymentDiscount = subtotal
-          .mul(paymentModelCfg.optionCDiscountPercent)
-          .div(100)
-          .toDecimalPlaces(2);
-      } else if (paymentModelCfg.optionCDiscountFixed > 0) {
-        onlinePaymentDiscount = Prisma.Decimal.min(
-          subtotal,
-          new Prisma.Decimal(paymentModelCfg.optionCDiscountFixed),
-        ).toDecimalPlaces(2);
-      }
-    }
-
-    // Non-stacking rule with coupons: apply whichever gives the larger discount
-    let effectiveDiscount = discount;
-    if (dto.paymentOption === 'OPTION_C') {
-      if (onlinePaymentDiscount.greaterThan(discount)) {
-        effectiveDiscount = onlinePaymentDiscount;
-        appliedCoupon = undefined; // Coupon discount replaced by larger online discount
-      } else {
-        onlinePaymentDiscount = new Prisma.Decimal(0);
-      }
-    }
-
-    const total = subtotal.minus(effectiveDiscount);
-
-    // --- Shipping calculation ---
-    // city/district are optional hints sent from the storefront address form.
-    // If not provided yet (cart page), we return the default outside-Dhaka rate
-    // so the customer can see an estimate; the final amount is re-verified on
-    // checkout submission using the confirmed shipping address.
-    const shippingFee = calcShipping(total.toNumber(), dto.city, dto.district);
-    const shipping = new Prisma.Decimal(shippingFee);
-    const grandTotal = total.plus(shipping);
-
-    // Rates config surfaced to the client so the UI can display the rule.
+    const coupon = dto.couponCode
+      ? await this.promotionsService.evaluateCoupon(dto.couponCode, subtotal)
+      : undefined;
+    const settings = await this.checkoutPayments.settings();
+    const selectedPlan = (
+      ['FULL_PAYMENT', 'PARTIAL_ADVANCE', 'COD'].includes(
+        dto.paymentOption || '',
+      )
+        ? dto.paymentOption
+        : 'COD'
+    ) as Plan;
+    const delivery = (base: Prisma.Decimal) =>
+      calcShipping(base.toNumber(), dto.city, dto.district);
+    const price = pricePlan(subtotal, selectedPlan, settings, delivery, coupon);
+    const plans = (['FULL_PAYMENT', 'PARTIAL_ADVANCE', 'COD'] as Plan[]).map(
+      (plan) =>
+        publicPrice(pricePlan(subtotal, plan, settings, delivery, coupon)),
+    );
+    const effectiveDiscount = price.discount,
+      shipping = price.shipping,
+      grandTotal = price.total;
+    const payableNow = price.payableNow,
+      amountDueOnDelivery = price.amountDueOnDelivery;
+    const onlinePaymentDiscount = price.prepaidDiscount;
+    const appliedCoupon = coupon
+      ? {
+          code: coupon.code,
+          discount: price.couponDiscount.toFixed(2),
+          description: coupon.description,
+        }
+      : undefined;
     const rates = getShippingRates();
-
-    let payableNow = grandTotal;
-    let amountDueOnDelivery = new Prisma.Decimal(0);
-    if (dto.paymentOption === 'OPTION_A') {
-      payableNow = shipping;
-      amountDueOnDelivery = total;
-    } else if (dto.paymentOption === 'COD') {
-      payableNow = grandTotal;
-      amountDueOnDelivery = grandTotal;
-    } else {
-      payableNow = grandTotal;
-      amountDueOnDelivery = new Prisma.Decimal(0);
-    }
-
     const payload = Buffer.from(
       JSON.stringify({
         sessionId,
@@ -385,6 +345,8 @@ export class ShopService {
         subtotal: subtotal.toFixed(2),
         discount: effectiveDiscount.toFixed(2),
         shipping: shipping.toFixed(2),
+        payableNow: payableNow.toFixed(2),
+        amountDueOnDelivery: amountDueOnDelivery.toFixed(2),
         city: dto.city,
         district: dto.district,
         couponCode: appliedCoupon?.code,
@@ -400,6 +362,10 @@ export class ShopService {
       items,
       subtotal: subtotal.toFixed(2),
       discount: effectiveDiscount.toFixed(2),
+      plans,
+      couponDiscount: price.couponDiscount.toFixed(2),
+      prepaidDiscount: price.prepaidDiscount.toFixed(2),
+      discountMessage: price.discountMessage,
       onlinePaymentDiscount: onlinePaymentDiscount.toFixed(2),
       coupon: appliedCoupon,
       shipping: shipping.toFixed(2),
@@ -458,6 +424,8 @@ export class ShopService {
       subtotal: string;
       discount?: string;
       shipping?: string;
+      payableNow?: string;
+      amountDueOnDelivery?: string;
       city?: string;
       district?: string;
       couponCode?: string;
@@ -478,122 +446,68 @@ export class ShopService {
         'Your cart changed or quote expired. Review it again.',
       );
 
-    // --- Re-verify shipping fee server-side using the confirmed address ---
-    // The city/district hint stored in the quoteToken is advisory; we always
-    // re-calculate from the actual shipping address supplied in the DTO.
-    const confirmedShippingFee = calcShipping(
-      parseFloat(quote.subtotal) - parseFloat(quote.discount ?? '0'),
-      dto.shippingAddress?.city,
-      dto.shippingAddress?.district,
-    );
-    const shippingTotal = new Prisma.Decimal(confirmedShippingFee);
-
-    // Tolerate ±1 BDT rounding drift but reject any material mismatch if quote.shipping was provided.
-    // This prevents a customer from gaming the quote by changing address after locking the token.
-    if (quote.shipping !== undefined) {
-      const quotedShipping = new Prisma.Decimal(quote.shipping);
-      if (shippingTotal.minus(quotedShipping).abs().greaterThan(1)) {
-        throw new ConflictException(
-          'Delivery address changed — please review your order summary and try again.',
-        );
-      }
-    }
-
-    const availablePayments = await this.payments();
-    const paymentOption =
-      dto.paymentOption ||
-      (dto.paymentMethod === 'BANK_TRANSFER'
-        ? 'BANK_TRANSFER'
-        : dto.paymentMethod === 'COD' || !dto.paymentMethod
-          ? 'COD'
-          : 'OPTION_B');
-    if (quote.paymentOption && quote.paymentOption !== paymentOption)
-      throw new ConflictException(
-        'Payment option changed. Review your order again.',
-      );
-    const requestedManual = dto.manualProvider || (isManualProvider(paymentOption) ? paymentOption : undefined);
-    const manualAccount = availablePayments.manualTransfers?.find(account => account.id === requestedManual);
-    if (requestedManual) {
-      if (!isManualProvider(paymentOption) && !['OPTION_A', 'OPTION_B', 'OPTION_C'].includes(paymentOption)) throw new BadRequestException('Select a payment plan for manual transfer');
-      const expectedMethod = paymentOption === 'OPTION_A' ? 'COD' : requestedManual === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'MANUAL';
-      if (
-        !manualAccount ||
-        dto.paymentMethod !== expectedMethod ||
-        (isManualProvider(paymentOption) && paymentOption !== requestedManual)
-      )
-        throw new BadRequestException(
-          'The selected manual payment method is unavailable',
-        );
-    } else if (
-      dto.paymentMethod === 'MANUAL' ||
-      dto.paymentMethod === 'BANK_TRANSFER' ||
-      (paymentOption === 'COD' &&
-        dto.paymentMethod &&
-        dto.paymentMethod !== 'COD') ||
-      (['OPTION_A', 'OPTION_B', 'OPTION_C'].includes(paymentOption) &&
-        (!dto.paymentMethod || ['COD', 'MANUAL'].includes(dto.paymentMethod)))
-    ) {
-      throw new BadRequestException(
-        'Payment method does not match the selected option',
-      );
-    }
-    if (['OPTION_A', 'OPTION_B', 'OPTION_C'].includes(paymentOption)) {
-      const flag = paymentOption === 'OPTION_A' ? 'optionAEnabled' : paymentOption === 'OPTION_B' ? 'optionBEnabled' : 'optionCEnabled';
-      if (availablePayments.options?.[flag] === false) throw new BadRequestException('The selected payment option is disabled');
-      if (paymentOption === 'OPTION_A' && !availablePayments.methods.some(method => method.id === 'COD' && method.enabled)) throw new BadRequestException('Cash on Delivery must be enabled for the remaining balance');
-    }
+    const paymentPlan = dto.paymentOption as Plan;
+    if (!['FULL_PAYMENT', 'PARTIAL_ADVANCE', 'COD'].includes(paymentPlan))
+      throw new BadRequestException('Select an available payment plan');
     if (
-      !manualAccount &&
-      !availablePayments.methods.some(
-        (method) =>
-          method.id === (dto.paymentMethod || 'COD') && method.enabled,
-      )
+      quote.paymentOption !== paymentPlan ||
+      (quote.couponCode || '') !== (dto.couponCode || '').trim().toUpperCase()
     )
-      throw new BadRequestException(
-        'The selected payment method is currently unavailable',
+      throw new ConflictException(
+        'Payment plan or coupon changed. Review checkout again.',
       );
-    if (dto.paymentMethod === 'BANK_TRANSFER' && !availablePayments.bank)
-      throw new BadRequestException('Bank transfer is not available');
-    const { quoteToken: _quote, manualProvider: _manualProvider, ...data } = dto;
-    if (paymentOption === 'OPTION_A' && shippingTotal.lessThanOrEqualTo(0)) {
-      throw new BadRequestException(
-        'Advance delivery payment is not applicable for free delivery orders',
+    const fresh = await this.quote(
+      {
+        items: dto.items,
+        couponCode: dto.couponCode,
+        paymentOption: paymentPlan,
+        city: dto.shippingAddress.city,
+        district: dto.shippingAddress.district,
+      },
+      session.id,
+    );
+    if (
+      fresh.subtotal !== quote.subtotal ||
+      fresh.discount !== quote.discount ||
+      fresh.shipping !== quote.shipping ||
+      fresh.payableNow !== quote.payableNow ||
+      fresh.amountDueOnDelivery !== quote.amountDueOnDelivery
+    )
+      throw new ConflictException(
+        'Prices or delivery changed. Review checkout again.',
       );
-    }
-
-    let verifiedOnlineDiscount = new Prisma.Decimal(0);
-    if (paymentOption === 'OPTION_C') {
-      const paymentModelCfg = this.paymentsService?.getPaymentModelConfig
-        ? await this.paymentsService.getPaymentModelConfig()
-        : { optionCDiscountPercent: 0, optionCDiscountFixed: 0 };
-      if (paymentModelCfg.optionCDiscountPercent > 0) {
-        verifiedOnlineDiscount = new Prisma.Decimal(quote.subtotal)
-          .mul(paymentModelCfg.optionCDiscountPercent)
-          .div(100)
-          .toDecimalPlaces(2);
-      } else if (paymentModelCfg.optionCDiscountFixed > 0) {
-        verifiedOnlineDiscount = Prisma.Decimal.min(
-          new Prisma.Decimal(quote.subtotal),
-          new Prisma.Decimal(paymentModelCfg.optionCDiscountFixed),
-        ).toDecimalPlaces(2);
-      }
-    }
-
+    const {
+      quoteToken: _quote,
+      paymentMethodId,
+      senderInfo,
+      reference,
+      ...data
+    } = dto;
     const order = await this.orders.create(
       {
         ...data,
         customerId: session.customerId || undefined,
-        paymentMethod: dto.paymentMethod || 'COD',
-        paymentOption,
-        couponCode: quote.couponCode || dto.couponCode,
-        onlineDiscount: verifiedOnlineDiscount.greaterThan(0)
-          ? verifiedOnlineDiscount.toFixed(2)
-          : undefined,
-        shippingTotal: shippingTotal.toFixed(2),
+        paymentMethod:
+          paymentPlan === 'COD' || paymentPlan === 'PARTIAL_ADVANCE'
+            ? 'COD'
+            : 'MANUAL',
+        paymentOption: paymentPlan,
+        onlineDiscount: undefined,
       },
       key ? `shop:${session.id}:${key}` : undefined,
       session.id,
-      { sessionId: session.id, expectedSubtotal: quote.subtotal, ...(manualAccount ? { manualAccount } : {}) },
+      {
+        sessionId: session.id,
+        expectedSubtotal: fresh.subtotal,
+        checkout: {
+          plan: paymentPlan,
+          paymentMethodId,
+          senderInfo,
+          reference,
+          expectedTotal: fresh.total,
+          expectedNow: fresh.payableNow,
+        },
+      },
     );
     return this.order(order.id, token);
   }
@@ -635,6 +549,20 @@ export class ShopService {
   ) {
     const scope = await this.scope(token);
     const session = await this.session(token);
+    const order = await this.db.order.findFirst({
+      where: { id, ...scope },
+      select: { manualPayments: { take: 1 } },
+    });
+    if (order?.manualPayments.length) {
+      await this.checkoutPayments.resubmit(
+        id,
+        scope,
+        dto.sender,
+        dto.reference,
+        session!.id,
+      );
+      return this.order(id, token);
+    }
     return this.manualPayments!.submit(id, scope, dto, session!.id);
   }
   async order(id: string, token?: string) {
@@ -647,6 +575,25 @@ export class ShopService {
         paymentStatus: true,
         paymentMethod: true,
         paymentOption: true,
+        paymentPlan: true,
+        couponDiscount: true,
+        prepaidDiscount: true,
+        manualPayments: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            plan: true,
+            methodSnapshot: true,
+            amountDueNow: true,
+            amountDueOnDelivery: true,
+            senderInfo: true,
+            reference: true,
+            status: true,
+            rejectReason: true,
+            verifiedAt: true,
+            createdAt: true,
+          },
+        },
         paidTotal: true,
         refundedTotal: true,
         createdAt: true,
@@ -709,12 +656,48 @@ export class ShopService {
       order.paymentStatus === 'PAID'
         ? new Prisma.Decimal(0)
         : Prisma.Decimal.max(new Prisma.Decimal(0), grandTotal.minus(netPaid));
-    const manualDetails = usesManualTransfer(order) && this.manualPayments ? await this.manualPayments.details(id) : null;
+    const manualDetails =
+      !order.manualPayments?.length &&
+      usesManualTransfer(order) &&
+      this.manualPayments
+        ? await this.manualPayments.details(id)
+        : null;
     return {
       ...order,
-      amountDueOnDelivery: order.paymentOption === 'OPTION_A' ? Prisma.Decimal.max(0, grandTotal.minus(Prisma.Decimal.max(paidTotal, new Prisma.Decimal(order.shippingTotal ?? 0)))).toFixed(2) : usesManualTransfer(order) ? '0.00' : due.toFixed(2),
-      ...(usesManualTransfer(order) && this.manualPayments
-        ? { manualPayment: manualDetails ? { ...manualDetails, amountDue: manualOutstanding({ ...order, grandTotal, paidTotal, shippingTotal: new Prisma.Decimal(order.shippingTotal ?? 0) }).toFixed(2) } : null }
+      amountDueOnDelivery: order.manualPayments?.length
+        ? order.paymentPlan === 'COD'
+          ? due.toFixed(2)
+          : Prisma.Decimal.min(
+              due,
+              order.manualPayments[0]?.amountDueOnDelivery ?? 0,
+            ).toFixed(2)
+        : order.paymentOption === 'OPTION_A'
+          ? Prisma.Decimal.max(
+              0,
+              grandTotal.minus(
+                Prisma.Decimal.max(
+                  paidTotal,
+                  new Prisma.Decimal(order.shippingTotal ?? 0),
+                ),
+              ),
+            ).toFixed(2)
+          : usesManualTransfer(order)
+            ? '0.00'
+            : due.toFixed(2),
+      ...(!order.paymentPlan && usesManualTransfer(order) && this.manualPayments
+        ? {
+            manualPayment: manualDetails
+              ? {
+                  ...manualDetails,
+                  amountDue: manualOutstanding({
+                    ...order,
+                    grandTotal,
+                    paidTotal,
+                    shippingTotal: new Prisma.Decimal(order.shippingTotal ?? 0),
+                  }).toFixed(2),
+                }
+              : null,
+          }
         : {}),
     };
   }

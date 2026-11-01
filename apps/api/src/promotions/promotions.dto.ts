@@ -15,6 +15,7 @@ import { CouponType } from '../generated/prisma/client.js';
 import { Trim } from '../orders/dto/trim.js';
 
 export class CreateCouponDto {
+  @IsOptional() @IsBoolean() combineWithPrepaidDiscount?: boolean;
   @Trim()
   @IsString()
   @Length(2, 32)
@@ -73,6 +74,7 @@ export class CreateCouponDto {
 }
 
 export class UpdateCouponDto {
+  @IsOptional() @IsBoolean() combineWithPrepaidDiscount?: boolean;
   @IsOptional()
   @Trim()
   @IsString()

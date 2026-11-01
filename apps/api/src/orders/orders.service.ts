@@ -1,3 +1,13 @@
+import {
+  pricePlan,
+  defaultPlanSettings,
+  type Plan,
+} from '../payments/plan-pricing.js';
+import {
+  paymentHandlers,
+  validMethod,
+} from '../payments/manual-payment-handler.js';
+import { calcShipping } from '../shop/shipping.config.js';
 import type { ManualTransfer } from '../payments/manual-payment.config.js';
 import {
   BadRequestException,
@@ -25,6 +35,7 @@ export const orderInclude = {
   reservations: true,
   notes: true,
   payments: true,
+  manualPayments: { orderBy: { createdAt: 'desc' as const } },
   shipments: true,
   coupon: true,
   returns: { include: { items: true }, orderBy: { createdAt: 'asc' as const } },
@@ -68,6 +79,7 @@ export class OrdersService {
       throw new BadRequestException('Invalid order status');
     if (
       paymentStatus &&
+      paymentStatus !== 'AWAITING_VERIFICATION' &&
       !Object.values(OrderPaymentStatus).includes(
         paymentStatus as OrderPaymentStatus,
       )
@@ -113,7 +125,9 @@ export class OrdersService {
     const where: Prisma.OrderWhereInput = {
       ...(status ? { status: status as OrderStatus } : {}),
       ...(paymentStatus
-        ? { paymentStatus: paymentStatus as OrderPaymentStatus }
+        ? paymentStatus === 'AWAITING_VERIFICATION'
+          ? { manualPayments: { some: { status: 'awaiting_verification' } } }
+          : { paymentStatus: paymentStatus as OrderPaymentStatus }
         : {}),
       ...(paymentMethod
         ? { paymentMethod: paymentMethod as OrderPaymentMethod }
@@ -173,7 +187,28 @@ export class OrdersService {
   async detail(id: string) {
     const order = await this.db.order.findUnique({
       where: { id },
-      include: orderInclude,
+      include: {
+        ...orderInclude,
+        items: {
+          include: {
+            product: {
+              select: {
+                slug: true,
+                category: { select: { name: true } },
+                images: {
+                  select: { url: true, altText: true },
+                  orderBy: { sortOrder: 'asc' },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+        idempotencyKeys: {
+          select: { id: true, key: true, operation: true, createdAt: true },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
     });
     if (!order) throw new NotFoundException('Order not found');
     const grandTotal = new Prisma.Decimal(order.grandTotal ?? 0);
@@ -186,13 +221,44 @@ export class OrdersService {
         : Prisma.Decimal.max(new Prisma.Decimal(0), grandTotal.minus(netPaid));
     return {
       ...order,
-      amountDueOnDelivery: order.paymentOption === 'OPTION_A' ? Prisma.Decimal.max(0, grandTotal.minus(Prisma.Decimal.max(netPaid, order.shippingTotal))).toFixed(2) : [
-        'MANUAL_BKASH',
-        'MANUAL_NAGAD',
-        'BANK_TRANSFER',
-      ].includes(order.paymentOption || '')
-        ? '0.00'
-        : due.toFixed(2),
+      outstandingBalance: due.toFixed(2),
+      amountDueNow:
+        order.paymentStatus === 'PAID'
+          ? '0.00'
+          : order.manualPayments?.length
+            ? order.manualPayments[0].status === 'confirmed'
+              ? '0.00'
+              : Prisma.Decimal.min(
+                  due,
+                  order.manualPayments[0].amountDueNow,
+                ).toFixed(2)
+            : order.paymentOption === 'OPTION_A'
+              ? Prisma.Decimal.min(
+                  due,
+                  Prisma.Decimal.max(0, order.shippingTotal.minus(netPaid)),
+                ).toFixed(2)
+              : order.paymentMethod === 'COD'
+                ? '0.00'
+                : due.toFixed(2),
+      amountDueOnDelivery: order.manualPayments?.length
+        ? order.paymentPlan === 'COD'
+          ? due.toFixed(2)
+          : Prisma.Decimal.min(
+              due,
+              order.manualPayments[0]?.amountDueOnDelivery ?? 0,
+            ).toFixed(2)
+        : order.paymentOption === 'OPTION_A'
+          ? Prisma.Decimal.max(
+              0,
+              grandTotal.minus(
+                Prisma.Decimal.max(netPaid, order.shippingTotal),
+              ),
+            ).toFixed(2)
+          : ['MANUAL_BKASH', 'MANUAL_NAGAD', 'BANK_TRANSFER'].includes(
+                order.paymentOption || '',
+              )
+            ? '0.00'
+            : due.toFixed(2),
     };
   }
 
@@ -200,7 +266,19 @@ export class OrdersService {
     dto: CreateOrderDto,
     key: string | undefined,
     actorId: string,
-    storefront?: { sessionId: string; expectedSubtotal: string; manualAccount?: ManualTransfer },
+    storefront?: {
+      sessionId: string;
+      expectedSubtotal: string;
+      manualAccount?: ManualTransfer;
+      checkout?: {
+        plan: Plan;
+        paymentMethodId?: string;
+        senderInfo?: string;
+        reference?: string;
+        expectedTotal: string;
+        expectedNow: string;
+      };
+    },
   ) {
     if (
       !key ||
@@ -233,7 +311,14 @@ export class OrdersService {
       ),
     };
     const hash = createHash('sha256')
-      .update(JSON.stringify({ actorId, canonical, manualProvider: storefront?.manualAccount?.id }))
+      .update(
+        JSON.stringify({
+          actorId,
+          canonical,
+          manualProvider: storefront?.manualAccount?.id,
+          checkout: storefront?.checkout,
+        }),
+      )
       .digest('hex');
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -394,6 +479,9 @@ export class OrdersService {
             let appliedCouponId: string | undefined;
             let appliedCouponCode: string | undefined;
 
+            let pricingCoupon: Awaited<
+              ReturnType<typeof tx.coupon.findUnique>
+            > = null;
             if (dto.couponCode) {
               const code = dto.couponCode.trim().toUpperCase();
               const coupon = await tx.coupon.findUnique({
@@ -472,6 +560,7 @@ export class OrdersService {
                   : coupon.value;
               }
 
+              pricingCoupon = coupon;
               appliedCouponId = coupon.id;
               appliedCouponCode = coupon.code;
             }
@@ -485,14 +574,101 @@ export class OrdersService {
 
             // Shipping total: passed in from shop.service (already server-verified)
             // or 0 for admin-created orders.
-            const shippingTotal = dto.shippingTotal
+            let shippingTotal = dto.shippingTotal
               ? new D(dto.shippingTotal)
               : new D(0);
 
-            const grandTotal = subtotal
-              .minus(discountTotal)
-              .plus(shippingTotal);
+            let grandTotal = subtotal.minus(discountTotal).plus(shippingTotal);
 
+            let checkoutPrice: ReturnType<typeof pricePlan> | undefined;
+            let checkoutMethod: Awaited<
+              ReturnType<typeof tx.paymentMethod.findUnique>
+            > = null;
+            let submission:
+              { senderInfo: string; reference: string } | undefined;
+            if (storefront?.checkout) {
+              const input = storefront.checkout;
+              const settings =
+                (await tx.paymentSettings.findUnique({
+                  where: { id: 'default' },
+                })) || defaultPlanSettings;
+              checkoutPrice = pricePlan(
+                subtotal,
+                input.plan,
+                settings,
+                (base) =>
+                  calcShipping(
+                    base.toNumber(),
+                    dto.shippingAddress.city,
+                    dto.shippingAddress.district,
+                  ),
+                pricingCoupon,
+              );
+              if (!checkoutPrice.available)
+                throw new BadRequestException(
+                  'The selected payment plan is unavailable',
+                );
+              if (
+                !checkoutPrice.total.equals(input.expectedTotal) ||
+                !checkoutPrice.payableNow.equals(input.expectedNow)
+              )
+                throw new ConflictException(
+                  'Pricing settings changed. Review checkout again.',
+                );
+              if (
+                input.plan !== 'COD' &&
+                checkoutPrice.payableNow.greaterThan(0)
+              ) {
+                if (!input.paymentMethodId)
+                  throw new BadRequestException('Select a payment method');
+                checkoutMethod = await tx.paymentMethod.findUnique({
+                  where: { id: input.paymentMethodId },
+                });
+                if (
+                  !checkoutMethod ||
+                  checkoutMethod.deletedAt ||
+                  !checkoutMethod.isEnabled ||
+                  !validMethod(checkoutMethod.type, checkoutMethod.details)
+                )
+                  throw new BadRequestException(
+                    'The selected payment method is unavailable',
+                  );
+                const handler = paymentHandlers.get(checkoutMethod.type);
+                if (!handler)
+                  throw new BadRequestException('Unsupported payment method');
+                submission = handler.validate(
+                  checkoutMethod.details,
+                  input.senderInfo || '',
+                  input.reference || '',
+                );
+                if (
+                  await tx.manualOrderPayment.findUnique({
+                    where: { reference: submission.reference },
+                  })
+                )
+                  throw new ConflictException(
+                    'This transaction reference has already been submitted.',
+                  );
+              } else if (
+                input.paymentMethodId ||
+                input.senderInfo ||
+                input.reference
+              )
+                throw new BadRequestException(
+                  'COD or a zero-total order does not need a payment method or transaction reference',
+                );
+              discountTotal = checkoutPrice.discount;
+              shippingTotal = checkoutPrice.shipping;
+              grandTotal = checkoutPrice.total;
+              if (
+                pricingCoupon &&
+                !checkoutPrice.couponDiscount.greaterThan(0) &&
+                pricingCoupon.type !== 'FREE_SHIPPING'
+              ) {
+                appliedCouponId = undefined;
+                appliedCouponCode = undefined;
+              }
+            }
             const order = await tx.order.create({
               data: {
                 orderNumber: `ORD-${randomUUID()}`,
@@ -500,8 +676,19 @@ export class OrdersService {
                 customerName: dto.customerName.trim(),
                 customerEmail: dto.customerEmail?.trim().toLowerCase(),
                 customerPhone: dto.customerPhone.trim(),
-                paymentMethod: dto.paymentMethod,
-                paymentOption: dto.paymentOption || null,
+                paymentMethod:
+                  checkoutMethod?.type === 'bank' &&
+                  storefront?.checkout?.plan === 'FULL_PAYMENT'
+                    ? 'BANK_TRANSFER'
+                    : dto.paymentMethod,
+                paymentOption:
+                  storefront?.checkout?.plan ?? dto.paymentOption ?? null,
+                paymentPlan: storefront?.checkout?.plan,
+                couponDiscount: checkoutPrice?.couponDiscount ?? discountTotal,
+                prepaidDiscount: checkoutPrice?.prepaidDiscount ?? 0,
+                ...(checkoutPrice?.total.isZero()
+                  ? { paymentStatus: 'PAID' as const }
+                  : {}),
                 source: storefront ? 'STOREFRONT' : undefined,
                 subtotal,
                 discountTotal,
@@ -554,7 +741,43 @@ export class OrdersService {
               },
               include: { items: true },
             });
-            if (storefront?.manualAccount) await tx.orderEvent.create({ data: { orderId: order.id, action: 'MANUAL_PAYMENT_INSTRUCTIONS', actorType: 'SHOPPER', actorId: storefront.sessionId, after: { ...storefront.manualAccount } } });
+            if (checkoutPrice && checkoutMethod && submission) {
+              await tx.manualOrderPayment.create({
+                data: {
+                  orderId: order.id,
+                  plan: storefront!.checkout!.plan,
+                  paymentMethodId: checkoutMethod.id,
+                  methodSnapshot: {
+                    name: checkoutMethod.name,
+                    type: checkoutMethod.type,
+                    logo: checkoutMethod.logo,
+                    details: checkoutMethod.details,
+                    instruction: checkoutMethod.instruction,
+                  } as Prisma.InputJsonValue,
+                  amountDueNow: checkoutPrice.payableNow,
+                  amountDueOnDelivery: checkoutPrice.amountDueOnDelivery,
+                  ...submission,
+                },
+              });
+              await tx.orderEvent.create({
+                data: {
+                  orderId: order.id,
+                  action: 'MANUAL_PAYMENT_SUBMITTED',
+                  actorType: 'CUSTOMER',
+                  actorId,
+                },
+              });
+            }
+            if (storefront?.manualAccount)
+              await tx.orderEvent.create({
+                data: {
+                  orderId: order.id,
+                  action: 'MANUAL_PAYMENT_INSTRUCTIONS',
+                  actorType: 'SHOPPER',
+                  actorId: storefront.sessionId,
+                  after: { ...storefront.manualAccount },
+                },
+              });
             for (const line of lines) {
               const item = order.items.find(
                 (i) =>
@@ -582,7 +805,8 @@ export class OrdersService {
                   customerPhone: dto.customerPhone.trim(),
                   customerEmail:
                     dto.customerEmail?.trim().toLowerCase() ?? null,
-                  discountAmount: discountTotal,
+                  discountAmount:
+                    checkoutPrice?.couponDiscount ?? discountTotal,
                 },
               });
               await tx.coupon.update({
@@ -597,7 +821,9 @@ export class OrdersService {
                   actorId,
                   after: {
                     couponCode: appliedCouponCode,
-                    discountAmount: discountTotal.toString(),
+                    discountAmount: (
+                      checkoutPrice?.couponDiscount ?? discountTotal
+                    ).toString(),
                   },
                 },
               });
@@ -637,7 +863,7 @@ export class OrdersService {
           if (existing?.requestHash === hash && existing.orderId)
             return this.detail(existing.orderId);
           throw new ConflictException(
-            'Duplicate idempotency key or order number',
+            'Duplicate transaction reference or checkout key. Review your order before retrying.',
           );
         }
         throw error;

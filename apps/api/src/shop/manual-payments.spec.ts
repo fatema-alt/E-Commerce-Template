@@ -272,7 +272,7 @@ describe('Shopper manual transfer claims', () => {
     const errors = await validate(
       plainToInstance(ShopCheckoutDto, {
         paymentMethod: 'MANUAL',
-        paymentOption: 'MANUAL_NAGAD',
+        paymentOption: 'FULL_PAYMENT',
       }),
     );
     expect(

@@ -28,6 +28,7 @@ interface Coupon {
   maxDiscountAmount?: string | number | null;
   usageLimit?: number | null;
   usageCount: number;
+  combineWithPrepaidDiscount?: boolean;
   perCustomerLimit: number;
   startsAt?: string | null;
   expiresAt?: string | null;
@@ -46,17 +47,26 @@ export default function PromotionsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
+  const [statusFilter, setStatusFilter] = useState<
+    "ALL" | "ACTIVE" | "INACTIVE"
+  >("ALL");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // Form State
+  const [combineWithPrepaidDiscount, setCombineWithPrepaidDiscount] =
+    useState(false);
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
-  const [type, setType] = useState<"PERCENTAGE" | "FIXED_AMOUNT" | "FREE_SHIPPING">("PERCENTAGE");
+  const [type, setType] = useState<
+    "PERCENTAGE" | "FIXED_AMOUNT" | "FREE_SHIPPING"
+  >("PERCENTAGE");
   const [value, setValue] = useState("");
   const [minOrderAmount, setMinOrderAmount] = useState("");
   const [maxDiscountAmount, setMaxDiscountAmount] = useState("");
@@ -118,7 +128,11 @@ export default function PromotionsPage() {
   };
 
   const handleDelete = async (id: string, couponCode: string) => {
-    if (!window.confirm(`Are you sure you want to delete or deactivate coupon "${couponCode}"?`)) {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete or deactivate coupon "${couponCode}"?`,
+      )
+    ) {
       return;
     }
     try {
@@ -141,12 +155,15 @@ export default function PromotionsPage() {
 
     try {
       const payload: Record<string, unknown> = {
+        combineWithPrepaidDiscount,
         code: code.trim().toUpperCase(),
         description: description.trim() || undefined,
         type,
         value: Number(value),
         minOrderAmount: minOrderAmount ? Number(minOrderAmount) : undefined,
-        maxDiscountAmount: maxDiscountAmount ? Number(maxDiscountAmount) : undefined,
+        maxDiscountAmount: maxDiscountAmount
+          ? Number(maxDiscountAmount)
+          : undefined,
         usageLimit: usageLimit ? Number(usageLimit) : undefined,
         perCustomerLimit: Number(perCustomerLimit) || 1,
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
@@ -161,13 +178,16 @@ export default function PromotionsPage() {
       const data = await res.json();
       if (!res.ok) {
         throw new Error(
-          Array.isArray(data.message) ? data.message.join(", ") : data.message || "Failed to create coupon",
+          Array.isArray(data.message)
+            ? data.message.join(", ")
+            : data.message || "Failed to create coupon",
         );
       }
 
       showToast("success", `Coupon "${payload.code}" created successfully!`);
       setIsModalOpen(false);
       // Reset form
+      setCombineWithPrepaidDiscount(false);
       setCode("");
       setDescription("");
       setType("PERCENTAGE");
@@ -198,7 +218,11 @@ export default function PromotionsPage() {
             toast.type === "success" ? "bg-emerald-600" : "bg-red-600"
           }`}
         >
-          {toast.type === "success" ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+          {toast.type === "success" ? (
+            <CheckCircle2 size={18} />
+          ) : (
+            <AlertCircle size={18} />
+          )}
           {toast.message}
         </div>
       )}
@@ -216,7 +240,8 @@ export default function PromotionsPage() {
             Coupons & Discounts
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Configure promotional discount codes, coupon rules, and customer usage limits.
+            Configure promotional discount codes, coupon rules, and customer
+            usage limits.
           </p>
         </div>
         <button
@@ -231,17 +256,25 @@ export default function PromotionsPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-medium text-slate-500">Total Coupons</p>
-          <p className="mt-2 text-3xl font-extrabold text-slate-900">{totalCoupons}</p>
+          <p className="mt-2 text-3xl font-extrabold text-slate-900">
+            {totalCoupons}
+          </p>
           <p className="mt-1 text-xs text-slate-400">Campaigns created</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-medium text-slate-500">Active Coupons</p>
-          <p className="mt-2 text-3xl font-extrabold text-emerald-600">{activeCoupons}</p>
+          <p className="mt-2 text-3xl font-extrabold text-emerald-600">
+            {activeCoupons}
+          </p>
           <p className="mt-1 text-xs text-slate-400">Available for checkout</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-medium text-slate-500">Total Redemptions</p>
-          <p className="mt-2 text-3xl font-extrabold text-indigo-600">{totalUsages}</p>
+          <p className="text-xs font-medium text-slate-500">
+            Total Redemptions
+          </p>
+          <p className="mt-2 text-3xl font-extrabold text-indigo-600">
+            {totalUsages}
+          </p>
           <p className="mt-1 text-xs text-slate-400">Times applied in orders</p>
         </div>
       </div>
@@ -249,7 +282,10 @@ export default function PromotionsPage() {
       {/* Search & Filter Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="relative min-w-[260px] flex-1">
-          <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search
+            size={17}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+          />
           <input
             type="text"
             placeholder="Search coupon code or description..."
@@ -293,19 +329,26 @@ export default function PromotionsPage() {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-slate-400">
+                  <td
+                    colSpan={7}
+                    className="px-5 py-12 text-center text-slate-400"
+                  >
                     Loading coupons...
                   </td>
                 </tr>
               ) : coupons.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-slate-400">
+                  <td
+                    colSpan={7}
+                    className="px-5 py-12 text-center text-slate-400"
+                  >
                     No coupons found. Create your first coupon to get started.
                   </td>
                 </tr>
               ) : (
                 coupons.map((c) => {
-                  const isExpired = c.expiresAt && new Date(c.expiresAt) < new Date();
+                  const isExpired =
+                    c.expiresAt && new Date(c.expiresAt) < new Date();
                   return (
                     <tr key={c.id} className="transition hover:bg-slate-50/60">
                       <td className="px-5 py-4">
@@ -340,8 +383,8 @@ export default function PromotionsPage() {
                             </>
                           ) : c.type === "FIXED_AMOUNT" ? (
                             <>
-                              <Coins size={14} className="text-emerald-600" />
-                              ৳{Number(c.value).toFixed(2)} off
+                              <Coins size={14} className="text-emerald-600" />৳
+                              {Number(c.value).toFixed(2)} off
                             </>
                           ) : (
                             <>
@@ -350,6 +393,37 @@ export default function PromotionsPage() {
                             </>
                           )}
                         </div>
+                        <label className="mt-2 flex items-center gap-2 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(c.combineWithPrepaidDiscount)}
+                            onChange={async (e) => {
+                              try {
+                                const response = await authenticatedFetch(
+                                  API_BASE + "/promotions/coupons/" + c.id,
+                                  {
+                                    method: "PATCH",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                    },
+                                    body: JSON.stringify({
+                                      combineWithPrepaidDiscount:
+                                        e.target.checked,
+                                    }),
+                                  },
+                                );
+                                if (!response.ok)
+                                  throw new Error(
+                                    "Failed to update coupon stacking",
+                                  );
+                                await fetchCoupons();
+                              } catch (error) {
+                                showToast("error", (error as Error).message);
+                              }
+                            }}
+                          />
+                          Combine with prepaid discount
+                        </label>
                         {c.maxDiscountAmount && (
                           <p className="text-xs text-slate-400">
                             Cap: ৳{Number(c.maxDiscountAmount).toFixed(0)}
@@ -364,7 +438,9 @@ export default function PromotionsPage() {
                         ) : (
                           <span className="text-slate-400">No minimum</span>
                         )}
-                        <p className="text-slate-400">Limit {c.perCustomerLimit}/user</p>
+                        <p className="text-slate-400">
+                          Limit {c.perCustomerLimit}/user
+                        </p>
                       </td>
                       <td className="px-5 py-4">
                         <div className="text-xs font-semibold text-slate-700">
@@ -383,7 +459,13 @@ export default function PromotionsPage() {
                       </td>
                       <td className="px-5 py-4 text-xs">
                         {c.expiresAt ? (
-                          <span className={isExpired ? "font-semibold text-red-600" : "text-slate-700"}>
+                          <span
+                            className={
+                              isExpired
+                                ? "font-semibold text-red-600"
+                                : "text-slate-700"
+                            }
+                          >
                             {new Date(c.expiresAt).toLocaleDateString()}
                             {isExpired && " (Expired)"}
                           </span>
@@ -436,8 +518,12 @@ export default function PromotionsPage() {
           <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Create New Coupon</h3>
-                <p className="text-xs text-slate-500">Configure promotional discount rules</p>
+                <h3 className="text-lg font-bold text-slate-900">
+                  Create New Coupon
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Configure promotional discount rules
+                </p>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -454,6 +540,16 @@ export default function PromotionsPage() {
             )}
 
             <form onSubmit={handleCreateCoupon} className="mt-4 space-y-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={combineWithPrepaidDiscount}
+                  onChange={(e) =>
+                    setCombineWithPrepaidDiscount(e.target.checked)
+                  }
+                />
+                Combine with prepaid discount
+              </label>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-bold uppercase text-slate-600">
@@ -486,7 +582,9 @@ export default function PromotionsPage() {
 
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-600">
-                  {type === "PERCENTAGE" ? "Discount Percentage (%) *" : "Discount Value (BDT) *"}
+                  {type === "PERCENTAGE"
+                    ? "Discount Percentage (%) *"
+                    : "Discount Value (BDT) *"}
                 </label>
                 <input
                   type="number"

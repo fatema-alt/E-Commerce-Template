@@ -213,3 +213,6 @@ html[data-theme=dark] .product-rich-content pre{background:#0B1020}
 html[data-theme=dark] .product-rich-error{color:#fca5a5}
 html[data-theme=dark] .product-gallery-tile>img{background:#0B1020}
 @media(max-width:600px){.product-rich-toolbar{position:static;padding:8px}.product-rich-content{padding:16px}.product-gallery-manager-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.gallery-image-details{grid-template-columns:1fr}.gallery-image-details>img{max-height:200px}}
+
+.payment-instruction-editor .product-rich-content{height:200px;min-height:200px;overflow-y:auto}
+.payment-instruction-editor .product-rich-loading{min-height:200px}

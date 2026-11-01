@@ -139,7 +139,8 @@ export class PaymentsService implements OnModuleInit {
     const hasPaymentChannel = hasOnlineGateway || manualTransfers.length > 0;
     const options = {
       ...rawOptions,
-      optionAEnabled: hasPaymentChannel && codEnabled && rawOptions.optionAEnabled,
+      optionAEnabled:
+        hasPaymentChannel && codEnabled && rawOptions.optionAEnabled,
       optionBEnabled: hasPaymentChannel && rawOptions.optionBEnabled,
       optionCEnabled: hasPaymentChannel && rawOptions.optionCEnabled,
     };
@@ -501,6 +502,10 @@ export class PaymentsService implements OnModuleInit {
       throw new NotFoundException('Order not found');
     }
 
+    if (order.paymentPlan)
+      throw new BadRequestException(
+        'Online gateways are disabled for this checkout',
+      );
     if (order.paymentStatus === 'PAID') {
       throw new ConflictException('Order is already paid');
     }
@@ -643,6 +648,10 @@ export class PaymentsService implements OnModuleInit {
         include: { coupon: true, addresses: true },
       });
 
+      if (order.paymentPlan)
+        throw new BadRequestException(
+          'This order uses the manual payment flow',
+        );
       // Verify caller ownership if sessionToken is present
       if (sessionToken) {
         const tokenHash = digest(sessionToken);

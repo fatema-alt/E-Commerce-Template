@@ -79,6 +79,7 @@ export function PriceSummary({
   discount,
   coupon,
   onlinePaymentDiscount,
+  couponDiscount,
 }: {
   subtotal: string;
   shipping: string;
@@ -87,6 +88,7 @@ export function PriceSummary({
   discount?: string;
   coupon?: string;
   onlinePaymentDiscount?: string;
+  couponDiscount?: string;
 }) {
   return (
     <dl className="summary-details">
@@ -94,15 +96,15 @@ export function PriceSummary({
         <dt>Subtotal</dt>
         <dd>{money(subtotal)}</dd>
       </div>
-      {Number(discount) > 0 && (
+      {Number(couponDiscount ?? discount) > 0 && (
         <div className="summary-discount">
           <dt>Discount{coupon ? ` (${coupon})` : ""}</dt>
-          <dd>−{money(discount!)}</dd>
+          <dd>−{money(couponDiscount ?? discount!)}</dd>
         </div>
       )}
       {Number(onlinePaymentDiscount) > 0 && (
         <div className="summary-discount">
-          <dt>Payment plan discount</dt>
+          <dt>Full Payment discount</dt>
           <dd>−{money(onlinePaymentDiscount!)}</dd>
         </div>
       )}

@@ -188,3 +188,30 @@ export const QuestionStatus = {
 } as const
 
 export type QuestionStatus = (typeof QuestionStatus)[keyof typeof QuestionStatus]
+
+
+export const PaymentMethodType = {
+  mobile_banking: 'mobile_banking',
+  bank: 'bank',
+  gateway: 'gateway'
+} as const
+
+export type PaymentMethodType = (typeof PaymentMethodType)[keyof typeof PaymentMethodType]
+
+
+export const PaymentPlan = {
+  FULL_PAYMENT: 'FULL_PAYMENT',
+  PARTIAL_ADVANCE: 'PARTIAL_ADVANCE',
+  COD: 'COD'
+} as const
+
+export type PaymentPlan = (typeof PaymentPlan)[keyof typeof PaymentPlan]
+
+
+export const ManualPaymentStatus = {
+  awaiting_verification: 'awaiting_verification',
+  confirmed: 'confirmed',
+  rejected: 'rejected'
+} as const
+
+export type ManualPaymentStatus = (typeof ManualPaymentStatus)[keyof typeof ManualPaymentStatus]

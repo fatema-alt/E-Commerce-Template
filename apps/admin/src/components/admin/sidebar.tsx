@@ -79,7 +79,7 @@ const navigation: NavItem[] = [
     href: "/settings",
     icon: Settings,
     children: [
-      { label: "Payment Gateways", href: "/settings/payments", icon: CreditCard },
+      { label: "Payments", href: "/settings/payments", icon: CreditCard },
       { label: "Site Settings", href: "/cms/settings", icon: Settings },
       { label: "Tracking & Pixels", href: "/cms/tracking", icon: Activity },
     ],

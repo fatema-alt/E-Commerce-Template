@@ -27,6 +27,11 @@ describe('Storefront order access and checkout boundaries', () => {
         sessionId: session.id,
         items,
         subtotal: '500.00',
+        discount: '0.00',
+        shipping: '60.00',
+        paymentOption: 'COD',
+        payableNow: '0.00',
+        amountDueOnDelivery: '560.00',
         expires: Date.now() + 60000,
         ...overrides,
       }),
@@ -39,9 +44,11 @@ describe('Storefront order access and checkout boundaries', () => {
     const db = {
       shopperSession: { findUnique: vi.fn().mockResolvedValue(session) },
       order: {
-        findFirst: vi
-          .fn()
-          .mockResolvedValue({ id: 'order-one', grandTotal: '560.00' }),
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'order-one',
+          grandTotal: '560.00',
+          manualPayments: [],
+        }),
       },
     };
     const orders = { create: vi.fn().mockResolvedValue({ id: 'order-one' }) };
@@ -66,7 +73,17 @@ describe('Storefront order access and checkout boundaries', () => {
       paymentMethod: 'COD',
       quoteToken: signed(),
       customerName: 'Shopper',
+      paymentOption: 'COD',
+      shippingAddress: { city: 'Dhaka' },
     } as ShopCheckoutDto;
+    vi.spyOn(service, 'quote').mockResolvedValue({
+      subtotal: '500.00',
+      discount: '0.00',
+      shipping: '60.00',
+      total: '560.00',
+      payableNow: '0.00',
+      amountDueOnDelivery: '560.00',
+    } as never);
     return { db, orders, payments, service, dto };
   }
   it('rejects order reads without a valid shopper session before querying orders', async () => {
@@ -110,12 +127,13 @@ describe('Storefront order access and checkout boundaries', () => {
       service.order('another-customer-order', token),
     ).rejects.toThrow('Order not found');
   });
-  it('rejects a disabled gateway before order creation', async () => {
+  it('rejects obsolete gateway payment plans before order creation', async () => {
     const { service, orders, dto } = fixture();
-    dto.paymentMethod = 'BKASH';
+    dto.paymentMethod = 'BKASH' as never;
+    dto.paymentOption = 'OPTION_B';
     await expect(
       service.checkout(dto, token, 'test-idempotency-key'),
-    ).rejects.toThrow('currently unavailable');
+    ).rejects.toThrow('Select an available payment plan');
     expect(orders.create).not.toHaveBeenCalled();
   });
   it.each([
@@ -145,49 +163,66 @@ describe('Storefront order access and checkout boundaries', () => {
       expect.objectContaining({ items, paymentMethod: 'COD' }),
       'shop:session-one:test-idempotency-key',
       session.id,
-      { sessionId: session.id, expectedSubtotal: '500.00' },
+      expect.objectContaining({
+        sessionId: session.id,
+        expectedSubtotal: '500.00',
+        checkout: expect.objectContaining({ plan: 'COD' }),
+      }),
     );
   });
-  it('creates a manual order only for an enabled matching channel, with no gateway discount', async () => {
-    const { service, payments, orders, dto } = fixture();
-    const account = {
-      id: 'MANUAL_NAGAD',
-      accountNumber: '01700000000',
-      accountName: 'Recipient',
-      accountType: 'personal',
-    };
-    payments.getMethods.mockResolvedValue({
-      methods: [{ id: 'MANUAL_NAGAD', enabled: true }],
-      manualTransfers: [account],
-      bank: null,
-    } as never);
-    dto.paymentMethod = 'MANUAL';
-    dto.paymentOption = 'MANUAL_NAGAD';
-    dto.quoteToken = signed({ paymentOption: 'MANUAL_NAGAD' });
+  it('passes a manual submission into atomic order creation without a gateway discount', async () => {
+    const { service, orders, dto } = fixture();
+    dto.paymentOption = 'FULL_PAYMENT';
+    dto.paymentMethodId = 'method-one';
+    dto.senderInfo = '01711111111';
+    dto.reference = 'TX123';
+    dto.quoteToken = signed({ paymentOption: 'FULL_PAYMENT' });
     await service.checkout(dto, token, 'test-manual-checkout');
     expect(orders.create).toHaveBeenCalledWith(
       expect.objectContaining({
         paymentMethod: 'MANUAL',
-        paymentOption: 'MANUAL_NAGAD',
+        paymentOption: 'FULL_PAYMENT',
         onlineDiscount: undefined,
       }),
       expect.any(String),
       session.id,
-      expect.any(Object),
+      expect.objectContaining({
+        checkout: expect.objectContaining({
+          plan: 'FULL_PAYMENT',
+          paymentMethodId: 'method-one',
+          senderInfo: '01711111111',
+          reference: 'TX123',
+        }),
+      }),
     );
   });
-  it('refuses disabled manual methods and changing a signed option to obtain an online discount', async () => {
+  it('rejects changing the signed payment plan and changed server totals', async () => {
     const { service, orders, dto } = fixture();
-    dto.paymentMethod = 'MANUAL';
-    dto.paymentOption = 'MANUAL_BKASH';
+    dto.paymentOption = 'FULL_PAYMENT';
     await expect(
       service.checkout(dto, token, 'test-manual-checkout'),
-    ).rejects.toThrow('manual payment method is unavailable');
-    dto.quoteToken = signed({ paymentOption: 'MANUAL_BKASH' });
-    dto.paymentOption = 'OPTION_C';
+    ).rejects.toThrow('Payment plan or coupon changed');
+    dto.paymentOption = 'COD';
+    vi.mocked(service.quote).mockResolvedValue({
+      subtotal: '501.00',
+      discount: '0.00',
+      shipping: '60.00',
+      total: '561.00',
+    } as never);
     await expect(
       service.checkout(dto, token, 'test-manual-checkout'),
-    ).rejects.toThrow('Payment option changed');
+    ).rejects.toThrow('Prices or delivery changed');
+    vi.mocked(service.quote).mockResolvedValue({
+      subtotal: '500.00',
+      discount: '0.00',
+      shipping: '60.00',
+      total: '560.00',
+      payableNow: '1.00',
+      amountDueOnDelivery: '559.00',
+    } as never);
+    await expect(
+      service.checkout(dto, token, 'test-manual-checkout'),
+    ).rejects.toThrow('Prices or delivery changed');
     expect(orders.create).not.toHaveBeenCalled();
   });
 });

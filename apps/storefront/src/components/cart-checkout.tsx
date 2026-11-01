@@ -1,4 +1,6 @@
 "use client";
+import { toProductHtml } from "@commerce/product-content";
+
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -85,18 +87,16 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
   const [review, setReview] = useState(0);
   const [payments, setPayments] = useState<Payments | null>(null);
   const [paymentError, setPaymentError] = useState("");
-  type CheckoutPaymentOption =
-    | "OPTION_A"
-    | "OPTION_B"
-    | "OPTION_C"
-    | "BANK_TRANSFER"
-    | "MANUAL_BKASH"
-    | "MANUAL_NAGAD"
-    | "COD";
+  type CheckoutPaymentOption = "FULL_PAYMENT" | "PARTIAL_ADVANCE" | "COD";
+  const [category, setCategory] = useState<"mobile_banking" | "bank">(
+    "mobile_banking",
+  );
+  const [senderInfo, setSenderInfo] = useState("");
+  const [reference, setReference] = useState("");
   const [selectedOption, setSelectedOption] = useState<
     CheckoutPaymentOption | ""
   >("");
-  const [chosenGateway, setChosenGateway] = useState<string>("");
+  const [chosenMethodId, setChosenMethodId] = useState<string>("");
   const [user, setUser] = useState<Shopper | null>(null);
   const [placed, setPlaced] = useState("");
   const [couponCode, setCouponCode] = useState("");
@@ -149,60 +149,33 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
     }
   });
 
-  const onlineGateways = (payments?.methods || []).filter(
-    (method) =>
-      (method.id === "BKASH" || method.id === "SSLCOMMERZ") && method.enabled,
+  const paymentChannels = (payments?.methods || []).filter(
+    (method) => method.type === category,
   );
-  const hasOnlineGateways = onlineGateways.length > 0;
-  const paymentChannels = [...(payments?.manualTransfers || []).map(method => ({ id: method.id, label: method.label, enabled: true })), ...onlineGateways];
-  const hasPaymentChannels = paymentChannels.length > 0;
-  const shippingCharge = quote ? Number(quote.shipping) : 0;
-  const isFreeDelivery = quote ? shippingCharge <= 0 : false;
-
-  const optionAAvailable =
-    hasPaymentChannels &&
-    payments?.options?.optionAEnabled !== false &&
-    !isFreeDelivery && Boolean(payments?.methods.some(method => method.id === 'COD' && method.enabled));
-
-  const optionBAvailable =
-    hasPaymentChannels && payments?.options?.optionBEnabled !== false;
-
-  const optionCAvailable =
-    hasPaymentChannels && payments?.options?.optionCEnabled !== false;
-
-  const codAvailable =
-    (isFreeDelivery || !hasOnlineGateways) &&
-    Boolean(payments?.methods.some((m) => m.id === "COD" && m.enabled));
-
-  const candidateOptions: (CheckoutPaymentOption | null)[] = [
-    optionAAvailable ? "OPTION_A" : null,
-    optionBAvailable ? "OPTION_B" : null,
-    optionCAvailable ? "OPTION_C" : null,
-    codAvailable ? "COD" : null,
-  ];
-  const availableOptionIds: CheckoutPaymentOption[] = candidateOptions.filter(
-    (v): v is CheckoutPaymentOption => v !== null,
+  const availablePlans = (quote?.plans || []).filter(
+    (plan) =>
+      plan.available &&
+      (plan.plan === "COD" ||
+        Number(plan.payableNow) === 0 ||
+        (payments?.methods.length || 0) > 0),
   );
-
+  const availableOptionIds = availablePlans.map((plan) => plan.plan);
   const paymentOption: CheckoutPaymentOption =
     selectedOption && availableOptionIds.includes(selectedOption)
       ? selectedOption
-      : (availableOptionIds[0] ?? "OPTION_A");
-
-  const selectedGateway: string =
-    chosenGateway && paymentChannels.some((g) => g.id === chosenGateway)
-      ? chosenGateway
-      : (paymentChannels[0]?.id ?? "");
-
-  const setPaymentOption = (opt: CheckoutPaymentOption) => {
-    setSelectedOption(opt);
-  };
-  const setSelectedGateway = (
-    idOrUpdater: string | ((curr: string) => string),
-  ) => {
-    setChosenGateway(idOrUpdater);
-  };
-
+      : (availableOptionIds[0] ?? "FULL_PAYMENT");
+  const needsPrepayment =
+    paymentOption !== "COD" && Number(quote?.payableNow || 0) > 0;
+  const selectedMethodId =
+    chosenMethodId &&
+    paymentChannels.some((method) => method.id === chosenMethodId)
+      ? chosenMethodId
+      : paymentChannels[0]?.id || "";
+  const selectedMethod = paymentChannels.find(
+    (method) => method.id === selectedMethodId,
+  );
+  const setPaymentOption = (option: CheckoutPaymentOption) =>
+    setSelectedOption(option);
   const currentKey =
     serialized +
     "::" +
@@ -370,14 +343,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
         .then((methods) => {
           if (live) {
             setPayments(methods);
-            const online = [...(methods.manualTransfers || []), ...(methods.methods || []).filter(
-              (m) => (m.id === "BKASH" || m.id === "SSLCOMMERZ") && m.enabled,
-            )];
-            if (online.length > 0) {
-              setSelectedGateway((curr) =>
-                online.some((g) => g.id === curr) ? curr : online[0].id,
-              );
-            }
+            if (methods.methods.length) setCategory(methods.methods[0].type);
             setPaymentError("");
           }
         })
@@ -488,26 +454,17 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
 
   async function placeOrder(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const isOnlineOption =
-      paymentOption === "OPTION_A" ||
-      paymentOption === "OPTION_B" ||
-      paymentOption === "OPTION_C";
-    const manualChannel = payments?.manualTransfers?.find(method => method.id === selectedGateway);
-    const effectivePaymentMethod = isOnlineOption && manualChannel ? (paymentOption === 'OPTION_A' ? 'COD' : manualChannel.id === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'MANUAL') :
-      paymentOption === "BANK_TRANSFER"
-        ? "BANK_TRANSFER"
-        : paymentOption === "MANUAL_BKASH" || paymentOption === "MANUAL_NAGAD"
-          ? "MANUAL"
-          : paymentOption === "COD"
-            ? "COD"
-            : selectedGateway;
-
+    const effectivePaymentMethod =
+      paymentOption === "COD" || paymentOption === "PARTIAL_ADVANCE"
+        ? "COD"
+        : "MANUAL";
     if (
       !validQuote ||
       submissionLock.current ||
       mutationLock.current ||
       !availableOptionIds.includes(paymentOption) ||
-      (isOnlineOption && !selectedGateway)
+      (needsPrepayment &&
+        (!selectedMethodId || !senderInfo.trim() || !reference.trim()))
     )
       return;
     const data = new FormData(e.currentTarget);
@@ -519,7 +476,9 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       ...(value("email") ? { customerEmail: value("email") } : {}),
       customerPhone: phone,
       paymentMethod: effectivePaymentMethod,
-      ...(isOnlineOption && manualChannel ? { manualProvider: manualChannel.id } : {}),
+      ...(needsPrepayment
+        ? { paymentMethodId: selectedMethodId, senderInfo, reference }
+        : {}),
       paymentOption,
       shippingAddress: {
         recipientName: value("name"),
@@ -593,30 +552,6 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
         );
       } catch {
         /* Storage non-fatal */
-      }
-      if (
-        isOnlineOption &&
-        (effectivePaymentMethod === "BKASH" ||
-          effectivePaymentMethod === "SSLCOMMERZ")
-      ) {
-        try {
-          const result = await shopRequest<{ redirectUrl: string }>(
-            "payments/initiate",
-            {
-              orderId: order.id,
-              method: effectivePaymentMethod,
-              paymentOption,
-            },
-          );
-          if (result.redirectUrl) {
-            window.location.href = result.redirectUrl;
-            return;
-          }
-          throw new Error("Payment gateway did not return a redirect.");
-        } catch {
-          router.push(`/orders/${order.id}?payment=initiate_failed`);
-          return;
-        }
       }
       router.push(`/orders/${order.id}`);
     } catch (e) {
@@ -924,230 +859,179 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                     </label>
                   </div>
                 </SectionCard>
-                <SectionCard title="Payment Method">
+                <SectionCard title="Payment plan">
                   {paymentError && (
                     <p className="shop-error" role="alert">
                       {paymentError}
                     </p>
                   )}
                   {!payments && !paymentError && (
-                    <p role="status">Loading available payment methods…</p>
+                    <p role="status">Loading payment options...</p>
                   )}
-                  {payments && availableOptionIds.length === 0 && (
+                  {payments && !availablePlans.length && (
                     <p role="alert">
-                      No payment methods are currently available. Please contact
-                      the store.
+                      No payment option is available for this order. Please
+                      contact the store.
                     </p>
                   )}
                   <div
                     className="payment-options"
                     role="radiogroup"
-                    aria-label="Payment method"
+                    aria-label="Payment plan"
                   >
-                    {optionAAvailable && (
-                      <div
-                        className={`payment-option-card ${paymentOption === "OPTION_A" ? "is-selected" : ""}`}
+                    {availablePlans.map((plan) => (
+                      <label
+                        key={plan.plan}
+                        className={`payment-option-card ${paymentOption === plan.plan ? "is-selected" : ""}`}
                       >
-                        <label className="payment-option-header">
-                          <input
-                            type="radio"
-                            name="paymentOption"
-                            value="OPTION_A"
-                            checked={paymentOption === "OPTION_A"}
-                            onChange={() => setPaymentOption("OPTION_A")}
-                          />
-                          <span>
-                            <strong>Pay delivery charge now</strong>
-                            <small>
-                              Pay only the delivery charge of BDT{" "}
-                              {validQuote
-                                ? Number(quote.shipping).toLocaleString("en-BD")
-                                : "0"}{" "}
-                              using your selected method. Pay the remaining BDT{" "}
-                              {validQuote
-                                ? Math.max(
-                                    0,
-                                    Number(quote.total) -
-                                      Number(quote.shipping),
-                                  ).toLocaleString("en-BD")
-                                : "0"}{" "}
-                              in cash when the order is delivered.
-                            </small>
-                          </span>
-                        </label>
-                        {paymentOption === "OPTION_A" &&
-                          paymentChannels.length > 1 && (
-                            <div
-                              className="nested-gateway-selector"
-                              role="radiogroup"
-                              aria-label="Payment provider"
-                            >
-                              <span className="nested-gateway-title">
-                                Pay with:
-                              </span>
-                              <div className="nested-gateway-options">
-                                {paymentChannels.map((g) => (
-                                  <label
-                                    key={g.id}
-                                    className={`gateway-pill ${selectedGateway === g.id ? "is-selected" : ""}`}
-                                  >
-                                    <input
-                                      type="radio"
-                                      name="gatewayProviderA"
-                                      value={g.id}
-                                      checked={selectedGateway === g.id}
-                                      onChange={() => setSelectedGateway(g.id)}
-                                    />
-                                    <span>{g.label}</span>
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                      </div>
-                    )}
-
-                    {optionBAvailable && (
-                      <div
-                        className={`payment-option-card ${paymentOption === "OPTION_B" ? "is-selected" : ""}`}
-                      >
-                        <label className="payment-option-header">
-                          <input
-                            type="radio"
-                            name="paymentOption"
-                            value="OPTION_B"
-                            checked={paymentOption === "OPTION_B"}
-                            onChange={() => setPaymentOption("OPTION_B")}
-                          />
-                          <span>
-                            <strong>Pay full amount</strong>
-                            <small>
-                              Pay BDT{" "}
-                              {validQuote
-                                ? Number(quote.total).toLocaleString("en-BD")
-                                : "0"}{" "}
-                              using your selected payment method.
-                            </small>
-                          </span>
-                        </label>
-                        {paymentOption === "OPTION_B" &&
-                          paymentChannels.length > 1 && (
-                            <div
-                              className="nested-gateway-selector"
-                              role="radiogroup"
-                              aria-label="Payment provider"
-                            >
-                              <span className="nested-gateway-title">
-                                Pay with:
-                              </span>
-                              <div className="nested-gateway-options">
-                                {paymentChannels.map((g) => (
-                                  <label
-                                    key={g.id}
-                                    className={`gateway-pill ${selectedGateway === g.id ? "is-selected" : ""}`}
-                                  >
-                                    <input
-                                      type="radio"
-                                      name="gatewayProviderB"
-                                      value={g.id}
-                                      checked={selectedGateway === g.id}
-                                      onChange={() => setSelectedGateway(g.id)}
-                                    />
-                                    <span>{g.label}</span>
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                      </div>
-                    )}
-
-                    {optionCAvailable && (
-                      <div
-                        className={`payment-option-card ${paymentOption === "OPTION_C" ? "is-selected" : ""}`}
-                      >
-                        <label className="payment-option-header">
-                          <input
-                            type="radio"
-                            name="paymentOption"
-                            value="OPTION_C"
-                            checked={paymentOption === "OPTION_C"}
-                            onChange={() => setPaymentOption("OPTION_C")}
-                          />
-                          <span>
-                            <strong>Pay full amount</strong>
-                            <small>
-                              Pay BDT{" "}
-                              {validQuote
-                                ? Number(quote.total).toLocaleString("en-BD")
-                                : "0"}{" "}
-                              now. Nothing is due on delivery.
-                            </small>
-                          </span>
-                        </label>
-                        {paymentOption === "OPTION_C" &&
-                          paymentChannels.length > 1 && (
-                            <div
-                              className="nested-gateway-selector"
-                              role="radiogroup"
-                              aria-label="Payment provider"
-                            >
-                              <span className="nested-gateway-title">
-                                Pay with:
-                              </span>
-                              <div className="nested-gateway-options">
-                                {paymentChannels.map((g) => (
-                                  <label
-                                    key={g.id}
-                                    className={`gateway-pill ${selectedGateway === g.id ? "is-selected" : ""}`}
-                                  >
-                                    <input
-                                      type="radio"
-                                      name="gatewayProviderC"
-                                      value={g.id}
-                                      checked={selectedGateway === g.id}
-                                      onChange={() => setSelectedGateway(g.id)}
-                                    />
-                                    <span>{g.label}</span>
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                      </div>
-                    )}
-
-                    {codAvailable && (
-                      <div
-                        className={`payment-option-card ${paymentOption === "COD" ? "is-selected" : ""}`}
-                      >
-                        <label className="payment-option-header">
-                          <input
-                            type="radio"
-                            name="paymentOption"
-                            value="COD"
-                            checked={paymentOption === "COD"}
-                            onChange={() => setPaymentOption("COD")}
-                          />
-                          <span>
-                            <strong>Cash on Delivery</strong>
-                            <small>
-                              Pay the courier when your order arrives.
-                            </small>
-                          </span>
-                        </label>
-                      </div>
-                    )}
+                        <input
+                          type="radio"
+                          name="paymentPlan"
+                          value={plan.plan}
+                          checked={paymentOption === plan.plan}
+                          onChange={() => setPaymentOption(plan.plan)}
+                        />
+                        <span>
+                          <strong>
+                            {plan.plan === "FULL_PAYMENT"
+                              ? "Full Payment"
+                              : plan.plan === "PARTIAL_ADVANCE"
+                                ? "Partial Advance + Cash on Delivery"
+                                : "Cash on Delivery"}
+                          </strong>
+                          <small>
+                            Pay now {money(plan.payableNow)}
+                            {Number(plan.prepaidDiscount) > 0
+                              ? `, save ${money(plan.prepaidDiscount)}`
+                              : ""}{" "}
+                            | Pay on delivery {money(plan.amountDueOnDelivery)}
+                          </small>
+                        </span>
+                      </label>
+                    ))}
                   </div>
-                  {paymentOption !== 'COD' && payments?.manualTransfers?.some(method => method.id === selectedGateway) && (
-                    <div className="bank-details" style={{ marginTop: "14px" }}>
-                      <p>
-                        Place your order first. Your order page will show the
-                        recipient details, exact amount and a form to submit
-                        your transaction reference. Payment stays unpaid until
-                        our team verifies the transfer.
-                      </p>
+                  {needsPrepayment && (
+                    <div className="shopping-stack" style={{ marginTop: 16 }}>
+                      <label>
+                        Method category
+                        <select
+                          name="methodCategory"
+                          value={category}
+                          onChange={(e) => {
+                            setCategory(
+                              e.target.value as "mobile_banking" | "bank",
+                            );
+                            setChosenMethodId("");
+                            setSenderInfo("");
+                            setReference("");
+                          }}
+                        >
+                          <option value="mobile_banking">Mobile Banking</option>
+                          <option value="bank">Bank</option>
+                        </select>
+                      </label>
+                      <label>
+                        Payment method
+                        <select
+                          name="paymentMethodId"
+                          required
+                          value={selectedMethodId}
+                          onChange={(e) => {
+                            setChosenMethodId(e.target.value);
+                            setSenderInfo("");
+                            setReference("");
+                          }}
+                        >
+                          <option value="" disabled>
+                            Select a method
+                          </option>
+                          {paymentChannels.map((method) => (
+                            <option key={method.id} value={method.id}>
+                              {method.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {!paymentChannels.length && (
+                        <p>
+                          No methods are available in this category. Choose
+                          another category.
+                        </p>
+                      )}
+                      {selectedMethod && (
+                        <>
+                          <div
+                            className="bank-details"
+                            style={{ overflowWrap: "anywhere" }}
+                          >
+                            {selectedMethod.logo && (
+                              <img
+                                src={selectedMethod.logo}
+                                alt={selectedMethod.name}
+                                width={64}
+                                height={48}
+                                style={{ objectFit: "contain" }}
+                              />
+                            )}
+                            <strong>{selectedMethod.name}</strong>
+                            <dl>
+                              {Object.entries(selectedMethod.details).map(
+                                ([key, value]) => (
+                                  <div key={key}>
+                                    <dt>{key.replace(/([A-Z])/g, " $1")}</dt>
+                                    <dd>{value}</dd>
+                                  </div>
+                                ),
+                              )}
+                            </dl>
+                            <div
+                              className="product-rich-content"
+                              dangerouslySetInnerHTML={{
+                                __html: toProductHtml(
+                                  selectedMethod.instruction,
+                                ),
+                              }}
+                            />
+                            <p>
+                              Transfer {money(quote?.payableNow || 0)} using the
+                              instructions above, then submit your reference.
+                              Your payment will await verification.
+                            </p>
+                          </div>
+                          <label>
+                            {category === "mobile_banking"
+                              ? "Sender mobile number"
+                              : "Sender name / account"}
+                            <input
+                              name="senderInfo"
+                              required
+                              value={senderInfo}
+                              maxLength={120}
+                              type={
+                                category === "mobile_banking" ? "tel" : "text"
+                              }
+                              onChange={(e) => setSenderInfo(e.target.value)}
+                            />
+                          </label>
+                          <label>
+                            {category === "mobile_banking"
+                              ? "Transaction ID"
+                              : "Bank reference"}
+                            <input
+                              name="reference"
+                              required
+                              value={reference}
+                              minLength={3}
+                              maxLength={100}
+                              onChange={(e) => setReference(e.target.value)}
+                            />
+                          </label>
+                        </>
+                      )}
                     </div>
+                  )}
+                  {quote?.discountMessage && (
+                    <p role="status">{quote.discountMessage}</p>
                   )}
                 </SectionCard>
                 <SectionCard title="Confirm your order">
@@ -1159,36 +1043,15 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                   {validQuote && (
                     <div
                       className="confirmation-total-block"
-                      style={{ marginBottom: "12px" }}
+                      style={{ marginBottom: 12 }}
                     >
                       <p className="confirmation-total">
-                        <span>
-                          {paymentOption === "OPTION_A"
-                            ? "Payable now"
-                            : "Total payable"}
-                        </span>
-                        <strong>
-                          {money(
-                            paymentOption === "OPTION_A"
-                              ? quote.shipping
-                              : quote.total,
-                          )}
-                        </strong>
+                        <span>Pay now</span>
+                        <strong>{money(quote.payableNow || 0)}</strong>
                       </p>
-                      {paymentOption === "OPTION_A" && (
-                        <p
-                          className="muted small"
-                          style={{ margin: "4px 0 0", textAlign: "right" }}
-                        >
-                          Due on delivery:{" "}
-                          {money(
-                            Math.max(
-                              0,
-                              Number(quote.total) - Number(quote.shipping),
-                            ),
-                          )}
-                        </p>
-                      )}
+                      <p>
+                        Pay on delivery: {money(quote.amountDueOnDelivery || 0)}
+                      </p>
                     </div>
                   )}
                   <label className="consent-row">
@@ -1205,22 +1068,13 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                       !validQuote ||
                       locked ||
                       !availableOptionIds.includes(paymentOption) ||
-                      ((paymentOption === "OPTION_A" ||
-                        paymentOption === "OPTION_B" ||
-                        paymentOption === "OPTION_C") &&
-                        !selectedGateway)
+                      (needsPrepayment &&
+                        (!selectedMethodId ||
+                          !senderInfo.trim() ||
+                          !reference.trim()))
                     }
                   >
-                    {busy
-                      ? "Processing your order…"
-                      : paymentOption !== 'COD' && payments?.manualTransfers?.some(method => method.id === selectedGateway)
-                        ? 'Place order, then make manual payment'
-                      : paymentOption === "OPTION_A"
-                        ? `Pay BDT ${validQuote ? Number(quote.shipping).toLocaleString("en-BD") : "0"} and place order`
-                        : paymentOption === "OPTION_B" ||
-                            paymentOption === "OPTION_C"
-                          ? `Pay BDT ${validQuote ? Number(quote.total).toLocaleString("en-BD") : "0"} and place order`
-                          : "Place Order"}
+                    {busy ? "Confirming your order..." : "Confirm My Order"}
                   </button>
                   <p className="muted small">
                     Your final price and stock are checked before the order is
@@ -1279,8 +1133,9 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                   tax={quote.tax}
                   total={quote.total}
                   discount={quote.discount}
+                  couponDiscount={quote.couponDiscount}
                   coupon={quote.coupon?.code}
-                  onlinePaymentDiscount={quote.onlinePaymentDiscount}
+                  onlinePaymentDiscount={quote.prepaidDiscount}
                 />
                 <div className="coupon-section">
                   {appliedCoupon ? (

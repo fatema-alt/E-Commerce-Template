@@ -1,5 +1,7 @@
 # Manual bKash, Nagad and bank transfer
 
+> Historical implementation notes. The active checkout now uses the [manual checkout payment redesign](checkout-payment-redesign.md). This document describes the retained legacy order flow.
+
 Implemented on `feat/manual-payments` from main `8b80cdf`. No Prisma schema or migration changes, API subscriptions, simulated payments, or production settings/data changes are required by this feature.
 
 ## Owner setup

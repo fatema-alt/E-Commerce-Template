@@ -16,7 +16,7 @@ export function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-4 rounded-xl border bg-white p-5 shadow-sm">
+    <section className="min-w-0 space-y-4 break-words rounded-xl border bg-white p-5 shadow-sm">
       <h2 className="text-lg font-semibold">{title}</h2>
       {children}
     </section>
@@ -377,17 +377,110 @@ export function PaymentWorkflow({
   financial,
   busy,
   act,
+  compact = false,
 }: {
   order: OrderDetail;
   financial: boolean;
   busy: boolean;
   act: OrderAction;
+  compact?: boolean;
 }) {
   const [kind, setKind] = useState(
-    order.paymentMethod === "COD" ? "COD_COLLECTION" : "MANUAL_VERIFIED",
+    order.paymentMethod === "COD"
+      ? "COD_COLLECTION"
+      : order.manualPayments?.length
+        ? "REFUND_RECORDED"
+        : "MANUAL_VERIFIED",
   );
   return (
     <Panel title="Payment and COD accounting">
+      {order.manualPayments?.map((payment, index) => (
+        <section
+          key={payment.id}
+          className="min-w-0 space-y-3 break-words rounded-lg border border-amber-300 p-4"
+        >
+          <h3 className="font-semibold">
+            {payment.methodSnapshot.name} |{" "}
+            {payment.status.replaceAll("_", " ")}
+          </h3>
+          <p>Plan: {order.paymentPlan?.replaceAll("_", " ")}</p>
+          <p>
+            Pay now: {formatMoney(payment.amountDueNow)} | Pay on delivery:{" "}
+            {formatMoney(payment.amountDueOnDelivery)}
+          </p>
+          <p>
+            Sender: {payment.senderInfo} | Reference: {payment.reference}
+          </p>
+          <dl>
+            {Object.entries(payment.methodSnapshot.details).map(
+              ([key, value]) => (
+                <div key={key}>
+                  <dt>{key.replace(/([A-Z])/g, " $1")}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ),
+            )}
+          </dl>
+          {payment.rejectReason && (
+            <p className="text-red-700">{payment.rejectReason}</p>
+          )}
+          {payment.verifiedAt && (
+            <p className="text-xs text-slate-500">
+              Reviewed by {payment.verifiedBy} | {payment.verifiedAt}
+            </p>
+          )}
+          {financial &&
+            index === 0 &&
+            payment.status === "awaiting_verification" &&
+            !["CANCELLED", "RETURNED"].includes(order.status) && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const f = new FormData(e.currentTarget);
+                  const action = f.get("action");
+                  void act("/admin/checkout-payments/review/" + payment.id, {
+                    action,
+                    reason: String(f.get("reason") || "").trim() || undefined,
+                    version: order.version,
+                  });
+                }}
+                className="space-y-3"
+              >
+                <p className="text-sm">
+                  Check the actual receipt in your account before confirming.
+                  This action records the verified transfer.
+                </p>
+                <label className="block">
+                  Action
+                  <select
+                    name="action"
+                    className="block w-full min-w-0 rounded border p-2"
+                  >
+                    <option value="confirm">Confirm verified payment</option>
+                    <option value="reject">
+                      Reject claim (reason required)
+                    </option>
+                  </select>
+                </label>
+                <label className="block">
+                  Reason for rejection
+                  <input
+                    name="reason"
+                    maxLength={500}
+                    className="block w-full rounded border p-2"
+                  />
+                </label>
+                <Submit busy={busy}>Submit payment review</Submit>
+              </form>
+            )}
+        </section>
+      ))}
+      {order.paymentPlan && (
+        <p className="text-sm">
+          Coupon discount: {formatMoney(order.couponDiscount || 0)} | Full
+          Payment discount: {formatMoney(order.prepaidDiscount || 0)}
+        </p>
+      )}
       {order.payments
         .filter(
           (payment) =>
@@ -483,102 +576,107 @@ export function PaymentWorkflow({
         do not execute a payment or refund and are never gateway verified.
       </p>
       {financial && (
-        <form
-          className="space-y-3"
-          onSubmit={(e) => {
-            const form = e.currentTarget;
-            const f = data(e);
-            if (
-              !window.confirm(
-                "Confirm you independently verified this completed transfer and the amount, reference and evidence are correct?",
+        <details className="od-accounting-entry" open={!compact || undefined}>
+          <summary>Record an accounting entry</summary>
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              const form = e.currentTarget;
+              const f = data(e);
+              if (
+                !window.confirm(
+                  "Confirm you independently verified this completed transfer and the amount, reference and evidence are correct?",
+                )
               )
-            )
-              return;
-            void act(`/orders/${order.id}/payments`, {
-              kind,
-              amount: text(f, "amount"),
-              provider: text(f, "provider"),
-              reference: text(f, "reference"),
-              evidence: text(f, "evidence"),
-              ...(["COD_COLLECTION", "COD_SETTLEMENT"].includes(kind)
-                ? { shipmentId: text(f, "shipmentId") }
-                : {}),
-              ...(kind === "COD_SETTLEMENT"
-                ? { fee: text(f, "fee") || "0" }
-                : {}),
-            }).then((ok) => {
-              if (ok) form.reset();
-            });
-          }}
-        >
-          <label className="block text-sm">
-            Accounting action
-            <select
-              name="kind"
-              value={kind}
-              onChange={(e) => setKind(e.target.value)}
-              className={inputClass}
-            >
-              {(order.paymentMethod === "COD"
-                ? ["COD_COLLECTION", "COD_SETTLEMENT", "REFUND_RECORDED"]
-                : ["MANUAL_VERIFIED", "REFUND_RECORDED"]
-              ).map((x) => (
-                <option key={x} value={x}>
-                  {x.replaceAll("_", " ")}
-                </option>
-              ))}
-            </select>
-          </label>
-          {["COD_COLLECTION", "COD_SETTLEMENT"].includes(kind) && (
+                return;
+              void act(`/orders/${order.id}/payments`, {
+                kind,
+                amount: text(f, "amount"),
+                provider: text(f, "provider"),
+                reference: text(f, "reference"),
+                evidence: text(f, "evidence"),
+                ...(["COD_COLLECTION", "COD_SETTLEMENT"].includes(kind)
+                  ? { shipmentId: text(f, "shipmentId") }
+                  : {}),
+                ...(kind === "COD_SETTLEMENT"
+                  ? { fee: text(f, "fee") || "0" }
+                  : {}),
+              }).then((ok) => {
+                if (ok) form.reset();
+              });
+            }}
+          >
             <label className="block text-sm">
-              Shipment
-              <select name="shipmentId" required className={inputClass}>
-                <option value="">Choose shipment</option>
-                {order.shipments.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.provider} · {s.trackingNumber}
+              Accounting action
+              <select
+                name="kind"
+                value={kind}
+                onChange={(e) => setKind(e.target.value)}
+                className={inputClass}
+              >
+                {(order.paymentMethod === "COD"
+                  ? ["COD_COLLECTION", "COD_SETTLEMENT", "REFUND_RECORDED"]
+                  : order.manualPayments?.length
+                    ? ["REFUND_RECORDED"]
+                    : ["MANUAL_VERIFIED", "REFUND_RECORDED"]
+                ).map((x) => (
+                  <option key={x} value={x}>
+                    {x.replaceAll("_", " ")}
                   </option>
                 ))}
               </select>
             </label>
-          )}
-          <Field
-            name="amount"
-            label={
-              kind === "COD_SETTLEMENT"
-                ? "Net remitted amount (BDT)"
-                : "Completed transfer amount (BDT)"
-            }
-            type="number"
-            min={0.01}
-            step="0.01"
-          />
-          {kind === "COD_SETTLEMENT" && (
+            {["COD_COLLECTION", "COD_SETTLEMENT"].includes(kind) && (
+              <label className="block text-sm">
+                Shipment
+                <select name="shipmentId" required className={inputClass}>
+                  <option value="">Choose shipment</option>
+                  {order.shipments.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.provider} · {s.trackingNumber}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <Field
-              name="fee"
-              label="Courier withheld fees (BDT)"
+              name="amount"
+              label={
+                kind === "COD_SETTLEMENT"
+                  ? "Net remitted amount (BDT)"
+                  : "Completed transfer amount (BDT)"
+              }
               type="number"
-              min={0}
+              min={0.01}
               step="0.01"
-              required={false}
             />
-          )}
-          <Field
-            name="provider"
-            label="Bank / mobile service / courier"
-            maxLength={80}
-          />
-          <Field
-            name="reference"
-            label="Unique transfer / settlement reference"
-            maxLength={120}
-          />
-          <Field
-            name="evidence"
-            label="Independent verification evidence (min 10 characters; no secrets)"
-          />
-          <Submit busy={busy}>Record verified accounting entry</Submit>
-        </form>
+            {kind === "COD_SETTLEMENT" && (
+              <Field
+                name="fee"
+                label="Courier withheld fees (BDT)"
+                type="number"
+                min={0}
+                step="0.01"
+                required={false}
+              />
+            )}
+            <Field
+              name="provider"
+              label="Bank / mobile service / courier"
+              maxLength={80}
+            />
+            <Field
+              name="reference"
+              label="Unique transfer / settlement reference"
+              maxLength={120}
+            />
+            <Field
+              name="evidence"
+              label="Independent verification evidence (min 10 characters; no secrets)"
+            />
+            <Submit busy={busy}>Record verified accounting entry</Submit>
+          </form>
+        </details>
       )}
       {!financial && (
         <p className="text-xs text-slate-500">

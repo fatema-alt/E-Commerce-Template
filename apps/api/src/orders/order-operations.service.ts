@@ -42,7 +42,25 @@ export class OrderOperationsService extends OrdersService {
 
   override async detail(id: string) {
     const order = await super.detail(id);
-    return { ...order, refundableBalance: this.refundable(order).toFixed(2) };
+    const history = await this.db.order.groupBy({
+      by: ['status'],
+      where: { customerPhone: order.customerPhone },
+      _count: { _all: true },
+    });
+    const count = (statuses: string[]) =>
+      history
+        .filter((row) => statuses.includes(row.status))
+        .reduce((sum, row) => sum + row._count._all, 0);
+    return {
+      ...order,
+      refundableBalance: this.refundable(order).toFixed(2),
+      customerHistory: {
+        total: history.reduce((sum, row) => sum + row._count._all, 0),
+        delivered: count(['DELIVERED']),
+        cancelled: count(['CANCELLED']),
+        returned: count(['RETURNED']),
+      },
+    };
   }
 
   private refundable(order: FullOrder) {
@@ -181,6 +199,14 @@ export class OrderOperationsService extends OrdersService {
       actor,
       'ORDER_STATUS_CHANGED',
       async (tx, order) => {
+        if (
+          dto.status === 'CONFIRMED' &&
+          order.manualPayments?.length &&
+          order.manualPayments[0].status !== 'confirmed'
+        )
+          throw new ConflictException(
+            'Verify the submitted payment before confirming the order',
+          );
         const next: Partial<Record<OrderStatus, OrderStatus>> = {
           PENDING: 'CONFIRMED',
           CONFIRMED: 'PROCESSING',
@@ -416,7 +442,22 @@ export class OrderOperationsService extends OrdersService {
       async (tx, order) => {
         if (!['CONFIRMED', 'PROCESSING'].includes(order.status))
           throw new ConflictException('Order must be confirmed or processing');
-        if (order.paymentOption === 'OPTION_A' && order.paymentMethod === 'COD' && manualOutstanding(order).greaterThan(0)) throw new ConflictException('Verify the advance delivery payment before booking a shipment');
+        if (
+          order.manualPayments?.length &&
+          order.manualPayments[0].status !== 'confirmed'
+        )
+          throw new ConflictException(
+            'Verify the manual payment before booking shipment',
+          );
+        if (
+          !order.manualPayments?.length &&
+          order.paymentOption === 'OPTION_A' &&
+          order.paymentMethod === 'COD' &&
+          manualOutstanding(order).greaterThan(0)
+        )
+          throw new ConflictException(
+            'Verify the advance delivery payment before booking a shipment',
+          );
         if (order.shipments.some((s) => s.status !== 'CANCELLED'))
           throw new ConflictException('An active shipment already exists');
         if (!dto.provider.trim() || !dto.trackingNumber.trim())
@@ -817,9 +858,27 @@ export class OrderOperationsService extends OrdersService {
               where: { id: shipment!.id },
               data: { codCollected: { increment: amount } },
             });
-          } else if (order.paymentMethod === 'COD' && !(dto.kind === 'MANUAL_VERIFIED' && order.paymentOption === 'OPTION_A' && pending))
+          } else if (
+            order.paymentMethod === 'COD' &&
+            !(
+              dto.kind === 'MANUAL_VERIFIED' &&
+              order.paymentOption === 'OPTION_A' &&
+              pending
+            )
+          )
             throw new ConflictException('Use COD collection for COD orders');
-          if (dto.kind === 'MANUAL_VERIFIED' && order.paymentOption === 'OPTION_A' && amount.greaterThan(manualOutstanding(order))) throw new ConflictException('Advance payment exceeds the delivery charge still due');
+          if (order.manualPayments?.length && dto.kind === 'MANUAL_VERIFIED')
+            throw new ConflictException(
+              'Use the manual payment review actions for this order',
+            );
+          if (
+            dto.kind === 'MANUAL_VERIFIED' &&
+            order.paymentOption === 'OPTION_A' &&
+            amount.greaterThan(manualOutstanding(order))
+          )
+            throw new ConflictException(
+              'Advance payment exceeds the delivery charge still due',
+            );
           paid = paid.plus(amount);
           if (paid.greaterThan(order.grandTotal))
             throw new ConflictException('Payment exceeds order balance');

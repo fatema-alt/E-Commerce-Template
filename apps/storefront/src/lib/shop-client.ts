@@ -28,6 +28,10 @@ export const money = (value: number | string) =>
     Number(value),
   );
 export type Quote = {
+  plans?: PlanQuote[];
+  couponDiscount?: string;
+  prepaidDiscount?: string;
+  discountMessage?: string;
   items: {
     productId: string;
     variantId?: string;
@@ -68,6 +72,10 @@ export type Shopper = {
   phone?: string;
 };
 export type Order = {
+  manualPayments?: ManualOrderPayment[];
+  paymentPlan?: PaymentPlan | null;
+  couponDiscount?: string;
+  prepaidDiscount?: string;
   manualPayment?: {
     amountDue?: string;
     account: ManualTransfer;
@@ -135,20 +143,40 @@ export type ManualTransfer = {
   bankName?: string;
   branch?: string;
 };
+export type PaymentPlan = "FULL_PAYMENT" | "PARTIAL_ADVANCE" | "COD";
+export type CheckoutMethod = {
+  id: string;
+  type: "mobile_banking" | "bank";
+  name: string;
+  logo?: string | null;
+  details: Record<string, string>;
+  instruction: string;
+  isEnabled: boolean;
+  sortOrder: number;
+};
+export type ManualOrderPayment = {
+  id: string;
+  plan: PaymentPlan;
+  methodSnapshot: CheckoutMethod;
+  amountDueNow: string;
+  amountDueOnDelivery: string;
+  senderInfo: string;
+  reference: string;
+  status: "awaiting_verification" | "confirmed" | "rejected";
+  rejectReason?: string | null;
+  verifiedAt?: string | null;
+};
+export type PlanQuote = {
+  plan: PaymentPlan;
+  available: boolean;
+  total: string;
+  payableNow: string;
+  amountDueOnDelivery: string;
+  prepaidDiscount: string;
+  couponDiscount: string;
+  discountMessage: string;
+};
 export type Payments = {
-  manualTransfers?: ManualTransfer[];
-  methods: { id: string; label: string; enabled: boolean }[];
-  bank: {
-    name: string;
-    accountName: string;
-    accountNumber: string;
-    branch: string;
-  } | null;
-  options?: {
-    optionAEnabled: boolean;
-    optionBEnabled: boolean;
-    optionCEnabled: boolean;
-    optionCDiscountPercent: number;
-    optionCDiscountFixed: number;
-  };
+  methods: CheckoutMethod[];
+  settings: { codEnabled: boolean };
 };

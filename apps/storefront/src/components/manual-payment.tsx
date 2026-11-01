@@ -1,16 +1,27 @@
 "use client";
+import { OrderPaymentReview } from "./order-payment-review";
 import { useRef, useState } from "react";
 import { money, shopRequest, type Order } from "../lib/shop-client";
 import { SectionCard } from "./shopping-ui";
 
 export function ManualPayment({ order }: { order: Order }) {
+  return order.manualPayments?.length ? (
+    <OrderPaymentReview order={order} />
+  ) : (
+    <LegacyManualPayment order={order} />
+  );
+}
+function LegacyManualPayment({ order }: { order: Order }) {
   const [details, setDetails] = useState(order.manualPayment);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const lock = useRef(false);
   if (
-    !order.manualPayment && !['MANUAL', 'BANK_TRANSFER'].includes(order.paymentMethod) && !(order.paymentOption === 'OPTION_A' && order.paymentMethod === 'COD') && !["MANUAL_BKASH", "MANUAL_NAGAD", "BANK_TRANSFER"].includes(
+    !order.manualPayment &&
+    !["MANUAL", "BANK_TRANSFER"].includes(order.paymentMethod) &&
+    !(order.paymentOption === "OPTION_A" && order.paymentMethod === "COD") &&
+    !["MANUAL_BKASH", "MANUAL_NAGAD", "BANK_TRANSFER"].includes(
       order.paymentOption || "",
     )
   )
@@ -18,7 +29,12 @@ export function ManualPayment({ order }: { order: Order }) {
   const closed = ["CANCELLED", "RETURNED"].includes(order.status);
   const due = Math.max(
     0,
-    Number(details?.amountDue ?? ((order.paymentOption === 'OPTION_A' ? Number(order.shippingTotal) : Number(order.grandTotal)) - Number(order.paidTotal || 0))),
+    Number(
+      details?.amountDue ??
+        (order.paymentOption === "OPTION_A"
+          ? Number(order.shippingTotal)
+          : Number(order.grandTotal)) - Number(order.paidTotal || 0),
+    ),
   );
   const pending =
     details?.submissions.some((item) => item.status === "PENDING") || submitted;
@@ -30,7 +46,11 @@ export function ManualPayment({ order }: { order: Order }) {
           sent.
         </p>
       ) : due === 0 || order.paymentStatus === "PAID" ? (
-        <p>{order.paymentOption === 'OPTION_A' ? `Delivery payment verified. Remaining ${money(order.amountDueOnDelivery || 0)} is due on delivery.` : 'Payment received. No transfer is needed.'}</p>
+        <p>
+          {order.paymentOption === "OPTION_A"
+            ? `Delivery payment verified. Remaining ${money(order.amountDueOnDelivery || 0)} is due on delivery.`
+            : "Payment received. No transfer is needed."}
+        </p>
       ) : !details ? (
         <p>
           Payment instructions are unavailable. Contact our team before
