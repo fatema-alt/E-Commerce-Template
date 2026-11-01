@@ -9,7 +9,16 @@ import { useDashboard } from "../dashboard-context";
 
 export function LowStockAlertsWidget() {
   const { data, dict } = useDashboard();
-  const alerts = data?.lowStockAlerts ?? [];
+  const rawAlerts = data?.lowStock || data?.lowStockAlerts || [];
+
+  const alerts = rawAlerts.map((l) => ({
+    id: l.id,
+    name: l.name,
+    sku: l.sku,
+    stock: l.quantity ?? l.stock ?? 0,
+    threshold: l.lowStockAt ?? l.threshold ?? 0,
+    isOutOfStock: l.isOutOfStock ?? ((l.quantity ?? l.stock ?? 0) <= 0),
+  }));
 
   if (alerts.length === 0) {
     return (

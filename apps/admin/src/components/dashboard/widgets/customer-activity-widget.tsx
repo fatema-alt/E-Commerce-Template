@@ -8,11 +8,17 @@ import { useDashboard } from "../dashboard-context";
 
 export function CustomerActivityWidget() {
   const { data, dict } = useDashboard();
-  const act = data?.customerActivity;
+  const act = data?.customers || data?.customerActivity;
 
-  const repeatRate = act?.repeatPurchaseRate !== null && act?.repeatPurchaseRate !== undefined
-    ? act.repeatPurchaseRate
-    : null;
+  const activeCount = act?.active ?? act?.active30d ?? 0;
+  const newCount = act?.new ?? act?.newInPeriod ?? 0;
+  const returningCount = act?.returning ?? act?.returningCustomers ?? 0;
+  const repeatRate =
+    act?.repeatRate !== null && act?.repeatRate !== undefined
+      ? act.repeatRate
+      : act?.repeatPurchaseRate !== null && act?.repeatPurchaseRate !== undefined
+        ? act.repeatPurchaseRate
+        : null;
 
   return (
     <WidgetCard
@@ -37,7 +43,7 @@ export function CustomerActivityWidget() {
             </span>
           </div>
           <p className="mt-2 text-xl font-extrabold text-slate-900 dark:text-white tabular-nums">
-            {act?.active30d ?? 0}
+            {activeCount}
           </p>
           <span className="text-[10px] text-slate-400">Active past 30 days</span>
         </div>
@@ -51,7 +57,7 @@ export function CustomerActivityWidget() {
             </span>
           </div>
           <p className="mt-2 text-xl font-extrabold text-slate-900 dark:text-white tabular-nums">
-            {act?.newInPeriod ?? 0}
+            {newCount}
           </p>
           <span className="text-[10px] text-slate-400">New this period</span>
         </div>
@@ -65,7 +71,7 @@ export function CustomerActivityWidget() {
             </span>
           </div>
           <p className="mt-2 text-xl font-extrabold text-slate-900 dark:text-white tabular-nums">
-            {act?.returningCustomers ?? 0}
+            {returningCount}
           </p>
           <span className="text-[10px] text-slate-400">2+ orders placed</span>
         </div>

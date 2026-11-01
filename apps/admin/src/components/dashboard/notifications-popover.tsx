@@ -42,10 +42,16 @@ export function NotificationsPopover({
   });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const notifications =
+  const rawNotifications =
     initialNotifications && initialNotifications.length > 0
       ? initialNotifications
       : fetchedNotifications;
+
+  const notifications: NotificationItem[] = Array.isArray(rawNotifications)
+    ? rawNotifications
+    : Array.isArray((rawNotifications as unknown as { items?: NotificationItem[] })?.items)
+      ? (rawNotifications as unknown as { items: NotificationItem[] }).items
+      : [];
 
   // Fetch notifications on mount only if not provided via props
   useEffect(() => {
@@ -59,7 +65,12 @@ export function NotificationsPopover({
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!live || !data?.notifications) return;
-        setFetchedNotifications(data.notifications);
+        const list = Array.isArray(data.notifications)
+          ? data.notifications
+          : Array.isArray(data.notifications?.items)
+            ? data.notifications.items
+            : [];
+        setFetchedNotifications(list);
       })
       .catch(() => {});
 

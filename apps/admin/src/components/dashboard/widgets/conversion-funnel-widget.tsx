@@ -10,12 +10,21 @@ export function ConversionFunnelWidget() {
   const { data, dict } = useDashboard();
   const funnel = data?.funnel;
 
+  const productViews = Number(funnel?.productViews ?? 0);
+  const addedToCart = Number(
+    funnel?.addedToCart ?? (funnel as unknown as { addToCart?: number })?.addToCart ?? 0,
+  );
+  const checkout = Number(
+    funnel?.checkout ?? (funnel as unknown as { checkoutStart?: number })?.checkoutStart ?? 0,
+  );
+  const purchases = Number(funnel?.purchases ?? 0);
+
   if (
     !funnel ||
-    (funnel.productViews === 0 &&
-      funnel.addToCart === 0 &&
-      funnel.checkoutStart === 0 &&
-      funnel.purchases === 0)
+    (productViews === 0 &&
+      addedToCart === 0 &&
+      checkout === 0 &&
+      purchases === 0)
   ) {
     return (
       <WidgetCard title={dict.conversionFunnel} subtitle="Storefront customer journey">
@@ -30,45 +39,50 @@ export function ConversionFunnelWidget() {
     );
   }
 
+  const dropOffRates = (funnel as unknown as { dropOffRates?: { viewToCart?: number; cartToCheckout?: number; checkoutToPurchase?: number } })?.dropOffRates || {};
+  const dropoffViewsToCart = dropOffRates.viewToCart ?? funnel.dropoffViewsToCart ?? null;
+  const dropoffCartToCheckout = dropOffRates.cartToCheckout ?? funnel.dropoffCartToCheckout ?? null;
+  const dropoffCheckoutToPurchase = dropOffRates.checkoutToPurchase ?? funnel.dropoffCheckoutToPurchase ?? null;
+
   const stages = [
     {
       label: dict.productViews,
-      count: funnel.productViews,
+      count: productViews,
       icon: Eye,
       color: "from-indigo-500 to-indigo-600",
       pctOfTop: 100,
-      dropoff: funnel.dropoffViewsToCart,
+      dropoff: dropoffViewsToCart,
     },
     {
       label: dict.addedToCart,
-      count: funnel.addToCart,
+      count: addedToCart,
       icon: ShoppingCart,
       color: "from-cyan-500 to-blue-600",
       pctOfTop:
-        funnel.productViews > 0
-          ? Math.round((funnel.addToCart / funnel.productViews) * 100)
+        productViews > 0
+          ? Math.round((addedToCart / productViews) * 100)
           : 0,
-      dropoff: funnel.dropoffCartToCheckout,
+      dropoff: dropoffCartToCheckout,
     },
     {
       label: dict.checkout,
-      count: funnel.checkoutStart,
+      count: checkout,
       icon: CreditCard,
       color: "from-fuchsia-500 to-purple-600",
       pctOfTop:
-        funnel.productViews > 0
-          ? Math.round((funnel.checkoutStart / funnel.productViews) * 100)
+        productViews > 0
+          ? Math.round((checkout / productViews) * 100)
           : 0,
-      dropoff: funnel.dropoffCheckoutToPurchase,
+      dropoff: dropoffCheckoutToPurchase,
     },
     {
       label: dict.purchases,
-      count: funnel.purchases,
+      count: purchases,
       icon: CheckCircle2,
       color: "from-emerald-500 to-teal-600",
       pctOfTop:
-        funnel.productViews > 0
-          ? Math.round((funnel.purchases / funnel.productViews) * 100)
+        productViews > 0
+          ? Math.round((purchases / productViews) * 100)
           : 0,
       dropoff: null,
     },
@@ -95,7 +109,7 @@ export function ConversionFunnelWidget() {
                 </div>
                 <div className="flex items-center gap-3 tabular-nums">
                   <span className="font-bold text-slate-900 dark:text-white">
-                    {stage.count.toLocaleString()}
+                    {(stage.count ?? 0).toLocaleString()}
                   </span>
                   <span className="text-[11px] text-slate-400 w-10 text-right">
                     {stage.pctOfTop}%

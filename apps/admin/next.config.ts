@@ -4,6 +4,14 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR ?? '.next',
   cacheComponents: true,
   partialPrefetching: true,
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
+    ],
+  },
   experimental: {
     // AdminShell intentionally withholds pages until the browser verifies the
     // session. Validate instant navigation only on routes that explicitly opt in.

@@ -18,3 +18,6 @@ apps/api/uploads/
 products-page.txt
 products-page-current.txt
 .manual-payment-check/
+
+test-results/
+playwright-report/

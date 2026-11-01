@@ -33,12 +33,15 @@ export function PaymentMethodsWidget() {
     );
   }
 
-  const donutData = methods.map((m) => ({
-    name: m.provider,
-    value: m.count,
-    percentage: m.percentage,
-    color: GATEWAY_COLORS[m.provider.toUpperCase()],
-  }));
+  const donutData = methods.map((m) => {
+    const name = (m.method || m.provider || "Other") as string;
+    return {
+      name,
+      value: Number(m.count ?? 0),
+      percentage: m.share ?? m.percentage ?? 0,
+      color: GATEWAY_COLORS[name.toUpperCase()],
+    };
+  });
 
   return (
     <WidgetCard

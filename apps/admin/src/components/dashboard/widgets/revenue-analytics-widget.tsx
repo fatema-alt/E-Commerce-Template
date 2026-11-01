@@ -9,7 +9,15 @@ import { useDashboard } from "../dashboard-context";
 
 export function RevenueAnalyticsWidget() {
   const { data, dict, locale } = useDashboard();
-  const series = data?.revenueSeries ?? [];
+  const rawSeries = data?.revenue || data?.revenueSeries || [];
+
+  const series = rawSeries.map((d) => ({
+    date: d.date || d.day || "",
+    label: d.label || d.day || d.date || "",
+    revenue: Number(d.revenue ?? 0),
+    orders: Number(d.orders ?? 0),
+    aov: Number(d.aov ?? 0),
+  }));
 
   if (series.length === 0) {
     return (

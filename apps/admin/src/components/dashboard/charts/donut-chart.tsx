@@ -48,7 +48,7 @@ export function DonutChart({
     );
   }
 
-  const total = data.reduce((sum, item) => sum + item.value, 0);
+  const total = data.reduce((sum, item) => sum + (Number(item?.value) || 0), 0);
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -87,11 +87,12 @@ export function DonutChart({
               content={({ active, payload }) => {
                 if (!active || !payload || !payload.length) return null;
                 const point = payload[0].payload as DonutSegment;
+                const val = Number(point?.value) || 0;
                 const pct =
                   point.percentage !== undefined
                     ? point.percentage
                     : total > 0
-                      ? Math.round((point.value / total) * 100)
+                      ? Math.round((val / total) * 100)
                       : 0;
                 return (
                   <div className="rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-xl backdrop-blur-md dark:border-white/10 dark:bg-[#121A30]/95 text-xs">
@@ -100,7 +101,7 @@ export function DonutChart({
                     </p>
                     <p className="tabular-nums font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
                       {valuePrefix}
-                      {point.value.toLocaleString()}
+                      {val.toLocaleString()}
                       {valueSuffix} ({pct}%)
                     </p>
                   </div>
@@ -128,11 +129,12 @@ export function DonutChart({
         {data.map((item, index) => {
           const color =
             item.color || DEFAULT_PALETTE[index % DEFAULT_PALETTE.length];
+          const val = Number(item?.value) || 0;
           const pct =
             item.percentage !== undefined
               ? item.percentage
               : total > 0
-                ? Math.round((item.value / total) * 100)
+                ? Math.round((val / total) * 100)
                 : 0;
           const isHovered = activeIndex === index;
 
@@ -159,7 +161,7 @@ export function DonutChart({
               <div className="flex items-center gap-2 shrink-0 ml-2 tabular-nums">
                 <span className="font-semibold text-slate-800 dark:text-white">
                   {valuePrefix}
-                  {item.value.toLocaleString()}
+                  {val.toLocaleString()}
                   {valueSuffix}
                 </span>
                 <span className="text-[11px] text-slate-400 w-8 text-right">

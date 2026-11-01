@@ -137,14 +137,20 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       credentials: "include",
       cache: "no-store",
     })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((saved) => {
-        if (!live || !saved?.layout) return;
-        if (Array.isArray(saved.layout.order) && saved.layout.order.length > 0) {
-          setWidgetOrder(saved.layout.order);
-        }
-        if (Array.isArray(saved.layout.hidden)) {
-          setHiddenWidgets(saved.layout.hidden);
+      .then((res) => (res.ok ? res.text() : ""))
+      .then((text) => {
+        if (!live || !text) return;
+        try {
+          const saved = JSON.parse(text);
+          const layout = saved?.layout ?? saved;
+          if (layout && Array.isArray(layout.order) && layout.order.length > 0) {
+            setWidgetOrder(layout.order);
+          }
+          if (layout && Array.isArray(layout.hidden)) {
+            setHiddenWidgets(layout.hidden);
+          }
+        } catch {
+          // ignore
         }
       })
       .catch(() => {});

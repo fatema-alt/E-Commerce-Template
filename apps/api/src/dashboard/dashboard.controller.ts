@@ -43,8 +43,9 @@ export class DashboardController {
 
   @Get('layout')
   @Header('Cache-Control', 'no-store')
-  getLayout(@Req() req: AdminRequest) {
-    return this.dashboard.getLayout(req.admin!.id);
+  async getLayout(@Req() req: AdminRequest) {
+    const layout = await this.dashboard.getLayout(req.admin!.id);
+    return { layout };
   }
 
   @Patch('layout')

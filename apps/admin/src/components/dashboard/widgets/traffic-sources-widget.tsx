@@ -17,7 +17,13 @@ const SOURCE_COLORS: Record<string, string> = {
 
 export function TrafficSourcesWidget() {
   const { data, dict } = useDashboard();
-  const sources = data?.trafficSources ?? [];
+  const rawSources = data?.sources || data?.trafficSources || [];
+
+  const sources = rawSources.map((s) => ({
+    source: s.source,
+    sessions: s.count ?? s.sessions ?? 0,
+    percentage: s.share ?? s.percentage ?? 0,
+  }));
 
   if (sources.length === 0 || sources.every((s) => s.sessions === 0)) {
     return (

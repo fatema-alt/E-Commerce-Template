@@ -13,6 +13,7 @@ import {
 import {
   DashboardProvider,
   useDashboard,
+  DEFAULT_WIDGET_ORDER,
 } from "@/components/dashboard/dashboard-context";
 import { DateRangePicker } from "@/components/dashboard/date-range-picker";
 import { KPICard } from "@/components/dashboard/kpi-card";
@@ -54,7 +55,7 @@ function DashboardContent() {
 
   const greeting = getGreeting(locale);
   const totals = data?.totals;
-  const changes = data?.changes;
+  const changes = data?.changes ?? (data?.comparison as unknown as { deltas?: Record<string, number | null> })?.deltas;
   const sparklines = data?.sparklines;
   const isStaff = data?.role === "STAFF";
 
@@ -112,6 +113,12 @@ function DashboardContent() {
     "geo-districts": <GeoDistrictsWidget key="geo-districts" />,
     "activity-feed": <ActivityFeedWidget key="activity-feed" />,
   };
+
+  const safeOrder =
+    Array.isArray(widgetOrder) && widgetOrder.length > 0
+      ? widgetOrder
+      : DEFAULT_WIDGET_ORDER;
+  const safeHidden = Array.isArray(hiddenWidgets) ? hiddenWidgets : [];
 
   return (
     <div className="space-y-6">
@@ -292,8 +299,8 @@ function DashboardContent() {
         aria-label="Dashboard Widgets"
         className="grid grid-cols-1 gap-5 lg:grid-cols-2"
       >
-        {widgetOrder
-          .filter((id) => !hiddenWidgets.includes(id))
+        {safeOrder
+          .filter((id) => !safeHidden.includes(id))
           .map((id) => widgetRegistry[id])
           .filter(Boolean)}
       </section>

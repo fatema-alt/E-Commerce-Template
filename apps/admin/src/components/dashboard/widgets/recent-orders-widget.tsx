@@ -60,6 +60,8 @@ export function RecentOrdersWidget() {
                 hour: "2-digit",
                 minute: "2-digit",
               });
+              const amount = Number(o.grandTotal ?? o.total ?? 0);
+
               return (
                 <tr
                   key={o.id || o.orderNumber}
@@ -77,15 +79,17 @@ export function RecentOrdersWidget() {
                     <p className="font-medium text-slate-800 dark:text-slate-200 truncate max-w-[120px] sm:max-w-[180px]">
                       {o.customerName}
                     </p>
-                    <p className="text-[10px] text-slate-400 truncate max-w-[120px] sm:max-w-[180px]">
-                      {o.customerEmail}
-                    </p>
+                    {o.customerEmail && (
+                      <p className="text-[10px] text-slate-400 truncate max-w-[120px] sm:max-w-[180px]">
+                        {o.customerEmail}
+                      </p>
+                    )}
                   </td>
                   <td className="py-2.5">
                     <StatusBadge status={o.status} />
                   </td>
                   <td className="py-2.5 text-right font-bold text-slate-900 dark:text-white tabular-nums">
-                    {formatBDT(o.total, { compact: false, locale })}
+                    {formatBDT(amount, { compact: false, locale })}
                   </td>
                   <td className="py-2.5 text-right text-[11px] text-slate-400">
                     {timeStr}

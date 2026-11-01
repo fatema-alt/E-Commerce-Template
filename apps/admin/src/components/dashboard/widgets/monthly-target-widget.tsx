@@ -9,13 +9,17 @@ import { formatBDT } from "@/lib/format";
 
 export function MonthlyTargetWidget() {
   const { data, dict, locale, updateMonthlyTarget } = useDashboard();
-  const targetData = data?.monthlyTarget;
+  const targetData = data?.target || data?.monthlyTarget;
   const isStaff = data?.role === "STAFF";
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [newTargetInput, setNewTargetInput] = useState(
-    targetData ? String(targetData.target) : "350000",
+  const targetAmount = Number(targetData?.target ?? targetData?.amount ?? 350000);
+  const actualAmount = Number(targetData?.actual ?? targetData?.achieved ?? 0);
+  const progressPct = Number(
+    targetData?.progressPercentage ?? targetData?.progress ?? 0,
   );
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [newTargetInput, setNewTargetInput] = useState(String(targetAmount));
   const [saving, setSaving] = useState(false);
 
   if (!targetData || isStaff) {
@@ -41,14 +45,20 @@ export function MonthlyTargetWidget() {
     );
   }
 
-  const { target, actual, progressPercentage, projectedEndMonth, status } =
-    targetData;
-  const clampedProgress = Math.min(Math.max(progressPercentage, 0), 100);
+  const clampedProgress = Math.min(Math.max(Math.round(progressPct), 0), 100);
 
   // SVG ring math
   const radius = 64;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (clampedProgress / 100) * circumference;
+
+  const status =
+    targetData.status ||
+    (actualAmount >= targetAmount
+      ? "achieved"
+      : clampedProgress >= 50
+        ? "on_track"
+        : "at_risk");
 
   const statusConfig = {
     on_track: {
@@ -86,12 +96,12 @@ export function MonthlyTargetWidget() {
     <>
       <WidgetCard
         title={dict.monthlyTarget}
-        subtitle={`${data.month} · Target tracking`}
+        subtitle={`${data.month || "This month"} · Target tracking`}
         action={
           <button
             type="button"
             onClick={() => {
-              setNewTargetInput(String(target));
+              setNewTargetInput(String(targetAmount));
               setModalOpen(true);
             }}
             title={dict.editTarget}
@@ -106,7 +116,6 @@ export function MonthlyTargetWidget() {
           {/* Radial Ring */}
           <div className="relative flex items-center justify-center shrink-0">
             <svg width="150" height="150" className="transform -rotate-90">
-              {/* Background circle */}
               <circle
                 cx="75"
                 cy="75"
@@ -115,7 +124,6 @@ export function MonthlyTargetWidget() {
                 strokeWidth="12"
                 fill="transparent"
               />
-              {/* Progress ring */}
               <circle
                 cx="75"
                 cy="75"
@@ -131,7 +139,7 @@ export function MonthlyTargetWidget() {
             </svg>
             <div className="absolute flex flex-col items-center justify-center text-center">
               <span className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">
-                {progressPercentage}%
+                {clampedProgress}%
               </span>
               <span
                 className={`rounded-full border px-2 py-0.5 text-[10px] font-bold mt-0.5 ${statusConfig.bg} ${statusConfig.color}`}
@@ -148,7 +156,7 @@ export function MonthlyTargetWidget() {
                 Monthly Target:
               </span>
               <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">
-                {formatBDT(target, { compact: false, locale })}
+                {formatBDT(targetAmount, { compact: false, locale })}
               </span>
             </div>
 
@@ -157,25 +165,18 @@ export function MonthlyTargetWidget() {
                 Net Sales to Date:
               </span>
               <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                {formatBDT(actual, { compact: false, locale })}
+                {formatBDT(actualAmount, { compact: false, locale })}
               </span>
             </div>
 
             <div className="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-white/5">
               <span className="text-xs text-slate-500 dark:text-slate-400">
-                Projected End-of-Month:
+                Remaining to Goal:
               </span>
               <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 tabular-nums">
-                {formatBDT(projectedEndMonth, { compact: true, locale })}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between text-[11px] text-slate-400">
-              <span>Remaining to Goal:</span>
-              <span className="font-semibold tabular-nums text-slate-600 dark:text-slate-300">
-                {actual >= target
+                {actualAmount >= targetAmount
                   ? "Goal achieved!"
-                  : formatBDT(target - actual, { compact: false, locale })}
+                  : formatBDT(targetAmount - actualAmount, { compact: false, locale })}
               </span>
             </div>
           </div>
