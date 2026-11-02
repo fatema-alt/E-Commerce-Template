@@ -111,7 +111,7 @@ function resolveDepartments(categories: Category[] = []): DepartmentItem[] {
       name: match.name || def.name,
       slug: match.slug || def.slug,
       productCountFormatted: countText,
-      imageUrl: match.imageUrl || def.imageUrl,
+      imageUrl: def.imageUrl,
     };
   });
 }
@@ -200,19 +200,12 @@ export function DepartmentBento({
             >
               {/* Background Product Artwork Layer */}
               <div className="bento-image-wrap" aria-hidden="true">
-                <Image
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
                   src={dept.imageUrl}
                   alt=""
-                  fill
-                  sizes={
-                    isFeatured
-                      ? "(max-width: 1024px) 100vw, 850px"
-                      : "(max-width: 1024px) 50vw, 450px"
-                  }
-                  priority={isFeatured}
                   loading={isFeatured ? "eager" : "lazy"}
                   className="bento-image-bg"
-                  unoptimized
                 />
               </div>
 
