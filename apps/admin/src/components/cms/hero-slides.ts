@@ -1,33 +1,17 @@
 import type { Value } from "./cms-api";
 
-// Promote a legacy hero into an editable list without inventing campaign data.
+// Promote hero into an editable list with image and href options
 export function editableHeroSlides(config: Record<string, Value>): Value[] {
-  if (Array.isArray(config.slides)) return structuredClone(config.slides);
-  const primary = Object.fromEntries(
-    Object.entries(config).filter(([key]) =>
-      [
-        "title",
-        "subtitle",
-        "image",
-        "mobileImage",
-        "bannerLink",
-        "button",
-        "secondaryButton",
-        "badge",
-        "badgeColor",
-        "theme",
-        "themePreset",
-        "customTheme",
-        "imageBackdrop",
-      ].includes(key),
-    ),
-  );
+  if (Array.isArray(config.slides) && config.slides.length > 0) {
+    return structuredClone(config.slides);
+  }
   return [
     {
-      ...primary,
-      title: config.title || "",
+      id: "slide-1",
       enabled: true,
-      slideType: config.bannerType === "without_button" ? "full_banner" : "split_content",
+      imageUrl: (config.imageUrl as string) || (config.image as { url?: string })?.url || "/brand/hero-banner-main.png",
+      image: config.image || { url: "/brand/hero-banner-main.png" },
+      href: (config.bannerLink as string) || (config.href as string) || "/shop",
     },
   ];
 }

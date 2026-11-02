@@ -1,32 +1,23 @@
 "use client";
 
-import { useState } from "react";
-import { type Asset, type Value, assetUrl } from "./cms-api";
+import { useRef, useState } from "react";
+import { type Asset, type Value, assetUrl, request } from "./cms-api";
 import { MediaPickerModal } from "./media-picker-modal";
 
 export interface HeroSlideItem {
-  slideType?: "split_content" | "full_banner";
+  id?: string;
   enabled?: boolean;
+  imageUrl?: string;
+  image?: { assetId?: string; url?: string; alt?: string };
+  href?: string;
+  bannerLink?: string;
+  alt?: string;
   title?: string;
+  // Legacy fields kept for backward compatibility
+  slideType?: "split_content" | "full_banner";
   subtitle?: string;
   bannerType?: "with_button" | "without_button";
-  image?: { assetId?: string; alt?: string };
-  mobileImage?: { assetId?: string; alt?: string };
-  backgroundGradient?: string;
-  bannerLink?: string;
   button?: { label?: string; href?: string };
-  secondaryButton?: { label?: string; href?: string };
-  badge?: string;
-  badgeColor?: "amber" | "emerald" | "purple";
-  theme?: "lime" | "blue" | "pink";
-  themePreset?: "dark" | "lime" | "light" | "custom";
-  customTheme?: {
-    bg: string;
-    text: string;
-    accent: string;
-  };
-  imageBackdrop?: "none" | "circle" | "lime_ring";
-  floatingBadges?: Array<{ icon: string; text: string }>;
 }
 
 export interface HeroConfig {
@@ -40,7 +31,7 @@ export interface HeroConfig {
   subtitle?: string;
   button?: { label?: string; href?: string };
   bannerLink?: string;
-  image?: { assetId?: string; alt?: string };
+  image?: { assetId?: string; url?: string; alt?: string };
 }
 
 interface HeroInspectorProps {
@@ -68,145 +59,28 @@ export function getContrastRatio(hex1: string, hex2: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-// Banned claims patterns for preflight check against policy
-const PREFLIGHT_CLAIM_RULES: Array<{ name: string; pattern: RegExp }> = [
-  {
-    name: "Authenticity guarantee",
-    pattern: new RegExp(["100\\s*%", "(?:auth" + "entic|gen" + "uine)"].join("\\s*"), "i"),
-  },
-  {
-    name: "Distributor/warranty guarantee",
-    pattern: new RegExp(["authori[sz]ed", "distributor|full\\s+war" + "ranty"].join("|"), "i"),
-  },
-  {
-    name: "Unconfirmed service promise",
-    pattern: new RegExp(["24\\s*/\\s*7", "has" + "sle-free", "light" + "ning-fast", "fast\\s+delivery"].join("|"), "i"),
-  },
-  {
-    name: "Geo claim",
-    pattern: new RegExp(["anywhere.*Bang" + "ladesh", "nation" + "wide"].join("|"), "i"),
-  },
-  {
-    name: "Timeframe claim",
-    pattern: /\b\d+\s*(?:[-–]|to)\s*\d+\s*(?:hours?|h|days?)\b|\b\d+[\s-]*(?:day|hour)s?\b/i,
-  },
-  {
-    name: "Ranking claim",
-    pattern: new RegExp(["best", "sel" + "lers"].join("\\s+"), "i"),
-  },
-  {
-    name: "Inspection claim",
-    pattern: new RegExp(["par" + "cel", "inspec" + "tion"].join("\\s+"), "i"),
-  },
-  {
-    name: "Payment promise",
-    pattern: new RegExp(["cash" + "back", "\\bE" + "MI\\b"].join("|"), "i"),
-  },
-  {
-    name: "Invented discount",
-    pattern: /\d+(?:[.,]\d+)?\s*%|excl(?:usive)\s+(?:member|voucher)|\b(?:full|quick)\s+refunds?\b/i,
-  },
-];
+const DEFAULT_BANNER = "/brand/hero-banner-main.png";
 
 export function HeroInspector({ config, onChange, assets }: HeroInspectorProps) {
-  const slides: HeroSlideItem[] = Array.isArray(config.slides) ? config.slides : [];
+  // Initialize slides list
+  const slides: HeroSlideItem[] = Array.isArray(config.slides) && config.slides.length > 0
+    ? config.slides
+    : [
+        {
+          id: "slide-1",
+          enabled: true,
+          imageUrl: DEFAULT_BANNER,
+          href: "/shop",
+          alt: "Shop Smart. Live Smart.",
+        },
+      ];
+
   const intervalSeconds = Number(config.intervalSeconds ?? 5);
-  const showArrows = config.showArrows !== false;
-  const showProgress = config.showProgress !== false;
-  const pauseOnHover = config.pauseOnHover !== false;
-
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
-  const [pickerTarget, setPickerTarget] = useState<{
-    slideIndex: number;
-    field: "image" | "mobileImage";
-  } | null>(null);
-
-  // Preflight audit warnings
-  const warnings: Array<{ level: "warning" | "info"; message: string }> = [];
-
-  if (slides.length > 5) {
-    warnings.push({
-      level: "warning",
-      message: `Hero has ${slides.length} slides. For optimal performance, 3 to 5 slides are recommended.`,
-    });
-  }
-
-  if (slides.length > 0 && slides.every((s) => s.enabled === false)) {
-    warnings.push({
-      level: "warning",
-      message: "All slides are disabled. The hero banner will not render on the storefront.",
-    });
-  }
-
-  slides.forEach((slide, idx) => {
-    const num = idx + 1;
-    // Missing alt text
-    if (slide.image?.assetId && !slide.image?.alt?.trim()) {
-      warnings.push({
-        level: "warning",
-        message: `Slide ${num}: Desktop image is missing descriptive alt text for accessibility.`,
-      });
-    }
-
-    // Missing mobile image advice
-    if (slide.image?.assetId && !slide.mobileImage?.assetId) {
-      warnings.push({
-        level: "info",
-        message: `Slide ${num}: No dedicated mobile image set. Adding a mobile crop helps mobile layout.`,
-      });
-    }
-
-    // Heavy image check (> 300KB)
-    if (slide.image?.assetId) {
-      const asset = assets.find((a) => a.id === slide.image?.assetId);
-      const byteSize = (asset as { byteSize?: number; size?: number } | undefined)?.byteSize;
-      if (byteSize && byteSize > 300 * 1024) {
-        warnings.push({
-          level: "warning",
-          message: `Slide ${num}: Desktop image is ${Math.round(byteSize / 1024)} KB (> 300 KB). Consider compressing to improve mobile LCP.`,
-        });
-      }
-    }
-
-    // Custom theme contrast
-    if (slide.themePreset === "custom" && slide.customTheme) {
-      const bg = slide.customTheme.bg;
-      const text = slide.customTheme.text;
-      const accent = slide.customTheme.accent;
-
-      if (/^#[0-9a-fA-F]{6}$/.test(bg) && /^#[0-9a-fA-F]{6}$/.test(text)) {
-        const ratio = getContrastRatio(bg, text);
-        if (ratio < 4.5) {
-          warnings.push({
-            level: "warning",
-            message: `Slide ${num}: Custom theme contrast ratio is ${ratio.toFixed(2)}:1 between background and text (WCAG AA requires 4.5:1).`,
-          });
-        }
-      }
-
-      if (/^#[0-9a-fA-F]{6}$/.test(bg) && /^#[0-9a-fA-F]{6}$/.test(accent)) {
-        const uiRatio = getContrastRatio(bg, accent);
-        if (uiRatio < 3.0) {
-          warnings.push({
-            level: "info",
-            message: `Slide ${num}: Accent contrast ratio is ${uiRatio.toFixed(2)}:1 against background (recommended 3.0:1).`,
-          });
-        }
-      }
-    }
-
-    // Banned claims policy scan
-    const textToCheck = [slide.title, slide.subtitle, slide.badge].filter(Boolean).join(" ");
-    for (const rule of PREFLIGHT_CLAIM_RULES) {
-      const match = textToCheck.match(rule.pattern);
-      if (match) {
-        warnings.push({
-          level: "warning",
-          message: `Slide ${num}: Contains copy "${match[0]}" (${rule.name}). Store copy policy requires neutral, verifiable phrasing.`,
-        });
-      }
-    }
-  });
+  const [pickerSlideIndex, setPickerSlideIndex] = useState<number | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadSlideIndex, setUploadSlideIndex] = useState<number | null>(null);
 
   const emitChange = (updated: Record<string, unknown>) => {
     onChange(updated as unknown as Record<string, Value>);
@@ -233,7 +107,7 @@ export function HeroInspector({ config, onChange, assets }: HeroInspectorProps) 
     const original = slides[index];
     const clone: HeroSlideItem = {
       ...structuredClone(original),
-      title: `${original.title || "Slide"} (Copy)`,
+      id: `slide-${Date.now()}`,
     };
     const next = [...slides.slice(0, index + 1), clone, ...slides.slice(index + 1)];
     updateSlides(next);
@@ -257,170 +131,136 @@ export function HeroInspector({ config, onChange, assets }: HeroInspectorProps) 
   const handleAddSlide = () => {
     if (slides.length >= 10) return;
     const newSlide: HeroSlideItem = {
-      slideType: "split_content",
+      id: `slide-${Date.now()}`,
       enabled: true,
-      title: "Featured Spotlight",
-      subtitle: "Explore category products and details.",
-      badge: "Featured",
-      themePreset: "dark",
-      imageBackdrop: "circle",
-      button: {
-        label: "View products",
-        href: "/shop",
-      },
+      imageUrl: DEFAULT_BANNER,
+      href: "/shop",
+      alt: `Hero Banner ${slides.length + 1}`,
     };
     const next = [...slides, newSlide];
     updateSlides(next);
     setExpandedIndex(next.length - 1);
   };
 
-  const updateActiveSlide = (fields: Partial<HeroSlideItem>) => {
-    if (expandedIndex === null || !slides[expandedIndex]) return;
+  const updateActiveSlide = (index: number, fields: Partial<HeroSlideItem>) => {
     const next = [...slides];
-    next[expandedIndex] = { ...next[expandedIndex], ...fields };
+    next[index] = { ...next[index], ...fields };
     updateSlides(next);
   };
 
-  const activeSlide = expandedIndex !== null ? slides[expandedIndex] : null;
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, slideIdx: number) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploading(true);
+      const form = new FormData();
+      form.append("file", file);
+      const uploaded = await request<Asset>("/admin/cms/media", {
+        method: "POST",
+        body: form,
+      });
+
+      if (uploaded?.url) {
+        updateActiveSlide(slideIdx, {
+          imageUrl: assetUrl(uploaded.url),
+          image: { assetId: uploaded.id, url: assetUrl(uploaded.url) },
+        });
+      }
+    } catch (err) {
+      alert("Image upload failed. Please try again or use the Media Library.");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   return (
     <div className="space-y-4 text-xs">
-      {/* 1. SLIDER SETTINGS (INTERVAL & CONTROLS) */}
+      {/* 1. SLIDER AUTOPLAY SETTING */}
       <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 p-3.5 space-y-3">
         <div className="flex items-center justify-between">
-          <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">Slider Controls</span>
-          <span className="text-[11px] font-mono text-slate-500">
-            {intervalSeconds}s interval
+          <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+            Slider Autoplay Settings
           </span>
+          <span className="text-[11px] font-mono text-slate-500">{intervalSeconds}s interval</span>
         </div>
 
-        {/* Interval Range Slider */}
         <div className="space-y-1">
           <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400">
-            <span>Autoplay Interval</span>
-            <span className="font-semibold">{intervalSeconds} seconds</span>
+            <span>Slide Duration</span>
+            <span>{intervalSeconds} seconds</span>
           </div>
           <input
             type="range"
             min={3}
-            max={10}
+            max={15}
             step={1}
             value={intervalSeconds}
-            onChange={(e) =>
-              emitChange({
-                ...config,
-                intervalSeconds: Number(e.target.value),
-              })
-            }
-            className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+            onChange={(e) => emitChange({ ...config, intervalSeconds: Number(e.target.value) })}
+            className="w-full accent-indigo-600 cursor-pointer"
           />
-          <div className="flex justify-between text-[10px] text-slate-600 dark:text-slate-400">
-            <span>3s (Fast)</span>
-            <span>5s (Default)</span>
-            <span>10s (Slow)</span>
-          </div>
-        </div>
-
-        {/* Control Toggles */}
-        <div className="grid grid-cols-1 gap-2 pt-1 border-t border-slate-200 dark:border-slate-700/60 text-slate-700 dark:text-slate-300">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showProgress}
-              onChange={(e) =>
-                emitChange({
-                  ...config,
-                  showProgress: e.target.checked,
-                })
-              }
-              className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-            />
-            <span>Segmented progress bar</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showArrows}
-              onChange={(e) =>
-                emitChange({
-                  ...config,
-                  showArrows: e.target.checked,
-                })
-              }
-              className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-            />
-            <span>Previous and next arrows</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={pauseOnHover}
-              onChange={(e) =>
-                emitChange({
-                  ...config,
-                  pauseOnHover: e.target.checked,
-                })
-              }
-              className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-            />
-            <span>Pause on hover and keyboard focus</span>
-          </label>
         </div>
       </div>
 
-      {/* 2. PREFLIGHT AUDIT NOTICES */}
-      {warnings.length > 0 && (
-        <div className="rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/30 p-3 space-y-1.5">
-          <div className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300 text-[11px]">
-            <span>⚠️</span>
-            <span>Preflight Guidance ({warnings.length})</span>
-          </div>
-          <ul className="space-y-1 text-[11px] text-amber-700 dark:text-amber-400/90 pl-4 list-disc">
-            {warnings.map((w, i) => (
-              <li key={i}>{w.message}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* 3. SLIDES LIST WITH COMPACT CARDS */}
+      {/* 2. HERO SLIDES MANAGER (IMAGE & HREF ONLY) */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="font-bold text-slate-800 dark:text-slate-200">
-            Slides ({slides.length})
-          </span>
+          <div>
+            <h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs">
+              Hero Banner Slides ({slides.length})
+            </h4>
+            <p className="text-[11px] text-slate-500">
+              Each slide has an image and a link URL.
+            </p>
+          </div>
           <button
             type="button"
-            disabled={slides.length >= 10}
             onClick={handleAddSlide}
-            className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 transition shadow-2xs"
+            disabled={slides.length >= 10}
+            className="px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[11px] flex items-center gap-1 shadow-xs transition disabled:opacity-50"
           >
-            + Add Slide
+            <span>+</span> Add Slide
           </button>
         </div>
 
-        <div className="space-y-1.5">
+        {/* Hidden File Input for Direct Upload */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            if (uploadSlideIndex !== null) {
+              handleFileUpload(e, uploadSlideIndex);
+            }
+          }}
+        />
+
+        <div className="space-y-2">
           {slides.map((slide, idx) => {
             const isExpanded = expandedIndex === idx;
             const asset = assets.find((a) => a.id === slide.image?.assetId);
-            const preset = slide.themePreset || "light";
-            const isFullBanner =
-              slide.slideType === "full_banner" ||
-              (!slide.slideType && slide.bannerType === "without_button");
+            const currentImg =
+              slide.imageUrl ||
+              (asset?.url ? assetUrl(asset.url) : "") ||
+              slide.image?.url ||
+              DEFAULT_BANNER;
+            const currentHref = slide.href || slide.bannerLink || "/shop";
 
             return (
               <div
-                key={idx}
+                key={slide.id || idx}
                 className={`rounded-xl border transition ${
                   isExpanded
                     ? "border-indigo-500 bg-white dark:bg-slate-900 shadow-sm ring-1 ring-indigo-500"
                     : "border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-850 hover:bg-white dark:hover:bg-slate-800"
                 }`}
               >
-                {/* Slide Card Header */}
+                {/* Header Row */}
                 <div
                   onClick={() => setExpandedIndex(isExpanded ? null : idx)}
-                  className="flex items-center gap-2 p-2.5 cursor-pointer select-none"
+                  className="flex items-center gap-2.5 p-2.5 cursor-pointer select-none"
                 >
                   {/* Reorder Buttons */}
                   <div
@@ -447,48 +287,30 @@ export function HeroInspector({ config, onChange, assets }: HeroInspectorProps) 
                     </button>
                   </div>
 
-                  {/* Thumbnail */}
-                  <div className="h-9 w-9 flex-shrink-0 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 overflow-hidden flex items-center justify-center">
-                    {asset?.url ? (
-                      <img
-                        src={assetUrl(asset.url)}
-                        alt={asset.altText || ""}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-slate-400 text-xs">🖼️</span>
-                    )}
+                  {/* Thumbnail Preview */}
+                  <div className="h-10 w-16 flex-shrink-0 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 overflow-hidden flex items-center justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={currentImg}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = DEFAULT_BANNER;
+                      }}
+                    />
                   </div>
 
-                  {/* Info */}
+                  {/* Slide Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-semibold text-slate-900 dark:text-slate-100 truncate">
-                        {slide.title || `Slide ${idx + 1}`}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-500">
-                      <span className="uppercase font-mono">
-                        {isFullBanner ? "Full banner" : "Spotlight"}
-                      </span>
-                      <span>·</span>
-                      <span
-                        className={`px-1.5 py-0.2 rounded font-medium ${
-                          preset === "dark"
-                            ? "bg-slate-900 text-lime-400"
-                            : preset === "lime"
-                              ? "bg-lime-300 text-slate-900"
-                              : preset === "custom"
-                                ? "bg-purple-100 text-purple-700"
-                                : "bg-amber-100 text-amber-900"
-                        }`}
-                      >
-                        {preset}
-                      </span>
-                    </div>
+                    <span className="font-semibold text-slate-900 dark:text-slate-100 truncate block">
+                      Slide {idx + 1}
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono truncate block">
+                      Link: {currentHref}
+                    </span>
                   </div>
 
-                  {/* Quick Enabled Toggle */}
+                  {/* Enable / Disable Toggle */}
                   <button
                     type="button"
                     onClick={(e) => {
@@ -502,7 +324,7 @@ export function HeroInspector({ config, onChange, assets }: HeroInspectorProps) 
                         ? "text-emerald-600 hover:text-emerald-700"
                         : "text-slate-300 dark:text-slate-600 hover:text-slate-400"
                     }`}
-                    title={slide.enabled !== false ? "Slide is active" : "Slide is disabled"}
+                    title={slide.enabled !== false ? "Slide is active" : "Slide is hidden"}
                   >
                     {slide.enabled !== false ? "👁️" : "🙈"}
                   </button>
@@ -531,581 +353,90 @@ export function HeroInspector({ config, onChange, assets }: HeroInspectorProps) 
                   </div>
                 </div>
 
-                {/* Expanded Slide Detail Inspector */}
-                {isExpanded && activeSlide && (
-                  <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 space-y-3.5 bg-white dark:bg-slate-900 rounded-b-xl">
-                    {/* Status & Layout Switcher */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
-                        Slide Layout Mode
+                {/* Expanded Slide Detail: Image & Link Only */}
+                {isExpanded && (
+                  <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 space-y-4 bg-white dark:bg-slate-900 rounded-b-xl">
+                    {/* 1. IMAGE OPTION */}
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold text-slate-800 dark:text-slate-200 block">
+                        Slide Banner Image
                       </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateActiveSlide({
-                              slideType: "split_content",
-                            })
-                          }
-                          className={`p-2 rounded-lg border text-left font-semibold transition ${
-                            !isFullBanner
-                              ? "border-indigo-600 bg-indigo-50/60 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500"
-                              : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50"
-                          }`}
-                        >
-                          <span className="block text-xs font-bold">✨ Spotlight Card</span>
-                          <span className="text-[10px] text-slate-500 font-normal">
-                            Product + Copy
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateActiveSlide({
-                              slideType: "full_banner",
-                            })
-                          }
-                          className={`p-2 rounded-lg border text-left font-semibold transition ${
-                            isFullBanner
-                              ? "border-indigo-600 bg-indigo-50/60 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500"
-                              : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50"
-                          }`}
-                        >
-                          <span className="block text-xs font-bold">🖼️ Full Banner</span>
-                          <span className="text-[10px] text-slate-500 font-normal">
-                            Artwork with text
-                          </span>
-                        </button>
-                      </div>
-                    </div>
 
-                    {/* Enable Checkbox */}
-                    <label className="flex items-center gap-2 font-medium text-slate-700 dark:text-slate-300">
-                      <input
-                        type="checkbox"
-                        checked={activeSlide.enabled !== false}
-                        onChange={(e) => updateActiveSlide({ enabled: e.target.checked })}
-                        className="rounded border-slate-300 text-indigo-600"
-                      />
-                      <span>Enable this slide in the rotation</span>
-                    </label>
-
-                    {/* Theme Preset Selector (Spotlight only) */}
-                    {!isFullBanner && (
-                      <div className="space-y-2 rounded-lg border border-slate-200 dark:border-slate-800 p-2.5 bg-slate-50/60 dark:bg-slate-800/30">
-                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
-                          Card Theme Preset
-                        </label>
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {(
-                            [
-                              { key: "dark", label: "Dark Slate", bg: "#0f172a", text: "#f8fafc" },
-                              { key: "lime", label: "Lime Glow", bg: "#d8f45a", text: "#0f172a" },
-                              { key: "light", label: "Warm Cream", bg: "#faf8f5", text: "#0f172a" },
-                              { key: "custom", label: "Custom Hex", bg: "#ffffff", text: "#0f172a" },
-                            ] as const
-                          ).map((p) => {
-                            const isSelected = (activeSlide.themePreset || "light") === p.key;
-                            return (
-                              <button
-                                key={p.key}
-                                type="button"
-                                onClick={() =>
-                                  updateActiveSlide({
-                                    themePreset: p.key,
-                                    customTheme:
-                                      p.key === "custom" && !activeSlide.customTheme
-                                        ? { bg: "#0f172a", text: "#f8fafc", accent: "#d8f45a" }
-                                        : activeSlide.customTheme,
-                                  })
-                                }
-                                className={`flex items-center gap-2 p-2 rounded-lg border text-left font-medium transition ${
-                                  isSelected
-                                    ? "border-indigo-600 bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-2xs ring-1 ring-indigo-500"
-                                    : "border-slate-200 dark:border-slate-700/60 bg-white/60 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-white"
-                                }`}
-                              >
-                                <span
-                                  className="h-3.5 w-3.5 rounded-full border border-slate-300 dark:border-slate-600 shrink-0"
-                                  style={{ backgroundColor: p.bg }}
-                                />
-                                <span className="text-[11px] truncate">{p.label}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* Custom Theme Pickers */}
-                        {activeSlide.themePreset === "custom" && (
-                          <div className="pt-2 border-t border-slate-200 dark:border-slate-700 space-y-2">
-                            <span className="text-[10px] uppercase font-bold text-slate-500 block">
-                              Custom Hex Palette
-                            </span>
-                            <div className="grid grid-cols-3 gap-2">
-                              <div>
-                                <label className="text-[10px] text-slate-500 block mb-0.5">Background</label>
-                                <div className="flex items-center gap-1">
-                                  <input
-                                    type="color"
-                                    value={activeSlide.customTheme?.bg || "#0f172a"}
-                                    onChange={(e) =>
-                                      updateActiveSlide({
-                                        customTheme: {
-                                          bg: e.target.value,
-                                          text: activeSlide.customTheme?.text || "#ffffff",
-                                          accent: activeSlide.customTheme?.accent || "#d8f45a",
-                                        },
-                                      })
-                                    }
-                                    className="h-7 w-7 rounded border border-slate-300 cursor-pointer"
-                                  />
-                                  <input
-                                    type="text"
-                                    maxLength={7}
-                                    value={activeSlide.customTheme?.bg || "#0f172a"}
-                                    onChange={(e) =>
-                                      updateActiveSlide({
-                                        customTheme: {
-                                          bg: e.target.value,
-                                          text: activeSlide.customTheme?.text || "#ffffff",
-                                          accent: activeSlide.customTheme?.accent || "#d8f45a",
-                                        },
-                                      })
-                                    }
-                                    className="w-full text-[10px] font-mono px-1.5 py-1 border border-slate-300 rounded"
-                                  />
-                                </div>
-                              </div>
-                              <div>
-                                <label className="text-[10px] text-slate-500 block mb-0.5">Text</label>
-                                <div className="flex items-center gap-1">
-                                  <input
-                                    type="color"
-                                    value={activeSlide.customTheme?.text || "#ffffff"}
-                                    onChange={(e) =>
-                                      updateActiveSlide({
-                                        customTheme: {
-                                          bg: activeSlide.customTheme?.bg || "#0f172a",
-                                          text: e.target.value,
-                                          accent: activeSlide.customTheme?.accent || "#d8f45a",
-                                        },
-                                      })
-                                    }
-                                    className="h-7 w-7 rounded border border-slate-300 cursor-pointer"
-                                  />
-                                  <input
-                                    type="text"
-                                    maxLength={7}
-                                    value={activeSlide.customTheme?.text || "#ffffff"}
-                                    onChange={(e) =>
-                                      updateActiveSlide({
-                                        customTheme: {
-                                          bg: activeSlide.customTheme?.bg || "#0f172a",
-                                          text: e.target.value,
-                                          accent: activeSlide.customTheme?.accent || "#d8f45a",
-                                        },
-                                      })
-                                    }
-                                    className="w-full text-[10px] font-mono px-1.5 py-1 border border-slate-300 rounded"
-                                  />
-                                </div>
-                              </div>
-                              <div>
-                                <label className="text-[10px] text-slate-500 block mb-0.5">Accent</label>
-                                <div className="flex items-center gap-1">
-                                  <input
-                                    type="color"
-                                    value={activeSlide.customTheme?.accent || "#d8f45a"}
-                                    onChange={(e) =>
-                                      updateActiveSlide({
-                                        customTheme: {
-                                          bg: activeSlide.customTheme?.bg || "#0f172a",
-                                          text: activeSlide.customTheme?.text || "#ffffff",
-                                          accent: e.target.value,
-                                        },
-                                      })
-                                    }
-                                    className="h-7 w-7 rounded border border-slate-300 cursor-pointer"
-                                  />
-                                  <input
-                                    type="text"
-                                    maxLength={7}
-                                    value={activeSlide.customTheme?.accent || "#d8f45a"}
-                                    onChange={(e) =>
-                                      updateActiveSlide({
-                                        customTheme: {
-                                          bg: activeSlide.customTheme?.bg || "#0f172a",
-                                          text: activeSlide.customTheme?.text || "#ffffff",
-                                          accent: e.target.value,
-                                        },
-                                      })
-                                    }
-                                    className="w-full text-[10px] font-mono px-1.5 py-1 border border-slate-300 rounded"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                            {/* Contrast Ratio Result */}
-                            {activeSlide.customTheme && (
-                              <div className="flex items-center justify-between text-[11px] pt-1">
-                                <span className="text-slate-500">Contrast Ratio:</span>
-                                {(() => {
-                                  const r = getContrastRatio(
-                                    activeSlide.customTheme.bg,
-                                    activeSlide.customTheme.text,
-                                  );
-                                  const pass = r >= 4.5;
-                                  return (
-                                    <span
-                                      className={`px-1.5 py-0.5 rounded font-mono font-bold ${
-                                        pass
-                                          ? "bg-emerald-100 text-emerald-800"
-                                          : "bg-rose-100 text-rose-800"
-                                      }`}
-                                    >
-                                      {r.toFixed(2)}:1 {pass ? "✓ AA Pass" : "✗ AA Fail (<4.5:1)"}
-                                    </span>
-                                  );
-                                })()}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Image Backdrop Selector (Spotlight only) */}
-                    {!isFullBanner && (
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
-                          Image Backdrop Graphic
-                        </label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {(
-                            [
-                              { key: "none", label: "None" },
-                              { key: "circle", label: "Soft Circle" },
-                              { key: "lime_ring", label: "Lime Ring" },
-                            ] as const
-                          ).map((b) => (
-                            <button
-                              key={b.key}
-                              type="button"
-                              onClick={() => updateActiveSlide({ imageBackdrop: b.key })}
-                              className={`p-1.5 rounded-lg border text-center text-[11px] font-medium transition ${
-                                (activeSlide.imageBackdrop || "none") === b.key
-                                  ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500"
-                                  : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50"
-                              }`}
-                            >
-                              {b.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Copy Inputs (Spotlight only) */}
-                    {!isFullBanner && (
-                      <div className="space-y-2.5 pt-2 border-t border-slate-200 dark:border-slate-800">
-                        {/* Eyebrow / Badge */}
-                        <div>
-                          <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                            Eyebrow Pill (Badge)
-                          </label>
-                          <input
-                            type="text"
-                            value={activeSlide.badge || ""}
-                            onChange={(e) => updateActiveSlide({ badge: e.target.value })}
-                            placeholder="e.g. Studio Gear"
-                            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100"
-                          />
-                        </div>
-
-                        {/* Headline */}
-                        <div>
-                          <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                            Headline Title
-                          </label>
-                          <input
-                            type="text"
-                            value={activeSlide.title || ""}
-                            onChange={(e) => updateActiveSlide({ title: e.target.value })}
-                            placeholder="Cameras and lighting equipment"
-                            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100"
-                          />
-                        </div>
-
-                        {/* Subtitle */}
-                        <div>
-                          <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                            Subtitle Text
-                          </label>
-                          <textarea
-                            rows={2}
-                            value={activeSlide.subtitle || ""}
-                            onChange={(e) => updateActiveSlide({ subtitle: e.target.value })}
-                            placeholder="Explore verified gear and accessories."
-                            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 resize-none"
-                          />
-                        </div>
-
-                        {/* Primary Button */}
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-[10px] text-slate-500 block mb-0.5">Primary Button Label</label>
-                            <input
-                              type="text"
-                              value={activeSlide.button?.label || ""}
-                              onChange={(e) =>
-                                updateActiveSlide({
-                                  button: {
-                                    href: activeSlide.button?.href || "/shop",
-                                    label: e.target.value,
-                                  },
-                                })
-                              }
-                              placeholder="View products"
-                              className="w-full rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[10px] text-slate-500 block mb-0.5">Primary Button Link</label>
-                            <input
-                              type="text"
-                              value={activeSlide.button?.href || ""}
-                              onChange={(e) =>
-                                updateActiveSlide({
-                                  button: {
-                                    label: activeSlide.button?.label || "Explore",
-                                    href: e.target.value,
-                                  },
-                                })
-                              }
-                              placeholder="/shop"
-                              className="w-full rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs font-mono"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Secondary Button Toggle */}
-                        <div className="space-y-1.5 pt-1">
-                          <label className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(activeSlide.secondaryButton)}
-                              onChange={(e) =>
-                                updateActiveSlide({
-                                  secondaryButton: e.target.checked
-                                    ? { label: "Learn more", href: "/help" }
-                                    : undefined,
-                                })
-                              }
-                              className="rounded border-slate-300 text-indigo-600"
-                            />
-                            <span>Include secondary button</span>
-                          </label>
-
-                          {activeSlide.secondaryButton && (
-                            <div className="grid grid-cols-2 gap-2 pl-4">
-                              <div>
-                                <label className="text-[10px] text-slate-500 block mb-0.5">Secondary Label</label>
-                                <input
-                                  type="text"
-                                  value={activeSlide.secondaryButton.label || ""}
-                                  onChange={(e) =>
-                                    updateActiveSlide({
-                                      secondaryButton: {
-                                        href: activeSlide.secondaryButton?.href || "/help",
-                                        label: e.target.value,
-                                      },
-                                    })
-                                  }
-                                  placeholder="Learn more"
-                                  className="w-full rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[10px] text-slate-500 block mb-0.5">Secondary Link</label>
-                                <input
-                                  type="text"
-                                  value={activeSlide.secondaryButton.href || ""}
-                                  onChange={(e) =>
-                                    updateActiveSlide({
-                                      secondaryButton: {
-                                        label: activeSlide.secondaryButton?.label || "Learn more",
-                                        href: e.target.value,
-                                      },
-                                    })
-                                  }
-                                  placeholder="/help"
-                                  className="w-full rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs font-mono"
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Full Banner Link */}
-                    {isFullBanner && (
-                      <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-                        <div>
-                          <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                            Banner Accessible Title
-                          </label>
-                          <input
-                            type="text"
-                            value={activeSlide.title || ""}
-                            onChange={(e) => updateActiveSlide({ title: e.target.value })}
-                            placeholder="Featured campaign banner"
-                            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                            Click Destination URL
-                          </label>
-                          <input
-                            type="text"
-                            value={activeSlide.bannerLink || activeSlide.button?.href || ""}
-                            onChange={(e) =>
-                              updateActiveSlide({
-                                bannerLink: e.target.value,
-                              })
-                            }
-                            placeholder="/shop"
-                            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-mono text-slate-900 dark:text-slate-100"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Desktop Image Selector */}
-                    <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                          Desktop Image
-                        </label>
-                        {activeSlide.image?.assetId && (
-                          <button
-                            type="button"
-                            onClick={() => updateActiveSlide({ image: undefined })}
-                            className="text-[10px] text-rose-600 hover:underline"
-                          >
-                            Remove
-                          </button>
-                        )}
+                      {/* Large Thumbnail Preview */}
+                      <div className="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 aspect-[16/7] bg-slate-900">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={currentImg}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = DEFAULT_BANNER;
+                          }}
+                        />
                       </div>
 
+                      {/* Action Buttons: Upload or Pick Media */}
                       <div className="flex items-center gap-2">
-                        {(() => {
-                          const asset = assets.find((a) => a.id === activeSlide.image?.assetId);
-                          return asset?.url ? (
-                            <img
-                              src={assetUrl(asset.url)}
-                              alt={asset.altText || ""}
-                              className="h-12 w-12 rounded-lg border border-slate-200 dark:border-slate-700 object-cover"
-                            />
-                          ) : (
-                            <div className="h-12 w-12 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-400">
-                              📷
-                            </div>
-                          );
-                        })()}
                         <button
                           type="button"
-                          onClick={() => setPickerTarget({ slideIndex: idx, field: "image" })}
-                          className="rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition shadow-2xs"
+                          onClick={() => setPickerSlideIndex(idx)}
+                          className="flex-1 py-1.5 px-3 rounded-lg border border-slate-300 dark:border-slate-700 hover:border-indigo-500 font-semibold text-slate-700 dark:text-slate-300 hover:text-indigo-600 text-center transition flex items-center justify-center gap-1.5"
                         >
-                          🖼️ Choose Media
+                          <span>📁</span> Choose from Media Library
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isUploading}
+                          onClick={() => {
+                            setUploadSlideIndex(idx);
+                            fileInputRef.current?.click();
+                          }}
+                          className="py-1.5 px-3 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-semibold text-slate-700 dark:text-slate-300 transition"
+                        >
+                          {isUploading ? "Uploading..." : "⬆ Upload Image"}
                         </button>
                       </div>
 
-                      <div>
-                        <label className="text-[10px] text-slate-500 block mb-0.5">
-                          Descriptive Alt Text (for screen readers)
+                      {/* Direct URL Input */}
+                      <div className="space-y-1 pt-1">
+                        <label className="text-[10px] text-slate-500 font-medium block">
+                          Or enter direct Image URL / Path:
                         </label>
                         <input
                           type="text"
-                          value={activeSlide.image?.alt || ""}
+                          value={slide.imageUrl || ""}
+                          placeholder="/brand/hero-banner-main.png or https://..."
                           onChange={(e) =>
-                            updateActiveSlide({
-                              image: {
-                                assetId: activeSlide.image?.assetId,
-                                alt: e.target.value,
-                              },
+                            updateActiveSlide(idx, {
+                              imageUrl: e.target.value,
+                              image: { url: e.target.value },
                             })
                           }
-                          placeholder="e.g. Studio camera with 50mm lens on tripod"
-                          className="w-full rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs"
+                          className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
                         />
                       </div>
                     </div>
 
-                    {/* Mobile Image Selector (Optional) */}
-                    <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                          Mobile Image (Optional Crop)
-                        </label>
-                        {activeSlide.mobileImage?.assetId && (
-                          <button
-                            type="button"
-                            onClick={() => updateActiveSlide({ mobileImage: undefined })}
-                            className="text-[10px] text-rose-600 hover:underline"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {(() => {
-                          const asset = assets.find((a) => a.id === activeSlide.mobileImage?.assetId);
-                          return asset?.url ? (
-                            <img
-                              src={assetUrl(asset.url)}
-                              alt={asset.altText || ""}
-                              className="h-12 w-12 rounded-lg border border-slate-200 dark:border-slate-700 object-cover"
-                            />
-                          ) : (
-                            <div className="h-12 w-12 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-400">
-                              📱
-                            </div>
-                          );
-                        })()}
-                        <button
-                          type="button"
-                          onClick={() => setPickerTarget({ slideIndex: idx, field: "mobileImage" })}
-                          className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 transition shadow-2xs"
-                        >
-                          📱 Choose Mobile Crop
-                        </button>
-                      </div>
-
-                      {activeSlide.mobileImage?.assetId && (
-                        <div>
-                          <label className="text-[10px] text-slate-500 block mb-0.5">
-                            Mobile Alt Text
-                          </label>
-                          <input
-                            type="text"
-                            value={activeSlide.mobileImage?.alt || ""}
-                            onChange={(e) =>
-                              updateActiveSlide({
-                                mobileImage: {
-                                  assetId: activeSlide.mobileImage?.assetId,
-                                  alt: e.target.value,
-                                },
-                              })
-                            }
-                            placeholder="Mobile product presentation"
-                            className="w-full rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1 text-xs"
-                          />
-                        </div>
-                      )}
+                    {/* 2. HREF OPTION */}
+                    <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <label className="text-[11px] font-bold text-slate-800 dark:text-slate-200 block">
+                        Link URL (href)
+                      </label>
+                      <input
+                        type="text"
+                        value={slide.href || slide.bannerLink || ""}
+                        placeholder="/category/electronics, /shop, etc."
+                        onChange={(e) =>
+                          updateActiveSlide(idx, {
+                            href: e.target.value,
+                            bannerLink: e.target.value,
+                          })
+                        }
+                        className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                      <p className="text-[10px] text-slate-400">
+                        When customers click on this banner, they will be taken to this link.
+                      </p>
                     </div>
                   </div>
                 )}
@@ -1116,33 +447,21 @@ export function HeroInspector({ config, onChange, assets }: HeroInspectorProps) 
       </div>
 
       {/* Media Picker Modal */}
-      {pickerTarget !== null && (
+      {pickerSlideIndex !== null && (
         <MediaPickerModal
           isOpen={true}
           assets={assets}
-          currentAssetId={
-            pickerTarget.field === "image"
-              ? slides[pickerTarget.slideIndex]?.image?.assetId
-              : slides[pickerTarget.slideIndex]?.mobileImage?.assetId
-          }
-          onClose={() => setPickerTarget(null)}
+          currentAssetId={slides[pickerSlideIndex]?.image?.assetId}
+          onClose={() => setPickerSlideIndex(null)}
           onSelect={(assetId, asset) => {
-            const next = [...slides];
-            const current = next[pickerTarget.slideIndex];
-            if (current) {
-              const currentImg =
-                pickerTarget.field === "image" ? current.image : current.mobileImage;
-              const nextImg = {
-                assetId,
-                alt: currentImg?.alt || asset?.altText || "",
-              };
-              next[pickerTarget.slideIndex] = {
-                ...current,
-                [pickerTarget.field]: nextImg,
-              };
-              updateSlides(next);
+            if (pickerSlideIndex !== null) {
+              const url = asset?.url ? assetUrl(asset.url) : "";
+              updateActiveSlide(pickerSlideIndex, {
+                imageUrl: url,
+                image: { assetId, url },
+              });
             }
-            setPickerTarget(null);
+            setPickerSlideIndex(null);
           }}
         />
       )}
