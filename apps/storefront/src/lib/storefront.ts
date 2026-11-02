@@ -270,13 +270,37 @@ function asDecimal(v: unknown): number | null {
 }
 export function imageUrl(v: unknown): string | null {
   if (typeof v !== "string" || !v) return null;
-  if (/^https?:\/\//.test(v)) return v;
-  if (v.startsWith("data:")) return v;
-  if (v.startsWith("/uploads/") || v.startsWith("/")) {
+  let str = v.trim();
+  if (!str) return null;
+  if (str.startsWith("data:")) return str;
+
+  // Rewrite any legacy localhost/127.0.0.1 image URLs to the active API origin
+  if (str.includes("localhost:4000") || str.includes("127.0.0.1:4000")) {
     try {
-      return new URL(v, new URL(apiBase).origin).toString();
+      const parsed = new URL(str);
+      const targetOrigin = new URL(apiBase).origin;
+      str = `${targetOrigin}${parsed.pathname}${parsed.search}`;
     } catch {
-      return v;
+      // fallback
+    }
+  }
+
+  // Prevent mixed content on HTTPS deployments
+  if (
+    !str.includes("localhost") &&
+    !str.includes("127.0.0.1") &&
+    str.startsWith("http://")
+  ) {
+    str = str.replace(/^http:\/\//, "https://");
+  }
+
+  if (/^https?:\/\//.test(str)) return str;
+
+  if (str.startsWith("/uploads/") || str.startsWith("/")) {
+    try {
+      return new URL(str, new URL(apiBase).origin).toString();
+    } catch {
+      return str;
     }
   }
   return null;

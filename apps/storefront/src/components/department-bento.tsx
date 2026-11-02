@@ -82,14 +82,17 @@ const DEFAULT_DEPARTMENTS: DepartmentItem[] = [
  * that uploaded image will be prominently displayed in the bento grid.
  */
 function resolveDepartments(categories: Category[] = []): DepartmentItem[] {
+  const safeCategories = Array.isArray(categories)
+    ? categories.filter((cat): cat is Category => Boolean(cat && typeof cat.id === "string"))
+    : [];
   const usedCategoryIds = new Set<string>();
 
   return DEFAULT_DEPARTMENTS.map((def) => {
     // 1. Try to match by slug or name keywords among unused categories
-    let match = categories.find((c) => {
-      if (usedCategoryIds.has(c.id)) return false;
-      const s = (c.slug || "").toLowerCase();
-      const n = (c.name || "").toLowerCase();
+    let match = safeCategories.find((cat) => {
+      if (usedCategoryIds.has(cat.id)) return false;
+      const s = typeof cat.slug === "string" ? cat.slug.toLowerCase() : "";
+      const n = typeof cat.name === "string" ? cat.name.toLowerCase() : "";
       if (def.id === "electronics") {
         return s.includes("elect") || n.includes("elect") || s.includes("gadget");
       }
@@ -114,19 +117,23 @@ function resolveDepartments(categories: Category[] = []): DepartmentItem[] {
     // 2. If no keyword match, match any category with an uploaded image or any remaining category
     if (!match) {
       match =
-        categories.find((c) => !usedCategoryIds.has(c.id) && Boolean(c.imageUrl?.trim())) ||
-        categories.find((c) => !usedCategoryIds.has(c.id));
+        safeCategories.find(
+          (cat) =>
+            !usedCategoryIds.has(cat.id) &&
+            typeof cat.imageUrl === "string" &&
+            cat.imageUrl.trim().length > 0,
+        ) || safeCategories.find((cat) => !usedCategoryIds.has(cat.id));
     }
 
-    if (match) {
+    if (match?.id) {
       usedCategoryIds.add(match.id);
     }
 
     // Prioritize image uploaded when adding/editing the category in admin
-    const resolvedImageUrl =
-      match?.imageUrl && match.imageUrl.trim()
-        ? match.imageUrl.trim()
-        : def.imageUrl;
+    let resolvedImageUrl = def.imageUrl;
+    if (match && typeof match.imageUrl === "string" && match.imageUrl.trim().length > 0) {
+      resolvedImageUrl = match.imageUrl.trim();
+    }
 
     const countText =
       typeof match?.productCount === "number" && match.productCount > 0

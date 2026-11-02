@@ -78,11 +78,8 @@ export const published = cache(
       signal: AbortSignal.timeout(8000),
     });
     if (response.status === 404) return null;
-    if (!response.ok)
-      throw new Error(
-        "Published storefront content is temporarily unavailable",
-      );
-    return response.json();
+    if (!response.ok) return null;
+    return response.json().catch(() => null);
   },
 );
 export type CmsConfig = StorefrontConfig & {
@@ -192,8 +189,7 @@ export async function sectionProducts(
     cache: "no-store",
     signal: AbortSignal.timeout(8000),
   });
-  if (!response.ok)
-    throw new Error("Storefront products are temporarily unavailable");
+  if (!response.ok) return [];
   const data = await response.json();
   return (data.items as unknown[])
     .map(product)

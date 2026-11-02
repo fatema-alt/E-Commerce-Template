@@ -32,21 +32,33 @@ async function Home(props: {
 }) {
   const sp = (await props.searchParams) || {};
   const requestedCount = sp.count ? Number(sp.count) : undefined;
-  const page = requestedCount ? null : await getHomePage();
+  let page = null;
+  try {
+    page = requestedCount ? null : await getHomePage();
+  } catch (err) {
+    console.error("Failed to load CMS home page, falling back to default:", err);
+  }
+
   if (
     page &&
     Array.isArray(page.content?.sections) &&
     page.content.sections.length > 0
-  )
-    return (
-      <main id="main" className="cms-page">
-        <h1 className="sr-only">{page.content.title}</h1>
-        <CmsSections sections={page.content.sections} assets={page.assets} />
-      </main>
-    );
+  ) {
+    try {
+      return (
+        <main id="main" className="cms-page">
+          <h1 className="sr-only">{page.content.title}</h1>
+          <CmsSections sections={page.content.sections} assets={page.assets} />
+        </main>
+      );
+    } catch (err) {
+      console.error("Failed to render CMS sections, falling back to default:", err);
+    }
+  }
+
   const [allCategories, products] = await Promise.all([
-    getCategories(undefined, { includeCounts: true }),
-    getFeaturedProducts(),
+    getCategories(undefined, { includeCounts: true }).catch(() => []),
+    getFeaturedProducts().catch(() => []),
   ]);
   const categories = requestedCount
     ? allCategories.slice(0, requestedCount)
