@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import type { Category } from "../lib/storefront";
 
@@ -11,7 +10,6 @@ export interface DepartmentItem {
   imageUrl: string;
   isFeatured?: boolean;
   gridClass: string;
-  ctaText?: string;
 }
 
 const DEFAULT_DEPARTMENTS: DepartmentItem[] = [
@@ -24,7 +22,6 @@ const DEFAULT_DEPARTMENTS: DepartmentItem[] = [
     imageUrl: "/brand/categories/electronics.jpg",
     isFeatured: true,
     gridClass: "bento-card-featured",
-    ctaText: "Shop Electronics",
   },
   {
     id: "lifestyle",
@@ -79,77 +76,41 @@ const DEFAULT_DEPARTMENTS: DepartmentItem[] = [
 ];
 
 /**
- * Merges dynamic API / CMS categories with the design mockup layout.
- * Ensures the 6-slot bento grid is always filled with premium assets while
- * picking up real database counts, custom uploaded images, or custom category slugs.
+ * Resolves category slugs against dynamic database categories.
+ * Preserves the pristine visual design and avoids mismatched slot assignments.
  */
 function resolveDepartments(categories: Category[] = []): DepartmentItem[] {
-  return DEFAULT_DEPARTMENTS.map((def, idx) => {
-    // Try to match category by keywords or slug
+  return DEFAULT_DEPARTMENTS.map((def) => {
     const match = categories.find((c) => {
-      const s = c.slug.toLowerCase();
-      const n = c.name.toLowerCase();
-      if (def.id === "electronics") return s.includes("elect") || n.includes("elect") || s.includes("gadget");
-      if (def.id === "lifestyle") return s.includes("home") || s.includes("life") || n.includes("home") || n.includes("living");
-      if (def.id === "spices") return s.includes("spice") || n.includes("spice") || s.includes("food");
-      if (def.id === "kids-toys") return s.includes("toy") || n.includes("toy") || s.includes("kid");
-      if (def.id === "kids-books") return s.includes("book") || n.includes("book") || s.includes("learn");
-      if (def.id === "groceries") return s.includes("groc") || n.includes("groc") || s.includes("fresh");
+      const s = (c.slug || "").toLowerCase();
+      const n = (c.name || "").toLowerCase();
+      if (def.id === "electronics") {
+        return s.includes("elect") || n.includes("elect") || s.includes("gadget");
+      }
+      if (def.id === "lifestyle") {
+        return s.includes("life") || s.includes("home") || n.includes("living") || n.includes("decor");
+      }
+      if (def.id === "spices") {
+        return s.includes("spice") || n.includes("spice");
+      }
+      if (def.id === "kids-toys") {
+        return (s.includes("toy") || n.includes("toy")) && !s.includes("book");
+      }
+      if (def.id === "kids-books") {
+        return s.includes("book") || n.includes("book") || s.includes("learn");
+      }
+      if (def.id === "groceries") {
+        return s.includes("groc") || n.includes("groc") || s.includes("fresh") || s.includes("food");
+      }
       return false;
-    }) || categories[idx];
-
-    if (!match) return def;
-
-    const countText =
-      typeof match.productCount === "number" && match.productCount > 0
-        ? `${match.productCount.toLocaleString()}+ Products`
-        : def.productCountFormatted;
+    });
 
     return {
       ...def,
-      id: match.id || def.id,
-      name: match.name || def.name,
-      slug: match.slug || def.slug,
-      productCountFormatted: countText,
-      imageUrl: def.imageUrl,
+      id: match?.id || def.id,
+      slug: match?.slug || def.slug,
     };
   });
-}
-
-function LayersIcon({ className = "bento-layers-icon" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
-      <path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65" />
-      <path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65" />
-    </svg>
-  );
-}
-
-function ChevronRightIcon({ className = "bento-chevron-icon" }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M9 5l7 7-7 7" />
-    </svg>
-  );
 }
 
 export function DepartmentBento({
@@ -165,7 +126,7 @@ export function DepartmentBento({
 
   return (
     <section className="department-bento-section" aria-labelledby="department-heading">
-      {/* Header with Lime Accent Pill and Responsive Layout */}
+      {/* Header with Lime Accent Pill */}
       <div className="department-bento-header">
         <div className="department-bento-accent-pill" aria-hidden="true" />
         <div className="department-bento-heading-row">
@@ -186,7 +147,7 @@ export function DepartmentBento({
         </div>
       </div>
 
-      {/* Smart Adaptive Bento Grid (6 slots matching design mockup) */}
+      {/* Pristine 6-Slot Bento Grid: zero double buttons, zero double text, zero murky shadows */}
       <div className="department-bento-grid">
         {departments.map((dept) => {
           const isFeatured = dept.isFeatured;
@@ -197,77 +158,23 @@ export function DepartmentBento({
               key={dept.id}
               href={href}
               className={`bento-card ${dept.gridClass} group`}
+              aria-label={`${dept.name} — ${dept.subtitle}`}
             >
-              {/* Background Product Artwork Layer */}
-              <div className="bento-image-wrap" aria-hidden="true">
+              {/* Pristine Artwork Tile */}
+              <div className="bento-image-wrap">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={dept.imageUrl}
-                  alt=""
+                  alt={dept.name}
                   loading={isFeatured ? "eager" : "lazy"}
                   className="bento-image-bg"
                 />
               </div>
 
-              {/* Gradient Scrim Layer for 100% Typography Contrast */}
-              <div
-                className={`bento-scrim ${
-                  isFeatured ? "bento-scrim-featured" : "bento-scrim-standard"
-                }`}
-                aria-hidden="true"
-              />
-
-              {/* Card Foreground Content */}
-              {isFeatured ? (
-                <div className="bento-featured-content">
-                  <div className="bento-featured-top">
-                    {/* DSmart Brand Badge */}
-                    <div className="bento-dsmart-badge">
-                      <span className="bento-dsmart-ds">DS</span>
-                      <span className="bento-dsmart-mart">mart</span>
-                    </div>
-
-                    <h3 className="bento-featured-title">{dept.name}</h3>
-                    <p className="bento-featured-subtitle">{dept.subtitle}</p>
-                  </div>
-
-                  <div className="bento-featured-bottom">
-                    {/* Count Badge */}
-                    <div className="bento-count-pill">
-                      <LayersIcon className="bento-layers-icon" />
-                      <span>{dept.productCountFormatted}</span>
-                    </div>
-
-                    {/* Prominent Lime CTA Pill Button */}
-                    <div className="bento-featured-cta-wrap">
-                      <span className="bento-featured-cta-btn">
-                        <span>{dept.ctaText || `Shop ${dept.name}`}</span>
-                        <ChevronRightIcon className="bento-cta-chevron" />
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bento-standard-content">
-                  <div className="bento-standard-top">
-                    <h3 className="bento-card-title">{dept.name}</h3>
-                    <p className="bento-card-subtitle">{dept.subtitle}</p>
-                  </div>
-
-                  <div className="bento-standard-bottom-row">
-                    {/* Count Badge */}
-                    <div className="bento-count-pill">
-                      <LayersIcon className="bento-layers-icon" />
-                      <span>{dept.productCountFormatted}</span>
-                    </div>
-
-                    {/* Circular Lime Arrow Button */}
-                    <div className="bento-arrow-circle" aria-hidden="true">
-                      <ChevronRightIcon className="bento-circle-chevron" />
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* Accessible Text for Screen Readers & SEO */}
+              <span className="sr-only">
+                {dept.name}: {dept.subtitle} ({dept.productCountFormatted})
+              </span>
             </Link>
           );
         })}
