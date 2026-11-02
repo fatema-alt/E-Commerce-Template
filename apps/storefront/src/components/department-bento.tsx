@@ -2,333 +2,279 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Category } from "../lib/storefront";
 
-export interface BentoLayoutRule {
-  desktopColSpan: number;
-  desktopRowSpan: number;
-  mobileColSpan: number;
-  minHeight: string;
-  isLead: boolean;
+export interface DepartmentItem {
+  id: string;
+  name: string;
+  slug: string;
+  subtitle: string;
+  productCountFormatted: string;
+  imageUrl: string;
+  isFeatured?: boolean;
+  gridClass: string;
+  ctaText?: string;
 }
 
+const DEFAULT_DEPARTMENTS: DepartmentItem[] = [
+  {
+    id: "electronics",
+    name: "Electronics",
+    slug: "electronics",
+    subtitle: "Gadgets, accessories & more for a smarter everyday life.",
+    productCountFormatted: "5,200+ Products",
+    imageUrl: "/brand/categories/electronics.jpg",
+    isFeatured: true,
+    gridClass: "bento-card-featured",
+    ctaText: "Shop Electronics",
+  },
+  {
+    id: "lifestyle",
+    name: "Lifestyle",
+    slug: "lifestyle",
+    subtitle: "Home, decor, wellness & more.",
+    productCountFormatted: "3,400+ Products",
+    imageUrl: "/brand/categories/lifestyle.jpg",
+    isFeatured: false,
+    gridClass: "bento-card-side-1",
+  },
+  {
+    id: "spices",
+    name: "Spices",
+    slug: "spices",
+    subtitle: "Pure spices for richer, healthier meals.",
+    productCountFormatted: "800+ Products",
+    imageUrl: "/brand/categories/spices.jpg",
+    isFeatured: false,
+    gridClass: "bento-card-side-2",
+  },
+  {
+    id: "kids-toys",
+    name: "Kids Toys",
+    slug: "kids-toys",
+    subtitle: "Fun, safe & creative toys for growing minds.",
+    productCountFormatted: "1,200+ Products",
+    imageUrl: "/brand/categories/kids-toys.jpg",
+    isFeatured: false,
+    gridClass: "bento-card-bottom-1",
+  },
+  {
+    id: "kids-books",
+    name: "Kids Learning Books",
+    slug: "kids-learning-books",
+    subtitle: "Engaging books for curious young learners.",
+    productCountFormatted: "950+ Products",
+    imageUrl: "/brand/categories/kids-books.jpg",
+    isFeatured: false,
+    gridClass: "bento-card-bottom-2",
+  },
+  {
+    id: "groceries",
+    name: "Groceries",
+    slug: "groceries",
+    subtitle: "Daily essentials, fresh and trusted.",
+    productCountFormatted: "4,800+ Products",
+    imageUrl: "/brand/categories/groceries.jpg",
+    isFeatured: false,
+    gridClass: "bento-card-bottom-3",
+  },
+];
+
 /**
- * Calculates the exact desktop (12-column) and mobile (2-column) grid span rules
- * for any count from 1 to 8 tiles, ensuring 0 empty slots or holes across all breakpoints.
+ * Merges dynamic API / CMS categories with the design mockup layout.
+ * Ensures the 6-slot bento grid is always filled with premium assets while
+ * picking up real database counts, custom uploaded images, or custom category slugs.
  */
-export function getBentoLayoutRule(totalCount: number, index: number): BentoLayoutRule {
-  const count = Math.min(Math.max(totalCount, 1), 8);
-  const isLead = index === 0;
+function resolveDepartments(categories: Category[] = []): DepartmentItem[] {
+  return DEFAULT_DEPARTMENTS.map((def, idx) => {
+    // Try to match category by keywords or slug
+    const match = categories.find((c) => {
+      const s = c.slug.toLowerCase();
+      const n = c.name.toLowerCase();
+      if (def.id === "electronics") return s.includes("elect") || n.includes("elect") || s.includes("gadget");
+      if (def.id === "lifestyle") return s.includes("home") || s.includes("life") || n.includes("home") || n.includes("living");
+      if (def.id === "spices") return s.includes("spice") || n.includes("spice") || s.includes("food");
+      if (def.id === "kids-toys") return s.includes("toy") || n.includes("toy") || s.includes("kid");
+      if (def.id === "kids-books") return s.includes("book") || n.includes("book") || s.includes("learn");
+      if (def.id === "groceries") return s.includes("groc") || n.includes("groc") || s.includes("fresh");
+      return false;
+    }) || categories[idx];
 
-  // Mobile 2-column rule:
-  // Lead tile spans 2 columns.
-  // When the remaining tile count after the lead tile is odd, the last tile spans 2 columns.
-  const remainingCount = count - 1;
-  const isRemainingOdd = remainingCount % 2 === 1;
-  const isLastTile = index === count - 1;
-  const mobileColSpan = isLead || (isRemainingOdd && isLastTile) ? 2 : 1;
+    if (!match) return def;
 
-  switch (count) {
-    case 1:
-      return {
-        desktopColSpan: 12,
-        desktopRowSpan: 1,
-        mobileColSpan: 2,
-        minHeight: "min-h-[280px] sm:min-h-[340px]",
-        isLead: true,
-      };
+    const countText =
+      typeof match.productCount === "number" && match.productCount > 0
+        ? `${match.productCount.toLocaleString()}+ Products`
+        : def.productCountFormatted;
 
-    case 2:
-      return {
-        desktopColSpan: 6,
-        desktopRowSpan: 1,
-        mobileColSpan: 2, // Both tiles span 2 cols on mobile (stacked)
-        minHeight: "min-h-[240px] sm:min-h-[300px]",
-        isLead,
-      };
+    return {
+      ...def,
+      id: match.id || def.id,
+      name: match.name || def.name,
+      slug: match.slug || def.slug,
+      productCountFormatted: countText,
+      imageUrl: match.imageUrl || def.imageUrl,
+    };
+  });
+}
 
-    case 3:
-      if (index === 0) {
-        return {
-          desktopColSpan: 7,
-          desktopRowSpan: 2,
-          mobileColSpan: 2,
-          minHeight: "min-h-[300px] lg:min-h-[420px]",
-          isLead: true,
-        };
-      }
-      return {
-        desktopColSpan: 5,
-        desktopRowSpan: 1,
-        mobileColSpan: 1,
-        minHeight: "min-h-[180px] lg:min-h-[198px]",
-        isLead: false,
-      };
+function LayersIcon({ className = "bento-layers-icon" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
+      <path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65" />
+      <path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65" />
+    </svg>
+  );
+}
 
-    case 4:
-      if (index === 0) {
-        return {
-          desktopColSpan: 6,
-          desktopRowSpan: 2,
-          mobileColSpan: 2,
-          minHeight: "min-h-[300px] lg:min-h-[420px]",
-          isLead: true,
-        };
-      }
-      if (index === 1) {
-        return {
-          desktopColSpan: 6,
-          desktopRowSpan: 1,
-          mobileColSpan: 1,
-          minHeight: "min-h-[180px] lg:min-h-[198px]",
-          isLead: false,
-        };
-      }
-      return {
-        desktopColSpan: 3,
-        desktopRowSpan: 1,
-        mobileColSpan: index === 3 ? 2 : 1, // index 3 is last tile (remaining count 3 is odd)
-        minHeight: "min-h-[180px] lg:min-h-[198px]",
-        isLead: false,
-      };
-
-    case 5:
-      if (index === 0) {
-        return {
-          desktopColSpan: 7,
-          desktopRowSpan: 1,
-          mobileColSpan: 2,
-          minHeight: "min-h-[240px] lg:min-h-[280px]",
-          isLead: true,
-        };
-      }
-      if (index === 1) {
-        return {
-          desktopColSpan: 5,
-          desktopRowSpan: 1,
-          mobileColSpan: 1,
-          minHeight: "min-h-[240px] lg:min-h-[280px]",
-          isLead: false,
-        };
-      }
-      return {
-        desktopColSpan: 4,
-        desktopRowSpan: 1,
-        mobileColSpan: 1,
-        minHeight: "min-h-[180px] lg:min-h-[200px]",
-        isLead: false,
-      };
-
-    case 6:
-      if (index === 0) {
-        return {
-          desktopColSpan: 8,
-          desktopRowSpan: 1,
-          mobileColSpan: 2,
-          minHeight: "min-h-[260px] lg:min-h-[300px]",
-          isLead: true,
-        };
-      }
-      if (index === 1) {
-        return {
-          desktopColSpan: 4,
-          desktopRowSpan: 1,
-          mobileColSpan: 1,
-          minHeight: "min-h-[260px] lg:min-h-[300px]",
-          isLead: false,
-        };
-      }
-      return {
-        desktopColSpan: 3,
-        desktopRowSpan: 1,
-        mobileColSpan: index === 5 ? 2 : 1, // index 5 is last tile (remaining count 5 is odd)
-        minHeight: "min-h-[180px] lg:min-h-[200px]",
-        isLead: false,
-      };
-
-    case 7:
-      if (index === 0) {
-        return {
-          desktopColSpan: 7,
-          desktopRowSpan: 1,
-          mobileColSpan: 2,
-          minHeight: "min-h-[240px] lg:min-h-[280px]",
-          isLead: true,
-        };
-      }
-      if (index === 1) {
-        return {
-          desktopColSpan: 5,
-          desktopRowSpan: 1,
-          mobileColSpan: 1,
-          minHeight: "min-h-[240px] lg:min-h-[280px]",
-          isLead: false,
-        };
-      }
-      if (index >= 2 && index <= 4) {
-        return {
-          desktopColSpan: 4,
-          desktopRowSpan: 1,
-          mobileColSpan: 1,
-          minHeight: "min-h-[180px] lg:min-h-[200px]",
-          isLead: false,
-        };
-      }
-      return {
-        desktopColSpan: 6,
-        desktopRowSpan: 1,
-        mobileColSpan: 1,
-        minHeight: "min-h-[180px] lg:min-h-[210px]",
-        isLead: false,
-      };
-
-    case 8:
-    default:
-      if (index === 0) {
-        return {
-          desktopColSpan: 8,
-          desktopRowSpan: 1,
-          mobileColSpan: 2,
-          minHeight: "min-h-[260px] lg:min-h-[300px]",
-          isLead: true,
-        };
-      }
-      if (index === 1) {
-        return {
-          desktopColSpan: 4,
-          desktopRowSpan: 1,
-          mobileColSpan: 1,
-          minHeight: "min-h-[260px] lg:min-h-[300px]",
-          isLead: false,
-        };
-      }
-      return {
-        desktopColSpan: 4,
-        desktopRowSpan: 1,
-        mobileColSpan: index === 7 ? 2 : 1, // index 7 is last tile (remaining count 7 is odd)
-        minHeight: "min-h-[180px] lg:min-h-[200px]",
-        isLead: false,
-      };
-  }
+function ChevronRightIcon({ className = "bento-chevron-icon" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 5l7 7-7 7" />
+    </svg>
+  );
 }
 
 export function DepartmentBento({
-  categories,
+  categories = [],
   title = "Shop by Department",
-  hasMore = categories.length > 8,
+  hasMore = true,
 }: {
-  categories: Category[];
+  categories?: Category[];
   title?: string;
   hasMore?: boolean;
 }) {
-  // Hide empty categories only when product counts are known
-  const filtered = categories.filter(
-    (c) => c.productCount === undefined || c.productCount > 0,
-  );
-
-  // Bento grid handles up to 8 tiles gracefully
-  const tiles = filtered.slice(0, 8);
-
-  if (!tiles.length) {
-    return (
-      <section className="department-bento-section" aria-labelledby="department-heading">
-        <div className="department-bento-heading">
-          <h2 id="department-heading">{title}</h2>
-        </div>
-        <p className="empty-content">No categories are available yet.</p>
-      </section>
-    );
-  }
+  const departments = resolveDepartments(categories);
 
   return (
     <section className="department-bento-section" aria-labelledby="department-heading">
-      <div className="department-bento-heading">
-        <div>
-          <h2 id="department-heading">{title}</h2>
-          <p>Explore curated collections and everyday essentials</p>
+      {/* Header with Lime Accent Pill and Responsive Layout */}
+      <div className="department-bento-header">
+        <div className="department-bento-accent-pill" aria-hidden="true" />
+        <div className="department-bento-heading-row">
+          <div>
+            <h2 id="department-heading" className="department-bento-title">
+              {title}
+            </h2>
+            <p className="department-bento-subtitle">
+              Explore curated collections across everyday essentials.
+            </p>
+          </div>
+          {hasMore && (
+            <Link href="/categories" className="department-bento-all-btn">
+              <span>All Categories</span>
+              <span aria-hidden="true">→</span>
+            </Link>
+          )}
         </div>
-        {hasMore && (
-          <Link href="/categories" className="department-bento-all">
-            <span>All Categories</span>
-            <span aria-hidden="true">↗</span>
-          </Link>
-        )}
       </div>
 
+      {/* Smart Adaptive Bento Grid (6 slots matching design mockup) */}
       <div className="department-bento-grid">
-        {tiles.map((cat, idx) => {
-          const rule = getBentoLayoutRule(tiles.length, idx);
-          const hasImage = Boolean(cat.imageUrl);
-          const spanClasses = `bento-m-col-${rule.mobileColSpan} bento-d-col-${rule.desktopColSpan} bento-d-row-${rule.desktopRowSpan} ${rule.minHeight}`;
-          const isLead = rule.isLead;
+        {departments.map((dept) => {
+          const isFeatured = dept.isFeatured;
+          const href = `/category/${encodeURIComponent(dept.slug)}`;
 
           return (
             <Link
-              key={cat.id}
-              href={`/category/${encodeURIComponent(cat.slug)}`}
-              className={`bento-card ${spanClasses} ${
-                hasImage ? "bento-card-has-image" : "bento-card-typographic"
-              }`}
+              key={dept.id}
+              href={href}
+              className={`bento-card ${dept.gridClass} group`}
             >
-              {/* Photo background with dark legibility gradient */}
-              {hasImage && (
-                <>
-                  <div className="bento-image-wrap">
-                    <Image
-                      src={cat.imageUrl!}
-                      alt=""
-                      fill
-                      sizes={
-                        rule.desktopColSpan >= 8
-                          ? "(max-width: 1024px) 100vw, 880px"
-                          : rule.desktopColSpan >= 6
-                          ? "(max-width: 1024px) 100vw, 660px"
-                          : "(max-width: 1024px) 50vw, 420px"
-                      }
-                      priority={idx === 0}
-                      loading={idx === 0 ? "eager" : "lazy"}
-                      className="bento-image"
-                      unoptimized={cat.imageUrl!.startsWith("http:") || cat.imageUrl!.startsWith("data:")}
-                    />
+              {/* Background Product Artwork Layer */}
+              <div className="bento-image-wrap" aria-hidden="true">
+                <Image
+                  src={dept.imageUrl}
+                  alt=""
+                  fill
+                  sizes={
+                    isFeatured
+                      ? "(max-width: 1024px) 100vw, 850px"
+                      : "(max-width: 1024px) 50vw, 450px"
+                  }
+                  priority={isFeatured}
+                  loading={isFeatured ? "eager" : "lazy"}
+                  className="bento-image-bg"
+                  unoptimized
+                />
+              </div>
+
+              {/* Gradient Scrim Layer for 100% Typography Contrast */}
+              <div
+                className={`bento-scrim ${
+                  isFeatured ? "bento-scrim-featured" : "bento-scrim-standard"
+                }`}
+                aria-hidden="true"
+              />
+
+              {/* Card Foreground Content */}
+              {isFeatured ? (
+                <div className="bento-featured-content">
+                  <div className="bento-featured-top">
+                    {/* DSmart Brand Badge */}
+                    <div className="bento-dsmart-badge">
+                      <span className="bento-dsmart-ds">DS</span>
+                      <span className="bento-dsmart-mart">mart</span>
+                    </div>
+
+                    <h3 className="bento-featured-title">{dept.name}</h3>
+                    <p className="bento-featured-subtitle">{dept.subtitle}</p>
                   </div>
-                  <div className="bento-overlay" aria-hidden="true" />
-                </>
-              )}
 
-              {/* Top metadata strip: item count badge (only when real data exists and card has image) & arrow */}
-              <div className="bento-top-bar">
-                {hasImage && typeof cat.productCount === "number" && cat.productCount > 0 ? (
-                  <span className="bento-count-badge bento-badge-image">
-                    {cat.productCount} {cat.productCount === 1 ? "item" : "items"}
-                  </span>
-                ) : (
-                  <span />
-                )}
+                  <div className="bento-featured-bottom">
+                    {/* Count Badge */}
+                    <div className="bento-count-pill">
+                      <LayersIcon className="bento-layers-icon" />
+                      <span>{dept.productCountFormatted}</span>
+                    </div>
 
-                <div
-                  aria-hidden="true"
-                  className={`bento-arrow-btn ${
-                    hasImage ? "bento-arrow-image" : "bento-arrow-typo"
-                  }`}
-                >
-                  ↗
+                    {/* Prominent Lime CTA Pill Button */}
+                    <div className="bento-featured-cta-wrap">
+                      <span className="bento-featured-cta-btn">
+                        <span>{dept.ctaText || `Shop ${dept.name}`}</span>
+                        <ChevronRightIcon className="bento-cta-chevron" />
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bento-standard-content">
+                  <div className="bento-standard-top">
+                    <h3 className="bento-card-title">{dept.name}</h3>
+                    <p className="bento-card-subtitle">{dept.subtitle}</p>
+                  </div>
 
-              {/* Bottom content: category title and optional explore link for image cards */}
-              <div className="bento-content">
-                <h3
-                  className={`bento-title ${
-                    isLead ? "bento-title-lead" : "bento-title-normal"
-                  } ${hasImage ? "bento-title-image" : "bento-title-typo"}`}
-                >
-                  {cat.name}
-                </h3>
-                {hasImage && (
-                  <span className="bento-explore bento-explore-image">
-                    <span>Explore department</span>
-                    <span aria-hidden="true">→</span>
-                  </span>
-                )}
-              </div>
+                  <div className="bento-standard-bottom-row">
+                    {/* Count Badge */}
+                    <div className="bento-count-pill">
+                      <LayersIcon className="bento-layers-icon" />
+                      <span>{dept.productCountFormatted}</span>
+                    </div>
+
+                    {/* Circular Lime Arrow Button */}
+                    <div className="bento-arrow-circle" aria-hidden="true">
+                      <ChevronRightIcon className="bento-circle-chevron" />
+                    </div>
+                  </div>
+                </div>
+              )}
             </Link>
           );
         })}

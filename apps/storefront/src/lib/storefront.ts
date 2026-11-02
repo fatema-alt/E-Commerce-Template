@@ -156,7 +156,7 @@ export const fallbackConfig: StorefrontConfig = {
       ctaHref: "/shop",
       ctaLabel: "Start shopping",
     },
-    { type: "categories", id: "departments", title: "Explore our departments" },
+    { type: "categories", id: "departments", title: "Shop by Department" },
     {
       type: "products",
       id: "featured",

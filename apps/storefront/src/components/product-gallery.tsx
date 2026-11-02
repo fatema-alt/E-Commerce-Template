@@ -16,6 +16,7 @@ export function ProductGallery({
   const [touchStart, setTouchStart] = useState<number | null>(null);
 
   const mainContainerRef = useRef<HTMLDivElement>(null);
+  const thumbnailRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const dialog = useRef<HTMLDialogElement>(null);
 
   const active = images[selected] || images[0];
@@ -54,6 +55,15 @@ export function ProductGallery({
     return () => window.removeEventListener("keydown", handleDialogKeyDown);
   }, [move]);
 
+  // Keep active thumbnail in view smoothly
+  useEffect(() => {
+    thumbnailRefs.current[selected]?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, [selected]);
+
   // Handle Desktop Mouse Zoom Movement
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!mainContainerRef.current) return;
@@ -87,40 +97,66 @@ export function ProductGallery({
       {/* 1. Main Display Image Container with Interactive Hover Zoom */}
       <div
         ref={mainContainerRef}
-        className="product-image-wrap gallery-main relative w-full aspect-square sm:aspect-[4/3] lg:aspect-square rounded-2xl border border-[var(--c-line)] bg-slate-50 dark:bg-slate-900/60 overflow-hidden select-none"
+        className="product-image-wrap gallery-main relative w-full aspect-square rounded-2xl border border-[var(--c-line)] bg-slate-50 dark:bg-slate-900/60 overflow-hidden select-none"
         onMouseEnter={() => setIsZooming(true)}
         onMouseLeave={() => setIsZooming(false)}
         onMouseMove={handleMouseMove}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
+        {/* Adaptive Background Layer for consistent aesthetics across all aspect ratios */}
+        {hasImage && (
+          <div
+            className="pdp-gallery-bg absolute inset-0 overflow-hidden pointer-events-none select-none z-0"
+            aria-hidden="true"
+          >
+            <div
+              className="pdp-gallery-bg-blur w-full h-full bg-center bg-cover transform scale-115 blur-xl opacity-28 dark:opacity-38 transition-all duration-300"
+              style={{
+                backgroundImage: `url("${active.url.replace(/"/g, '\\"')}")`,
+              }}
+            />
+          </div>
+        )}
+
+        {/* Main Product Image Stage - original product image above background layer */}
         {hasImage ? (
+          <div className="pdp-image-stage absolute inset-0 z-10 overflow-hidden flex items-center justify-center p-4 sm:p-6 pointer-events-none">
+            <img
+              className="product-image w-auto h-auto max-w-full max-h-full object-contain object-center transition-transform duration-150 ease-out drop-shadow-sm pointer-events-auto"
+              src={active.url}
+              alt={active.altText || `${name}, image ${selected + 1}`}
+              width={900}
+              height={900}
+              fetchPriority="high"
+              decoding="sync"
+              style={{
+                transformOrigin: `${zoomPos.x}% ${zoomPos.y}%`,
+                transform: isZooming ? "scale(2.1)" : "scale(1)",
+              }}
+              onError={() => setFailed((current) => [...current, active.url])}
+            />
+          </div>
+        ) : (
+          <div className="image-placeholder pdp-missing-image absolute inset-0 z-10 flex flex-col items-center justify-center text-[var(--c-muted)] p-8 text-center">
+            <span className="text-4xl mb-2" aria-hidden="true">
+              📷
+            </span>
+            <span className="font-semibold text-sm">Image unavailable</span>
+            <small className="text-xs text-[var(--c-muted)] mt-1">{name}</small>
+          </div>
+        )}
+
+        {/* Interactive Click-to-Enlarge Trigger Button Overlay */}
+        {hasImage && (
           <button
             type="button"
-            className="pdp-zoom-trigger w-full h-full p-0 m-0 border-0 bg-transparent block relative cursor-zoom-in group text-left"
+            className="pdp-zoom-trigger absolute inset-0 w-full h-full p-0 m-0 border-0 bg-transparent block cursor-zoom-in group text-left z-20"
             aria-label={`Enlarge image ${selected + 1} of ${name}`}
             onClick={() => dialog.current?.showModal()}
           >
-            {/* Main Interactive Zoom Image */}
-            <div className="w-full h-full overflow-hidden flex items-center justify-center p-4 sm:p-6">
-              <img
-                className="product-image max-w-full max-h-full object-contain transition-transform duration-150 ease-out"
-                src={active.url}
-                alt={active.altText || `${name}, image ${selected + 1}`}
-                width={900}
-                height={900}
-                fetchPriority="high"
-                decoding="sync"
-                style={{
-                  transformOrigin: `${zoomPos.x}% ${zoomPos.y}%`,
-                  transform: isZooming ? "scale(2.1)" : "scale(1)",
-                }}
-                onError={() => setFailed((current) => [...current, active.url])}
-              />
-            </div>
-
             {/* Visual Hover Zoom Badge / Hint */}
-            <span className="pdp-zoom-hint absolute bottom-3.5 right-3.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md text-white text-[11px] font-semibold tracking-wide pointer-events-none opacity-85 group-hover:opacity-100 transition-opacity">
+            <span className="pdp-zoom-hint absolute bottom-3.5 right-3.5 z-20 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md text-white text-[11px] font-semibold tracking-wide pointer-events-none opacity-85 group-hover:opacity-100 transition-opacity">
               <svg
                 width="13"
                 height="13"
@@ -142,24 +178,16 @@ export function ProductGallery({
 
             {/* Mobile swipe hint pill */}
             {images.length > 1 && (
-              <span className="lg:hidden absolute top-3 left-3 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-medium pointer-events-none">
+              <span className="lg:hidden absolute top-3 left-3 z-20 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] font-medium pointer-events-none">
                 {selected + 1} / {images.length}
               </span>
             )}
           </button>
-        ) : (
-          <div className="image-placeholder pdp-missing-image w-full h-full flex flex-col items-center justify-center text-[var(--c-muted)] p-8 text-center">
-            <span className="text-4xl mb-2" aria-hidden="true">
-              📷
-            </span>
-            <span className="font-semibold text-sm">Image unavailable</span>
-            <small className="text-xs text-[var(--c-muted)] mt-1">{name}</small>
-          </div>
         )}
 
         {/* Previous & Next overlay arrow controls */}
         {images.length > 1 && (
-          <div className="pdp-gallery-controls absolute inset-x-2 top-1/2 -translate-y-1/2 flex justify-between pointer-events-none">
+          <div className="pdp-gallery-controls absolute inset-x-2 top-1/2 -translate-y-1/2 flex justify-between pointer-events-none z-20">
             <button
               type="button"
               aria-label="Previous product image"
@@ -213,7 +241,11 @@ export function ProductGallery({
 
       {/* 2. Interactive Thumbnails Strip */}
       {images.length > 1 && (
-        <div className="gallery-thumbnails flex items-center gap-2.5 overflow-x-auto pb-1 pt-0.5 scrollbar-thin">
+        <div
+          className="gallery-thumbnails flex items-center gap-2.5 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin scroll-smooth"
+          role="region"
+          aria-label="Product thumbnails"
+        >
           {images.map((image, i) => {
             const isSelected = i === selected;
             const isFailed = failed.includes(image.url);
@@ -221,13 +253,16 @@ export function ProductGallery({
             return (
               <button
                 key={`${image.url}-${i}`}
+                ref={(el) => {
+                  thumbnailRefs.current[i] = el;
+                }}
                 type="button"
                 onClick={() => setSelected(i)}
                 aria-label={`View image ${i + 1}`}
                 aria-pressed={isSelected}
-                className={`w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-xl overflow-hidden shrink-0 border-2 transition-all p-1 bg-slate-50 dark:bg-slate-900/50 cursor-pointer ${
+                className={`w-16 h-16 sm:w-[72px] sm:h-[72px] aspect-square rounded-xl overflow-hidden shrink-0 border-2 transition-all p-1 bg-slate-50 dark:bg-slate-900/50 cursor-pointer relative ${
                   isSelected
-                    ? "border-slate-900 dark:border-lime-400 ring-2 ring-lime-400/40 shadow-sm"
+                    ? "border-slate-900 dark:border-lime-400 ring-2 ring-lime-400/40 shadow-sm opacity-100"
                     : "border-transparent opacity-70 hover:opacity-100 hover:border-slate-300 dark:hover:border-slate-700"
                 }`}
               >
@@ -236,19 +271,29 @@ export function ProductGallery({
                     📷
                   </span>
                 ) : (
-                  <img
-                    src={image.url}
-                    alt=""
-                    width={72}
-                    height={72}
-                    className="w-full h-full object-contain rounded-lg"
-                    loading="lazy"
-                    onError={() =>
-                      setFailed((current) =>
-                        current.includes(image.url) ? current : [...current, image.url],
-                      )
-                    }
-                  />
+                  <div className="relative w-full h-full overflow-hidden rounded-lg flex items-center justify-center">
+                    {/* Thumbnail subtle adaptive background */}
+                    <div
+                      className="absolute inset-0 bg-cover bg-center filter blur-xs scale-125 opacity-25 dark:opacity-35 pointer-events-none"
+                      style={{
+                        backgroundImage: `url("${image.url.replace(/"/g, '\\"')}")`,
+                      }}
+                      aria-hidden="true"
+                    />
+                    <img
+                      src={image.url}
+                      alt=""
+                      width={72}
+                      height={72}
+                      className="relative z-10 max-w-full max-h-full object-contain"
+                      loading="lazy"
+                      onError={() =>
+                        setFailed((current) =>
+                          current.includes(image.url) ? current : [...current, image.url],
+                        )
+                      }
+                    />
+                  </div>
                 )}
               </button>
             );
