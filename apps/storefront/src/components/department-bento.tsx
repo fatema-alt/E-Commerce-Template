@@ -8,6 +8,7 @@ export interface DepartmentItem {
   subtitle: string;
   productCountFormatted: string;
   imageUrl: string;
+  fallbackImageUrl?: string;
   isFeatured?: boolean;
   gridClass: string;
 }
@@ -76,12 +77,17 @@ const DEFAULT_DEPARTMENTS: DepartmentItem[] = [
 ];
 
 /**
- * Resolves category slugs against dynamic database categories.
- * Preserves the pristine visual design and avoids mismatched slot assignments.
+ * Resolves category items against dynamic database categories.
+ * If a category was added or updated with an uploaded image in Admin,
+ * that uploaded image will be prominently displayed in the bento grid.
  */
 function resolveDepartments(categories: Category[] = []): DepartmentItem[] {
+  const usedCategoryIds = new Set<string>();
+
   return DEFAULT_DEPARTMENTS.map((def) => {
-    const match = categories.find((c) => {
+    // 1. Try to match by slug or name keywords among unused categories
+    let match = categories.find((c) => {
+      if (usedCategoryIds.has(c.id)) return false;
       const s = (c.slug || "").toLowerCase();
       const n = (c.name || "").toLowerCase();
       if (def.id === "electronics") {
@@ -105,10 +111,36 @@ function resolveDepartments(categories: Category[] = []): DepartmentItem[] {
       return false;
     });
 
+    // 2. If no keyword match, match any category with an uploaded image or any remaining category
+    if (!match) {
+      match =
+        categories.find((c) => !usedCategoryIds.has(c.id) && Boolean(c.imageUrl?.trim())) ||
+        categories.find((c) => !usedCategoryIds.has(c.id));
+    }
+
+    if (match) {
+      usedCategoryIds.add(match.id);
+    }
+
+    // Prioritize image uploaded when adding/editing the category in admin
+    const resolvedImageUrl =
+      match?.imageUrl && match.imageUrl.trim()
+        ? match.imageUrl.trim()
+        : def.imageUrl;
+
+    const countText =
+      typeof match?.productCount === "number" && match.productCount > 0
+        ? `${match.productCount.toLocaleString()}+ Products`
+        : def.productCountFormatted;
+
     return {
       ...def,
       id: match?.id || def.id,
+      name: match?.name || def.name,
       slug: match?.slug || def.slug,
+      imageUrl: resolvedImageUrl,
+      fallbackImageUrl: def.imageUrl,
+      productCountFormatted: countText,
     };
   });
 }
@@ -147,7 +179,7 @@ export function DepartmentBento({
         </div>
       </div>
 
-      {/* Pristine 6-Slot Bento Grid: zero double buttons, zero double text, zero murky shadows */}
+      {/* 6-Slot Bento Grid: displays uploaded category images with graceful fallback */}
       <div className="department-bento-grid">
         {departments.map((dept) => {
           const isFeatured = dept.isFeatured;
@@ -160,7 +192,7 @@ export function DepartmentBento({
               className={`bento-card ${dept.gridClass} group`}
               aria-label={`${dept.name} — ${dept.subtitle}`}
             >
-              {/* Pristine Artwork Tile */}
+              {/* Image Tile Layer */}
               <div className="bento-image-wrap">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -168,6 +200,14 @@ export function DepartmentBento({
                   alt={dept.name}
                   loading={isFeatured ? "eager" : "lazy"}
                   className="bento-image-bg"
+                  onError={(e) => {
+                    if (
+                      dept.fallbackImageUrl &&
+                      (e.target as HTMLImageElement).src !== dept.fallbackImageUrl
+                    ) {
+                      (e.target as HTMLImageElement).src = dept.fallbackImageUrl;
+                    }
+                  }}
                 />
               </div>
 
