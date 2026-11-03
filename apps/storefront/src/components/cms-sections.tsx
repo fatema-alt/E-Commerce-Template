@@ -155,7 +155,7 @@ async function Block({
     section.type === "featuredCollections" ||
     section.type === "brandShowcase"
   ) {
-    const tiles = (c.collections || c.brands) as Tile[];
+    const tiles = ((Array.isArray(c.collections) ? c.collections : Array.isArray(c.brands) ? c.brands : []) as Tile[]);
     return (
       <>
         {title}
@@ -191,7 +191,7 @@ async function Block({
         <Picture image={c.image as Image} assets={assets} />
         <div>
           {title}
-          {(c.paragraphs as string[]).map((text, i) => (
+          {(Array.isArray(c.paragraphs) ? (c.paragraphs as string[]) : []).map((text, i) => (
             <p key={i}>{text}</p>
           ))}
           <Button button={c.button as { label: string; href: string }} />
@@ -202,7 +202,7 @@ async function Block({
     return (
       <div className="cms-prose">
         {title}
-        {(c.paragraphs as string[]).map((text, i) => (
+        {(Array.isArray(c.paragraphs) ? (c.paragraphs as string[]) : []).map((text, i) => (
           <p key={i}>{text}</p>
         ))}
       </div>
@@ -211,7 +211,7 @@ async function Block({
     return (
       <div className="cms-faq">
         {title}
-        {(c.items as { question: string; answer: string }[]).map((item, i) => (
+        {(Array.isArray(c.items) ? (c.items as { question: string; answer: string }[]) : []).map((item, i) => (
           <details key={i}>
             <summary>{item.question}</summary>
             <p>{item.answer}</p>
@@ -270,6 +270,22 @@ async function Block({
   }
   return null;
 }
+
+async function SafeBlock({
+  section,
+  assets,
+}: {
+  section: Section;
+  assets: Asset[];
+}) {
+  try {
+    return await Block({ section, assets });
+  } catch (error) {
+    console.error(`Failed to render CMS section ${section.type} (${section.id}):`, error);
+    return null;
+  }
+}
+
 export function CmsSections({
   sections,
   assets,
@@ -307,7 +323,7 @@ export function CmsSections({
               } as CSSProperties
             }
           >
-            <Block section={section} assets={assets} />
+            <SafeBlock section={section} assets={assets} />
           </section>
         ))}
     </>

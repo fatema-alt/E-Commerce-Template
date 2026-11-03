@@ -1,5 +1,5 @@
 import { assetSource, safeHref, type Asset, type Image } from "./cms";
-import type { HeroBlock } from "./storefront";
+import { imageUrl, type HeroBlock } from "./storefront";
 
 export type HeroSlide = {
   id: string;
@@ -31,13 +31,13 @@ export function heroSlides(
       // Resolve image source with prioritized fallbacks
       let imageSrc = "";
       if (typeof row.imageUrl === "string" && row.imageUrl.trim()) {
-        imageSrc = row.imageUrl.trim();
+        imageSrc = imageUrl(row.imageUrl.trim()) || row.imageUrl.trim();
       } else if (typeof row.imageSrc === "string" && row.imageSrc.trim()) {
-        imageSrc = row.imageSrc.trim();
+        imageSrc = imageUrl(row.imageSrc.trim()) || row.imageSrc.trim();
       } else if (typeof row.image === "string" && row.image.trim()) {
-        imageSrc = row.image.trim();
+        imageSrc = imageUrl(row.image.trim()) || row.image.trim();
       } else if (image?.url) {
-        imageSrc = image.url;
+        imageSrc = imageUrl(image.url) || image.url;
       } else if (image?.assetId) {
         imageSrc = assetSource(assets, image.assetId) || "";
       }

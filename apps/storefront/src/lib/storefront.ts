@@ -274,11 +274,41 @@ export function imageUrl(v: unknown): string | null {
   if (!str) return null;
   if (str.startsWith("data:")) return str;
 
+  // Determine active target origin
+  let targetOrigin = "";
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host.includes("digislashagency.com") || host.includes("dsmart")) {
+      targetOrigin = "https://api.dsmart.digislashagency.com";
+    } else if (host !== "localhost" && host !== "127.0.0.1") {
+      targetOrigin = `${window.location.protocol}//api.${window.location.host}`;
+    }
+  }
+
+  if (!targetOrigin) {
+    try {
+      const parsedBase = new URL(apiBase);
+      if (parsedBase.hostname.includes("localhost") || parsedBase.hostname === "127.0.0.1") {
+        if (
+          process.env.NODE_ENV === "production" ||
+          process.env.STOREFRONT_ORIGIN?.includes("digislashagency.com")
+        ) {
+          targetOrigin = "https://api.dsmart.digislashagency.com";
+        } else {
+          targetOrigin = parsedBase.origin;
+        }
+      } else {
+        targetOrigin = parsedBase.origin;
+      }
+    } catch {
+      targetOrigin = "https://api.dsmart.digislashagency.com";
+    }
+  }
+
   // Rewrite any legacy localhost/127.0.0.1 image URLs to the active API origin
-  if (str.includes("localhost:4000") || str.includes("127.0.0.1:4000")) {
+  if (str.includes("localhost:4000") || str.includes("127.0.0.1:4000") || str.includes("localhost:3000")) {
     try {
       const parsed = new URL(str);
-      const targetOrigin = new URL(apiBase).origin;
       str = `${targetOrigin}${parsed.pathname}${parsed.search}`;
     } catch {
       // fallback
@@ -298,7 +328,7 @@ export function imageUrl(v: unknown): string | null {
 
   if (str.startsWith("/uploads/") || str.startsWith("/")) {
     try {
-      return new URL(str, new URL(apiBase).origin).toString();
+      return new URL(str, targetOrigin).toString();
     } catch {
       return str;
     }

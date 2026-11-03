@@ -145,7 +145,7 @@ export function HeroBanner({
               aria-roledescription="slide"
               aria-label={`${index + 1} of ${count}: ${slide.alt}`}
               aria-hidden={!isActive}
-              inert={!isActive}
+              inert={!isActive ? true : undefined}
             >
               {slide.href ? (
                 <Link
