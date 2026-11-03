@@ -24,6 +24,10 @@ export type Asset = {
   thumbnailUrl: string | null;
   bytes: number;
   altText: string | null;
+  width?: number | null;
+  height?: number | null;
+  mimeType?: string | null;
+  createdAt?: string | null;
 };
 export type Registry = {
   documents: Record<string, Schema>;

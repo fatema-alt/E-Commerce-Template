@@ -19,6 +19,7 @@ import { getStandardEcommerceTemplate } from "./standard-template";
 import { VisualHomepageBuilder } from "./visual-homepage-builder";
 import { EngagementPreview, engagementDefaults } from "./engagement-preview";
 import { TrackingEditor } from "./tracking-editor";
+import { MediaLibraryView } from "./media-library-view";
 
 const tabs = [
   ["SITE_SETTINGS", "Site Settings", "settings"],
@@ -476,92 +477,14 @@ export function CmsWorkspace({
       {loading ? (
         <p role="status">Loading CMS…</p>
       ) : kind === "MEDIA" ? (
-        <>
-          <div className="rounded-xl border bg-white p-5">
-            <h2 className="font-semibold">Upload storefront images</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              JPG, PNG or WebP, up to 5 MB. Images are optimized automatically.
-            </p>
-            {editable && (
-              <input
-                className="mt-4 block text-sm"
-                aria-label="Upload CMS image"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                disabled={busy}
-                onChange={async (event) => {
-                  const file = event.target.files?.[0];
-                  if (!file) return;
-                  if (file.size > 5 * 1024 * 1024) {
-                    setError("Image must be at most 5 MB.");
-                    return;
-                  }
-                  setBusy(true);
-                  setError("");
-                  try {
-                    const form = new FormData();
-                    form.append("file", file);
-                    await request("/admin/cms/media", {
-                      method: "POST",
-                      body: form,
-                    });
-                    await refreshList();
-                    setNotice(
-                      "Image uploaded. It is now available in CMS image selectors.",
-                    );
-                  } catch (e) {
-                    setError((e as Error).message);
-                  } finally {
-                    setBusy(false);
-                    event.target.value = "";
-                  }
-                }}
-              />
-            )}
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {assets.map((asset) => (
-              <article
-                key={asset.id}
-                className="overflow-hidden rounded-xl border bg-white"
-              >
-                <div className="flex h-40 items-center justify-center bg-slate-100">
-                  {asset.url && (
-                    <img
-                      src={assetUrl(asset.thumbnailUrl || asset.url)}
-                      alt={asset.altText || "CMS media"}
-                      className="h-full w-full object-contain"
-                    />
-                  )}
-                </div>
-                <div className="space-y-2 p-4">
-                  <p className="break-all text-xs text-slate-500">{asset.id}</p>
-                  <p className="text-sm">{Math.round(asset.bytes / 1024)} KB</p>
-                  <button
-                    className={button}
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(asset.id);
-                        setNotice("Asset ID copied.");
-                      } catch {
-                        setError(
-                          "Clipboard unavailable. Select and copy the asset ID above.",
-                        );
-                      }
-                    }}
-                  >
-                    Copy asset ID
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-          {!assets.length && (
-            <p className="rounded-xl border border-dashed p-10 text-center text-slate-500">
-              No images yet. Upload your first storefront image.
-            </p>
-          )}
-        </>
+        <MediaLibraryView
+          assets={assets}
+          setAssets={setAssets}
+          editable={editable}
+          refreshList={refreshList}
+          setError={setError}
+          setNotice={setNotice}
+        />
       ) : kind === "PAGE" && builderMode && key && registry ? (
         <div className="w-full space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-2.5 shadow-xs">
