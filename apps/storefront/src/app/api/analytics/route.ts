@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { isStorefrontRequest } from "../../../lib/request-origin";
 import { trafficSource } from "../../../lib/analytics";
+import { resolveApiBaseUrl } from "../../../lib/storefront";
 
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -54,9 +55,7 @@ export async function POST(req: NextRequest) {
 
     const cookie = req.cookies.get("commerce_analytics")?.value ?? "";
     const sessionId = uuid.test(cookie) ? cookie : randomUUID();
-    const api = (
-      process.env.STOREFRONT_API_BASE_URL || "http://localhost:4000/api/v1"
-    ).replace(/\/$/, "");
+    const api = resolveApiBaseUrl();
     const upstream = await fetch(`${api}/shop/analytics`, {
       method: "POST",
       cache: "no-store",
@@ -77,7 +76,7 @@ export async function POST(req: NextRequest) {
     const response = NextResponse.json(
       { ok: upstream.ok },
       {
-        status: upstream.ok ? 200 : 503,
+        status: upstream.ok ? 200 : 202,
         headers: { "Cache-Control": "no-store" },
       },
     );
@@ -89,7 +88,8 @@ export async function POST(req: NextRequest) {
       maxAge: 1800,
     });
     return response;
-  } catch {
-    return NextResponse.json({ ok: false }, { status: 503 });
+  } catch (err) {
+    console.warn("Analytics telemetry bypassed:", err);
+    return NextResponse.json({ ok: false, error: "upstream_unavailable" }, { status: 202 });
   }
 }

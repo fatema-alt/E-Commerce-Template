@@ -1,8 +1,7 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { isStorefrontRequest } from "../../../../lib/request-origin";
-const api = (
-  process.env.STOREFRONT_API_BASE_URL || "http://localhost:4000/api/v1"
-).replace(/\/$/, "");
+import { resolveApiBaseUrl } from "../../../../lib/storefront";
+const api = resolveApiBaseUrl();
 async function proxy(
   req: NextRequest,
   context: { params: Promise<{ path: string[] }> },

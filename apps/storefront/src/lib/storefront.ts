@@ -246,13 +246,64 @@ export const fallbackConfig: StorefrontConfig = {
 function record(x: unknown): x is Record<string, unknown> {
   return typeof x === "object" && x !== null && !Array.isArray(x);
 }
+/**
+ * Resolves the backend API base URL with production-first fallback.
+ * Includes /api/v1; server-side only.
+ */
+export function resolveApiBaseUrl(): string {
+  if (process.env.STOREFRONT_API_BASE_URL?.trim()) {
+    return process.env.STOREFRONT_API_BASE_URL.trim().replace(/\/$/, "");
+  }
+  if (
+    process.env.NODE_ENV === "production" ||
+    process.env.STOREFRONT_ORIGIN?.includes("digislashagency.com") ||
+    process.env.STOREFRONT_ORIGIN?.includes("dsmart") ||
+    process.env.NEXT_PUBLIC_SITE_URL?.includes("digislashagency.com")
+  ) {
+    return "https://api.dsmart.digislashagency.com/api/v1";
+  }
+  return "http://localhost:4000/api/v1";
+}
+
+/**
+ * Resolves the media/asset origin for images and uploads.
+ * Works both on server and in browser.
+ */
+export function resolveMediaOrigin(): string {
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host.includes("digislashagency.com") || host.includes("dsmart")) {
+      return "https://api.dsmart.digislashagency.com";
+    }
+    if (host !== "localhost" && host !== "127.0.0.1") {
+      return `${window.location.protocol}//api.${window.location.host}`;
+    }
+  }
+
+  const base = resolveApiBaseUrl();
+  try {
+    const parsed = new URL(base);
+    if (!parsed.hostname.includes("localhost") && parsed.hostname !== "127.0.0.1") {
+      return parsed.origin;
+    }
+  } catch {}
+
+  if (
+    process.env.NODE_ENV === "production" ||
+    process.env.STOREFRONT_ORIGIN?.includes("digislashagency.com") ||
+    process.env.STOREFRONT_ORIGIN?.includes("dsmart")
+  ) {
+    return "https://api.dsmart.digislashagency.com";
+  }
+
+  return "http://localhost:4000";
+}
+
 /** API base includes /api/v1; server-side only. */
-const apiBase = (
-  process.env.STOREFRONT_API_BASE_URL || "http://localhost:4000/api/v1"
-).replace(/\/$/, "");
+const apiBase = resolveApiBaseUrl();
 async function getJson(path: string): Promise<unknown> {
   try {
-    const response = await fetch(`${apiBase}${path}`, {
+    const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
       cache: "no-store",
       signal: AbortSignal.timeout(8000),
     });

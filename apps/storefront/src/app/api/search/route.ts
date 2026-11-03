@@ -1,4 +1,4 @@
-import { product } from "../../../lib/storefront";
+import { product, resolveApiBaseUrl } from "../../../lib/storefront";
 export async function GET(request: Request) {
   const query =
     new URL(request.url).searchParams.get("q")?.trim().slice(0, 200) || "";
@@ -8,9 +8,7 @@ export async function GET(request: Request) {
       { headers: { "Cache-Control": "no-store" } },
     );
   try {
-    const base = (
-      process.env.STOREFRONT_API_BASE_URL || "http://localhost:4000/api/v1"
-    ).replace(/\/$/, "");
+    const base = resolveApiBaseUrl();
     const response = await fetch(
       `${base}/storefront/products?${new URLSearchParams({ search: query, page: "1", pageSize: "6" })}`,
       { cache: "no-store", signal: AbortSignal.timeout(6000) },

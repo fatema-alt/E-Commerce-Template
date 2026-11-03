@@ -1,3 +1,4 @@
+import { unstable_rethrow } from "next/navigation";
 import { cache } from "react";
 import type { ContactSettings, RibbonSettings } from "./engagement";
 import type { TrackingSettings } from "./tracking";
@@ -5,6 +6,7 @@ import {
   fallbackConfig,
   imageUrl,
   product,
+  resolveApiBaseUrl,
   type StorefrontConfig,
   type Product,
 } from "./storefront";
@@ -66,20 +68,23 @@ export type Settings = {
   legalLinks?: { label: string; href: string }[];
 };
 type Published<T> = { content: T; assets: Asset[]; version: number };
-const base = (
-  process.env.STOREFRONT_API_BASE_URL || "http://localhost:4000/api/v1"
-).replace(/\/$/, "");
+const base = resolveApiBaseUrl();
 const keyPattern = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 export const published = cache(
   async <T>(kind: string, key: string): Promise<Published<T> | null> => {
     if (!keyPattern.test(key)) return null;
-    const response = await fetch(`${base}/storefront/cms/${kind}/${key}`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(8000),
-    });
-    if (response.status === 404) return null;
-    if (!response.ok) return null;
-    return response.json().catch(() => null);
+    try {
+      const response = await fetch(`${resolveApiBaseUrl()}/storefront/cms/${kind}/${key}`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
+      });
+      if (response.status === 404) return null;
+      if (!response.ok) return null;
+      return await response.json().catch(() => null);
+    } catch (err) {
+      unstable_rethrow(err);
+      return null;
+    }
   },
 );
 export type CmsConfig = StorefrontConfig & {
@@ -166,7 +171,9 @@ export const getHomePage = cache(async () => {
   );
 });
 export function assetSource(assets: Asset[], id?: string) {
-  return imageUrl(assets.find((asset) => asset.id === id)?.url);
+  if (!Array.isArray(assets) || !id) return null;
+  const found = assets.find((asset) => asset?.id === id);
+  return found?.url ? imageUrl(found.url) : null;
 }
 export async function sectionProducts(
   config: Record<string, unknown>,

@@ -163,8 +163,8 @@ export function HeroInspector({ config, onChange, assets }: HeroInspectorProps) 
 
       if (uploaded?.url) {
         updateActiveSlide(slideIdx, {
-          imageUrl: assetUrl(uploaded.url),
-          image: { assetId: uploaded.id, url: assetUrl(uploaded.url) },
+          imageUrl: uploaded.url,
+          image: { assetId: uploaded.id, url: uploaded.url },
         });
       }
     } catch (err) {

@@ -9,7 +9,7 @@ import {
   type Image,
   type Section,
 } from "../lib/cms";
-import { getCategories } from "../lib/storefront";
+import { getCategories, imageUrl } from "../lib/storefront";
 import { ProductCard } from "./home-sections";
 import { BannerSlider, SaleCountdown } from "./cms-interactive";
 import { Newsletter } from './newsletter';
@@ -19,7 +19,8 @@ import { DepartmentBento } from "./department-bento";
 import { RecentlyViewedSection } from "./recently-viewed";
 import { CustomerReviewsSection } from "./customer-reviews-section";
 function Picture({ image, assets }: { image?: Image; assets: Asset[] }) {
-  const src = assetSource(assets, image?.assetId);
+  const imgWithUrl = image as (Image & { url?: string }) | undefined;
+  const src = (imgWithUrl?.url ? imageUrl(imgWithUrl.url) : null) || assetSource(assets, image?.assetId);
   if (!src) return null;
   const picture = (
     <img
