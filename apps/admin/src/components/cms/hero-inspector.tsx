@@ -87,9 +87,21 @@ export function HeroInspector({ config, onChange, assets }: HeroInspectorProps) 
   };
 
   const updateSlides = (nextSlides: HeroSlideItem[]) => {
+    const sanitizedSlides = nextSlides.map((slide, idx) => {
+      const altText = (slide.alt || slide.image?.alt || slide.title || `Hero Banner ${idx + 1}`).trim();
+      return {
+        ...slide,
+        alt: altText,
+        image: {
+          ...(slide.image || {}),
+          alt: altText,
+        },
+      };
+    });
+
     emitChange({
       ...config,
-      slides: nextSlides,
+      slides: sanitizedSlides,
     });
   };
 
@@ -130,12 +142,17 @@ export function HeroInspector({ config, onChange, assets }: HeroInspectorProps) 
 
   const handleAddSlide = () => {
     if (slides.length >= 10) return;
+    const defaultAlt = `Hero Banner ${slides.length + 1}`;
     const newSlide: HeroSlideItem = {
       id: `slide-${Date.now()}`,
       enabled: true,
       imageUrl: DEFAULT_BANNER,
+      image: {
+        url: DEFAULT_BANNER,
+        alt: defaultAlt,
+      },
       href: "/shop",
-      alt: `Hero Banner ${slides.length + 1}`,
+      alt: defaultAlt,
     };
     const next = [...slides, newSlide];
     updateSlides(next);
@@ -162,9 +179,11 @@ export function HeroInspector({ config, onChange, assets }: HeroInspectorProps) 
       });
 
       if (uploaded?.url) {
+        const altText = slides[slideIdx]?.alt || slides[slideIdx]?.image?.alt || `Hero Banner ${slideIdx + 1}`;
         updateActiveSlide(slideIdx, {
           imageUrl: uploaded.url,
-          image: { assetId: uploaded.id, url: uploaded.url },
+          image: { assetId: uploaded.id, url: uploaded.url, alt: altText },
+          alt: altText,
         });
       }
     } catch (err) {
@@ -409,7 +428,11 @@ export function HeroInspector({ config, onChange, assets }: HeroInspectorProps) 
                           onChange={(e) =>
                             updateActiveSlide(idx, {
                               imageUrl: e.target.value,
-                              image: { url: e.target.value },
+                              image: {
+                                ...(slide.image || {}),
+                                url: e.target.value,
+                                alt: slide.alt || slide.image?.alt || "Hero Banner",
+                              },
                             })
                           }
                           className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
@@ -417,7 +440,37 @@ export function HeroInspector({ config, onChange, assets }: HeroInspectorProps) 
                       </div>
                     </div>
 
-                    {/* 2. HREF OPTION */}
+                    {/* 2. IMAGE ALT TEXT (REQUIRED FOR SEO & VALIDATION) */}
+                    <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-slate-800 dark:text-slate-200 block">
+                          Image Alt Text (SEO & Accessibility)
+                        </label>
+                        <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">
+                          Required
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        value={slide.alt || slide.image?.alt || ""}
+                        placeholder="e.g. Mega Tech Deals Sale Banner"
+                        onChange={(e) =>
+                          updateActiveSlide(idx, {
+                            alt: e.target.value,
+                            image: {
+                              ...(slide.image || {}),
+                              alt: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                      <p className="text-[10px] text-slate-400">
+                        Describes this banner image for search engines and accessibility.
+                      </p>
+                    </div>
+
+                    {/* 3. HREF OPTION */}
                     <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
                       <label className="text-[11px] font-bold text-slate-800 dark:text-slate-200 block">
                         Link URL (href)
@@ -456,9 +509,11 @@ export function HeroInspector({ config, onChange, assets }: HeroInspectorProps) 
           onSelect={(assetId, asset) => {
             if (pickerSlideIndex !== null) {
               const url = asset?.url ? assetUrl(asset.url) : "";
+              const altText = asset?.altText || slides[pickerSlideIndex]?.alt || slides[pickerSlideIndex]?.image?.alt || `Hero Banner ${pickerSlideIndex + 1}`;
               updateActiveSlide(pickerSlideIndex, {
                 imageUrl: url,
-                image: { assetId, url },
+                image: { assetId, url, alt: altText },
+                alt: altText,
               });
             }
             setPickerSlideIndex(null);
