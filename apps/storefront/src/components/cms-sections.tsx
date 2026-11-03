@@ -18,6 +18,7 @@ import { HeroBanner } from "./hero-banner";
 import { DepartmentBento } from "./department-bento";
 import { RecentlyViewedSection } from "./recently-viewed";
 import { CustomerReviewsSection } from "./customer-reviews-section";
+import { BrandShowcaseSlider } from "./brand-showcase-slider";
 function Picture({ image, assets }: { image?: Image; assets: Asset[] }) {
   const imgWithUrl = image as (Image & { url?: string }) | undefined;
   const src = (imgWithUrl?.url ? imageUrl(imgWithUrl.url) : null) || assetSource(assets, image?.assetId);
@@ -152,11 +153,18 @@ async function Block({
       />
     );
   }
-  if (
-    section.type === "featuredCollections" ||
-    section.type === "brandShowcase"
-  ) {
-    const tiles = ((Array.isArray(c.collections) ? c.collections : Array.isArray(c.brands) ? c.brands : []) as Tile[]);
+  if (section.type === "brandShowcase") {
+    const brands = (Array.isArray(c.brands) ? c.brands : []) as Tile[];
+    return (
+      <BrandShowcaseSlider
+        title={title}
+        brands={brands}
+        assets={assets}
+      />
+    );
+  }
+  if (section.type === "featuredCollections") {
+    const tiles = (Array.isArray(c.collections) ? c.collections : []) as Tile[];
     return (
       <>
         {title}
