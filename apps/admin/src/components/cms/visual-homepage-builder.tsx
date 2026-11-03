@@ -15,6 +15,8 @@ import { getStandardEcommerceTemplate } from "./standard-template";
 import { editableHeroSlides } from "./hero-slides";
 import { HeroInspector } from "./hero-inspector";
 import { HeroSectionPreview } from "./hero-preview";
+import { CategoryBentoInspector } from "./category-bento-inspector";
+import { CategoryBentoPreview } from "./category-bento-preview";
 
 export type Section = {
   id: string;
@@ -452,88 +454,11 @@ export function VisualHomepageBuilder({
                           <HeroSectionPreview config={c} assets={assets} viewport={viewport} />
                         </div>
                       ) : section.type === "categoryGrid" ? (
-                        <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                          <div className="flex items-center justify-between mb-3">
-                            <div>
-                              <div className="w-6 h-1 rounded-full bg-[#c6f53a] mb-1.5" />
-                              <h3 className="text-base font-bold text-slate-900">
-                                {String(c.title || "Shop by Department")}
-                              </h3>
-                              <p className="text-[11px] text-slate-500">6-slot smart adaptive bento grid (1 featured lead + 2 stacked + 3 bottom cards)</p>
-                            </div>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#c6f53a]/30 text-slate-800 border border-[#c6f53a]">
-                              Adaptive Bento
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-12 gap-2">
-                            <div className="col-span-8 rounded-xl bg-[#111714] text-white p-3 flex flex-col justify-between min-h-[140px] border border-white/10 relative overflow-hidden">
-                              <div>
-                                <div className="inline-flex items-center gap-0.5 bg-white px-1.5 py-0.5 rounded-full text-[9px] mb-1.5">
-                                  <span className="font-extrabold text-[#0284c7]">DS</span>
-                                  <span className="font-bold text-[#0f172a]">mart</span>
-                                </div>
-                                <h4 className="font-extrabold text-xs text-white">Electronics</h4>
-                                <p className="text-[9px] text-slate-400">Gadgets, accessories & more for a smarter everyday life.</p>
-                              </div>
-                              <div className="flex items-center justify-between mt-2">
-                                <span className="bg-black/50 text-[9px] px-2 py-0.5 rounded-full text-slate-300 border border-white/10">5,200+ Products</span>
-                                <span className="bg-[#c6f53a] text-black font-bold text-[9px] px-2.5 py-0.5 rounded-full">Shop Electronics ›</span>
-                              </div>
-                            </div>
-                            <div className="col-span-4 flex flex-col gap-2">
-                              <div className="rounded-xl bg-[#141a17] text-white p-2 flex flex-col justify-between min-h-[66px] border border-white/10">
-                                <div>
-                                  <span className="font-bold text-[11px]">Lifestyle</span>
-                                  <p className="text-[9px] text-slate-400 leading-tight">Home, decor, wellness & more.</p>
-                                </div>
-                                <div className="flex items-center justify-between mt-1">
-                                  <span className="text-[8px] text-slate-400">3,400+ Products</span>
-                                  <span className="w-4 h-4 rounded-full bg-[#c6f53a] text-black text-[9px] font-bold flex items-center justify-center">›</span>
-                                </div>
-                              </div>
-                              <div className="rounded-xl bg-[#141a17] text-white p-2 flex flex-col justify-between min-h-[66px] border border-white/10">
-                                <div>
-                                  <span className="font-bold text-[11px]">Spices</span>
-                                  <p className="text-[9px] text-slate-400 leading-tight">Pure spices for richer meals.</p>
-                                </div>
-                                <div className="flex items-center justify-between mt-1">
-                                  <span className="text-[8px] text-slate-400">800+ Products</span>
-                                  <span className="w-4 h-4 rounded-full bg-[#c6f53a] text-black text-[9px] font-bold flex items-center justify-center">›</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="col-span-4 rounded-xl bg-[#141a17] text-white p-2 flex flex-col justify-between min-h-[72px] border border-white/10">
-                              <div>
-                                <span className="font-bold text-[11px]">Kids Toys</span>
-                                <p className="text-[9px] text-slate-400 leading-tight">Fun, safe & creative toys.</p>
-                              </div>
-                              <div className="flex items-center justify-between mt-1">
-                                <span className="text-[8px] text-slate-400">1,200+</span>
-                                <span className="w-4 h-4 rounded-full bg-[#c6f53a] text-black text-[9px] font-bold flex items-center justify-center">›</span>
-                              </div>
-                            </div>
-                            <div className="col-span-4 rounded-xl bg-[#141a17] text-white p-2 flex flex-col justify-between min-h-[72px] border border-white/10">
-                              <div>
-                                <span className="font-bold text-[11px]">Kids Books</span>
-                                <p className="text-[9px] text-slate-400 leading-tight">Engaging learning books.</p>
-                              </div>
-                              <div className="flex items-center justify-between mt-1">
-                                <span className="text-[8px] text-slate-400">950+</span>
-                                <span className="w-4 h-4 rounded-full bg-[#c6f53a] text-black text-[9px] font-bold flex items-center justify-center">›</span>
-                              </div>
-                            </div>
-                            <div className="col-span-4 rounded-xl bg-[#141a17] text-white p-2 flex flex-col justify-between min-h-[72px] border border-white/10">
-                              <div>
-                                <span className="font-bold text-[11px]">Groceries</span>
-                                <p className="text-[9px] text-slate-400 leading-tight">Daily fresh essentials.</p>
-                              </div>
-                              <div className="flex items-center justify-between mt-1">
-                                <span className="text-[8px] text-slate-400">4,800+</span>
-                                <span className="w-4 h-4 rounded-full bg-[#c6f53a] text-black text-[9px] font-bold flex items-center justify-center">›</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                        <CategoryBentoPreview
+                          config={c}
+                          assets={assets}
+                          viewport={viewport}
+                        />
                       ) : section.type === "productGrid" || section.type === "productCarousel" ? (
                         <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-2xs">
                           <div className="flex items-center justify-between mb-3">

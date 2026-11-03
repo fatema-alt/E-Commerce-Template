@@ -121,7 +121,17 @@ export const BLOCK_SCHEMAS: Record<string, Schema> = {
     ['slides'],
   ),
   categoryGrid: object(
-    { title: text(), categoryIds: array(uuid, 50, 0), columns: number(1, 8) },
+    {
+      title: text(),
+      subtitle: text(300, 0),
+      layoutType: choice('adaptive', 'equal', 'featured'),
+      selectionMode: choice('auto', 'manual'),
+      categoryIds: array(uuid, 50, 0),
+      featuredCategoryId: text(64, 0),
+      columns: number(1, 8),
+      limit: choice('6', '8', '10', '12', 'all'),
+      showViewAll: bool,
+    },
     ['title'],
   ),
   productGrid: object(productSource, ['title', 'source']),

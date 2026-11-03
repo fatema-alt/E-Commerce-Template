@@ -135,21 +135,41 @@ async function Block({
   }
   if (section.type === "categoryGrid") {
     const rawCategoryIds = Array.isArray(c.categoryIds) ? (c.categoryIds as string[]) : [];
+    const selectionMode = (c.selectionMode as string) || (rawCategoryIds.length > 0 ? "manual" : "auto");
+    const layoutType = (c.layoutType as "adaptive" | "equal" | "featured") || "adaptive";
+    const columns = Number(c.columns || 4);
+    const limit = c.limit === "all" ? Infinity : Number(c.limit || 6);
+    const showViewAll = c.showViewAll !== false;
+    const featuredCategoryId = typeof c.featuredCategoryId === "string" && c.featuredCategoryId.trim() ? c.featuredCategoryId : undefined;
+
     const [all, configured] = await Promise.all([
       getCategories(undefined, { includeCounts: true }),
       rawCategoryIds.length ? getCategories(rawCategoryIds, { includeCounts: true }) : Promise.resolve([]),
     ]);
-    const selected =
-      rawCategoryIds.length > 0
-        ? rawCategoryIds
-            .map((id) => configured.find((category) => category.id === id))
-            .filter((category): category is (typeof all)[number] => category !== undefined)
-        : all;
+
+    let selected: typeof all;
+    if (selectionMode === "manual" && rawCategoryIds.length > 0) {
+      selected = rawCategoryIds
+        .map((id) => configured.find((category) => category.id === id))
+        .filter((category): category is (typeof all)[number] => category !== undefined);
+    } else {
+      // Auto selection: top categories sorted by product count
+      selected = [...all].sort((a, b) => (b.productCount ?? 0) - (a.productCount ?? 0));
+    }
+
+    const hasMore = all.length > selected.length || (limit !== Infinity && selected.length > limit);
+    const displayedCategories = limit === Infinity ? selected : selected.slice(0, limit);
+
     return (
       <DepartmentBento
-        categories={selected}
-        hasMore={all.length > selected.length}
+        categories={displayedCategories}
+        hasMore={hasMore}
+        showViewAll={showViewAll}
         title={typeof c.title === "string" && c.title.trim() ? c.title : undefined}
+        subtitle={typeof c.subtitle === "string" && c.subtitle.trim() ? c.subtitle : undefined}
+        layoutType={layoutType}
+        columns={columns}
+        featuredCategoryId={featuredCategoryId}
       />
     );
   }

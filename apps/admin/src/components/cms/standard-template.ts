@@ -91,7 +91,12 @@ export function getStandardEcommerceTemplate(): StandardSection[] {
       },
       config: {
         title: "Shop by Department",
+        subtitle: "Explore curated collections across everyday essentials.",
+        layoutType: "adaptive",
+        selectionMode: "auto",
         columns: 6,
+        limit: "6",
+        showViewAll: true,
         categoryIds: [],
       },
     },

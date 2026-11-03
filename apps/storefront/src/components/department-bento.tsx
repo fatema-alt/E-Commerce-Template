@@ -1,6 +1,8 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import type { Category } from "../lib/storefront";
 
 export interface DepartmentItem {
@@ -13,9 +15,11 @@ export interface DepartmentItem {
   fallbackImageUrl?: string;
   isFeatured?: boolean;
   gridClass: string;
+  gridStyle?: CSSProperties;
+  isCustomImage?: boolean;
 }
 
-const DEFAULT_DEPARTMENTS: DepartmentItem[] = [
+export const DEFAULT_DEPARTMENTS: DepartmentItem[] = [
   {
     id: "electronics",
     name: "Electronics",
@@ -79,95 +83,259 @@ const DEFAULT_DEPARTMENTS: DepartmentItem[] = [
 ];
 
 /**
- * Resolves category items against dynamic database categories.
- * If a category was added or updated with an uploaded image in Admin,
- * that uploaded image will be prominently displayed in the bento grid.
+ * Returns dynamic grid span class or style for adaptive bento matrix.
+ * Ensures zero orphan gaps across any number of items (1 to 24).
  */
-function resolveDepartments(categories: Category[] = []): DepartmentItem[] {
+export function getAdaptiveSlot(index: number, total: number, isFeatured = false): {
+  gridClass: string;
+  gridStyle?: CSSProperties;
+} {
+  // Classic 6-card bento matches the original design mockup classes exactly
+  if (total === 6) {
+    const classes = [
+      "bento-card-featured",
+      "bento-card-side-1",
+      "bento-card-side-2",
+      "bento-card-bottom-1",
+      "bento-card-bottom-2",
+      "bento-card-bottom-3",
+    ];
+    return { gridClass: classes[index] || "bento-card-span-4" };
+  }
+
+  // 1 item: full hero
+  if (total === 1) {
+    return { gridClass: "bento-card-hero bento-card-span-12" };
+  }
+
+  // 2 items: 50/50 split
+  if (total === 2) {
+    return { gridClass: "bento-card-span-6 bento-card-half" };
+  }
+
+  // 3 items: 1 lead (span 8) + 2 stacked (span 4 each)
+  if (total === 3) {
+    if (index === 0 || isFeatured) return { gridClass: "bento-card-featured" };
+    if (index === 1) return { gridClass: "bento-card-side-1" };
+    return { gridClass: "bento-card-side-2" };
+  }
+
+  // 4 items: 1 lead (span 8) + 2 stacked (span 4 each) + 1 full-width bottom banner
+  if (total === 4) {
+    if (index === 0) return { gridClass: "bento-card-featured" };
+    if (index === 1) return { gridClass: "bento-card-side-1" };
+    if (index === 2) return { gridClass: "bento-card-side-2" };
+    return { gridClass: "bento-card-span-12 bento-card-wide" };
+  }
+
+  // 5 items: 1 lead (span 8) + 2 stacked (span 4 each) + 2 half-width bottom cards (span 6 each)
+  if (total === 5) {
+    if (index === 0) return { gridClass: "bento-card-featured" };
+    if (index === 1) return { gridClass: "bento-card-side-1" };
+    if (index === 2) return { gridClass: "bento-card-side-2" };
+    return { gridClass: "bento-card-span-6 bento-card-half" };
+  }
+
+  // 7 items: 1 lead (span 8) + 2 stacked (span 4 each) + 4 bottom cards (span 3 each)
+  if (total === 7) {
+    if (index === 0) return { gridClass: "bento-card-featured" };
+    if (index === 1) return { gridClass: "bento-card-side-1" };
+    if (index === 2) return { gridClass: "bento-card-side-2" };
+    return { gridClass: "bento-card-span-3" };
+  }
+
+  // 8 items: 1 lead (span 8) + 2 stacked (span 4) + 3 middle (span 4) + 2 bottom (span 6)
+  if (total === 8) {
+    if (index === 0) return { gridClass: "bento-card-featured" };
+    if (index === 1) return { gridClass: "bento-card-side-1" };
+    if (index === 2) return { gridClass: "bento-card-side-2" };
+    if (index < 6) return { gridClass: "bento-card-span-4" };
+    return { gridClass: "bento-card-span-6 bento-card-half" };
+  }
+
+  // 9 items: 1 lead (span 8) + 2 stacked (span 4) + 6 standard (span 4)
+  if (total === 9) {
+    if (index === 0) return { gridClass: "bento-card-featured" };
+    if (index === 1) return { gridClass: "bento-card-side-1" };
+    if (index === 2) return { gridClass: "bento-card-side-2" };
+    return { gridClass: "bento-card-span-4" };
+  }
+
+  // 10 items: 1 lead (span 8) + 2 stacked (span 4) + 3 middle (span 4) + 4 bottom (span 3)
+  if (total === 10) {
+    if (index === 0) return { gridClass: "bento-card-featured" };
+    if (index === 1) return { gridClass: "bento-card-side-1" };
+    if (index === 2) return { gridClass: "bento-card-side-2" };
+    if (index < 6) return { gridClass: "bento-card-span-4" };
+    return { gridClass: "bento-card-span-3" };
+  }
+
+  // 11+ items: 1 lead (span 8) + 2 stacked (span 4), remaining in clean 3-col or 4-col rows
+  if (index === 0) return { gridClass: "bento-card-featured" };
+  if (index === 1) return { gridClass: "bento-card-side-1" };
+  if (index === 2) return { gridClass: "bento-card-side-2" };
+  return { gridClass: "bento-card-span-4" };
+}
+
+/**
+ * Resolves dynamic category list into DepartmentItem cards with fallback images
+ * and assigned featured state.
+ */
+export function resolveDynamicDepartments(
+  categories: Category[] = [],
+  options?: {
+    layoutType?: "adaptive" | "equal" | "featured";
+    featuredCategoryId?: string;
+    columns?: number;
+  },
+): DepartmentItem[] {
   const safeCategories = Array.isArray(categories)
     ? categories.filter((cat): cat is Category => Boolean(cat && typeof cat.id === "string"))
     : [];
-  const usedCategoryIds = new Set<string>();
 
-  return DEFAULT_DEPARTMENTS.map((def) => {
-    // 1. Try to match by slug or name keywords among unused categories
-    let match = safeCategories.find((cat) => {
-      if (usedCategoryIds.has(cat.id)) return false;
-      const s = typeof cat.slug === "string" ? cat.slug.toLowerCase() : "";
-      const n = typeof cat.name === "string" ? cat.name.toLowerCase() : "";
-      if (def.id === "electronics") {
-        return s.includes("elect") || n.includes("elect") || s.includes("gadget");
-      }
-      if (def.id === "lifestyle") {
-        return s.includes("life") || s.includes("home") || n.includes("living") || n.includes("decor");
-      }
-      if (def.id === "spices") {
-        return s.includes("spice") || n.includes("spice");
-      }
-      if (def.id === "kids-toys") {
-        return (s.includes("toy") || n.includes("toy")) && !s.includes("book");
-      }
-      if (def.id === "kids-books") {
-        return s.includes("book") || n.includes("book") || s.includes("learn");
-      }
-      if (def.id === "groceries") {
-        return s.includes("groc") || n.includes("groc") || s.includes("fresh") || s.includes("food");
-      }
+  const layoutType = options?.layoutType || "adaptive";
+  const featuredId = options?.featuredCategoryId;
+
+  // If no dynamic categories are available at all, fall back to default template
+  if (safeCategories.length === 0) {
+    return DEFAULT_DEPARTMENTS.map((def, idx) => {
+      const slot = getAdaptiveSlot(idx, DEFAULT_DEPARTMENTS.length, def.isFeatured);
+      return {
+        ...def,
+        gridClass:
+          layoutType === "equal"
+            ? "bento-card-equal"
+            : layoutType === "featured"
+            ? idx === 0
+              ? "bento-card-hero bento-card-span-12"
+              : "bento-card-span-4 bento-card-sub"
+            : slot.gridClass,
+      };
+    });
+  }
+
+  // Sort: if featuredId is specified and in list, put it first for primary hero spotlight
+  let sorted = [...safeCategories];
+  if (featuredId) {
+    const featuredIndex = sorted.findIndex((c) => c.id === featuredId);
+    if (featuredIndex > 0) {
+      const [feat] = sorted.splice(featuredIndex, 1);
+      sorted.unshift(feat);
+    }
+  }
+
+  const total = sorted.length;
+
+  return sorted.map((cat, idx) => {
+    const isFeatured = featuredId ? cat.id === featuredId : idx === 0;
+
+    // Check if category has its own uploaded image
+    const hasCustomImage = Boolean(
+      typeof cat.imageUrl === "string" && cat.imageUrl.trim().length > 0,
+    );
+
+    // Fallback image selection: match by keyword if possible, else cycle through default images
+    let fallbackImage = DEFAULT_DEPARTMENTS[idx % DEFAULT_DEPARTMENTS.length].imageUrl;
+    const s = typeof cat.slug === "string" ? cat.slug.toLowerCase() : "";
+    const n = typeof cat.name === "string" ? cat.name.toLowerCase() : "";
+    const keywordMatch = DEFAULT_DEPARTMENTS.find((def) => {
+      if (def.id === "electronics" && (s.includes("elect") || n.includes("elect") || s.includes("gadget"))) return true;
+      if (def.id === "lifestyle" && (s.includes("life") || s.includes("home") || n.includes("living") || n.includes("decor"))) return true;
+      if (def.id === "spices" && (s.includes("spice") || n.includes("spice"))) return true;
+      if (def.id === "kids-toys" && (s.includes("toy") || n.includes("toy"))) return true;
+      if (def.id === "kids-books" && (s.includes("book") || n.includes("book") || s.includes("learn"))) return true;
+      if (def.id === "groceries" && (s.includes("groc") || n.includes("groc") || s.includes("fresh") || s.includes("food"))) return true;
       return false;
     });
-
-    // 2. If no keyword match, match any category with an uploaded image or any remaining category
-    if (!match) {
-      match =
-        safeCategories.find(
-          (cat) =>
-            !usedCategoryIds.has(cat.id) &&
-            typeof cat.imageUrl === "string" &&
-            cat.imageUrl.trim().length > 0,
-        ) || safeCategories.find((cat) => !usedCategoryIds.has(cat.id));
+    if (keywordMatch) {
+      fallbackImage = keywordMatch.imageUrl;
     }
 
-    if (match?.id) {
-      usedCategoryIds.add(match.id);
-    }
-
-    // Prioritize image uploaded when adding/editing the category in admin
-    let resolvedImageUrl = def.imageUrl;
-    if (match && typeof match.imageUrl === "string" && match.imageUrl.trim().length > 0) {
-      resolvedImageUrl = match.imageUrl.trim();
-    }
+    const resolvedImageUrl = hasCustomImage ? cat.imageUrl!.trim() : fallbackImage;
 
     const countText =
-      typeof match?.productCount === "number" && match.productCount > 0
-        ? `${match.productCount.toLocaleString()}+ Products`
-        : def.productCountFormatted;
+      typeof cat.productCount === "number" && cat.productCount > 0
+        ? `${cat.productCount.toLocaleString()}+ Products`
+        : DEFAULT_DEPARTMENTS[idx % DEFAULT_DEPARTMENTS.length].productCountFormatted;
+
+    // Assign grid class depending on layout type
+    let gridClass = "bento-card-span-4";
+    let gridStyle: CSSProperties | undefined;
+
+    if (layoutType === "equal") {
+      gridClass = "bento-card-equal";
+    } else if (layoutType === "featured") {
+      if (isFeatured) {
+        gridClass = "bento-card-hero bento-card-span-12";
+      } else {
+        const subCols = options?.columns === 3 ? "bento-card-span-4" : "bento-card-span-3";
+        gridClass = `${subCols} bento-card-sub`;
+      }
+    } else {
+      // Adaptive layout
+      const slot = getAdaptiveSlot(idx, total, isFeatured);
+      gridClass = slot.gridClass;
+      gridStyle = slot.gridStyle;
+    }
 
     return {
-      ...def,
-      id: match?.id || def.id,
-      name: match?.name || def.name,
-      slug: match?.slug || def.slug,
-      imageUrl: resolvedImageUrl,
-      fallbackImageUrl: def.imageUrl,
+      id: cat.id,
+      name: cat.name,
+      slug: cat.slug,
+      subtitle: (cat as { description?: string }).description || `Explore curated ${cat.name} products.`,
       productCountFormatted: countText,
+      imageUrl: resolvedImageUrl,
+      fallbackImageUrl: fallbackImage,
+      isFeatured,
+      gridClass,
+      gridStyle,
+      isCustomImage: hasCustomImage,
     };
   });
+}
+
+export interface DepartmentBentoProps {
+  categories?: Category[];
+  title?: string;
+  subtitle?: string;
+  hasMore?: boolean;
+  showViewAll?: boolean;
+  layoutType?: "adaptive" | "equal" | "featured";
+  columns?: number;
+  featuredCategoryId?: string;
 }
 
 export function DepartmentBento({
   categories = [],
   title = "Shop by Department",
+  subtitle = "Explore curated collections across everyday essentials.",
   hasMore = true,
-}: {
-  categories?: Category[];
-  title?: string;
-  hasMore?: boolean;
-}) {
-  const departments = resolveDepartments(categories);
+  showViewAll = true,
+  layoutType = "adaptive",
+  columns = 4,
+  featuredCategoryId,
+}: DepartmentBentoProps) {
+  const departments = resolveDynamicDepartments(categories, {
+    layoutType,
+    featuredCategoryId,
+    columns,
+  });
+
+  const gridContainerClass =
+    layoutType === "equal"
+      ? "department-bento-grid bento-layout-equal"
+      : layoutType === "featured"
+      ? "department-bento-grid bento-layout-featured"
+      : "department-bento-grid bento-layout-adaptive";
+
+  const containerStyle =
+    layoutType === "equal"
+      ? ({ "--equal-cols": columns } as CSSProperties)
+      : undefined;
 
   return (
     <section className="department-bento-section" aria-labelledby="department-heading">
-      {/* Header with Lime Accent Pill */}
+      {/* Header with Lime Accent Pill & View All Button */}
       <div className="department-bento-header">
         <div className="department-bento-accent-pill" aria-hidden="true" />
         <div className="department-bento-heading-row">
@@ -175,11 +343,13 @@ export function DepartmentBento({
             <h2 id="department-heading" className="department-bento-title">
               {title}
             </h2>
-            <p className="department-bento-subtitle">
-              Explore curated collections across everyday essentials.
-            </p>
+            {subtitle && (
+              <p className="department-bento-subtitle">
+                {subtitle}
+              </p>
+            )}
           </div>
-          {hasMore && (
+          {showViewAll && hasMore && (
             <Link href="/categories" className="department-bento-all-btn">
               <span>All Categories</span>
               <span aria-hidden="true">→</span>
@@ -188,8 +358,8 @@ export function DepartmentBento({
         </div>
       </div>
 
-      {/* 6-Slot Bento Grid: displays uploaded category images with graceful fallback */}
-      <div className="department-bento-grid">
+      {/* Dynamic Adaptive Bento Grid */}
+      <div className={gridContainerClass} style={containerStyle}>
         {departments.map((dept) => {
           const isFeatured = dept.isFeatured;
           const href = `/category/${encodeURIComponent(dept.slug)}`;
@@ -199,11 +369,11 @@ export function DepartmentBento({
               key={dept.id}
               href={href}
               className={`bento-card ${dept.gridClass} group`}
+              style={dept.gridStyle}
               aria-label={`${dept.name} — ${dept.subtitle}`}
             >
-              {/* Image Tile Layer */}
+              {/* Image Tile Layer with Proper Fit */}
               <div className="bento-image-wrap">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={dept.imageUrl}
                   alt={dept.name}
@@ -219,6 +389,16 @@ export function DepartmentBento({
                   }}
                 />
               </div>
+
+              {/* Title & Count overlay (enhanced for custom uploaded images) */}
+              {dept.isCustomImage && (
+                <div className="bento-card-caption">
+                  <span className="bento-card-name">{dept.name}</span>
+                  {dept.productCountFormatted && (
+                    <span className="bento-card-count">{dept.productCountFormatted}</span>
+                  )}
+                </div>
+              )}
 
               {/* Accessible Text for Screen Readers & SEO */}
               <span className="sr-only">
