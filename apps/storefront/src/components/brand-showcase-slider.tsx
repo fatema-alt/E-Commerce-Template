@@ -7,7 +7,7 @@ import { type Asset, type Image, assetSource, safeHref } from "../lib/cms";
 import { imageUrl } from "../lib/storefront";
 
 export type BrandTile = {
-  name: string;
+  name?: string;
   image?: Image;
   href?: string;
 };
@@ -49,37 +49,37 @@ export function BrandShowcaseSlider({
           {loopBrands.map((brand, idx) => {
             const src = getImgSrc(brand.image);
             const href = safeHref(brand.href);
+            const altText = brand.image?.alt || brand.name || "Brand logo";
             const content = (
               <article className="brand-card">
                 <div className="brand-card-img-wrapper">
                   {src ? (
                     <img
                       src={src}
-                      alt={brand.image?.alt || brand.name}
+                      alt={altText}
                       className="brand-card-img"
                       loading="lazy"
                     />
                   ) : (
                     <div className="brand-card-placeholder">
-                      {brand.name.charAt(0)}
+                      {(brand.name || "B").charAt(0)}
                     </div>
                   )}
                 </div>
-                <span className="brand-card-name">{brand.name}</span>
               </article>
             );
 
             return href ? (
               <Link
-                key={`${brand.name}-${idx}`}
+                key={`brand-${idx}`}
                 href={href}
                 className="brand-card-link"
-                title={brand.name}
+                title={brand.name || altText}
               >
                 {content}
               </Link>
             ) : (
-              <div key={`${brand.name}-${idx}`} className="brand-card-link">
+              <div key={`brand-${idx}`} className="brand-card-link">
                 {content}
               </div>
             );
