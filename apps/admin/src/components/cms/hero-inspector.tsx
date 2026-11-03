@@ -89,13 +89,41 @@ export function HeroInspector({ config, onChange, assets }: HeroInspectorProps) 
   const updateSlides = (nextSlides: HeroSlideItem[]) => {
     const sanitizedSlides = nextSlides.map((slide, idx) => {
       const altText = (slide.alt || slide.image?.alt || slide.title || `Hero Banner ${idx + 1}`).trim();
+      const title = (slide.title || `Hero Banner ${idx + 1}`).trim();
+      const bannerLink = slide.href || slide.bannerLink || "/shop";
+      const imageUrlVal = slide.imageUrl || slide.image?.url || "";
+
+      // Build clean image object strictly conforming to schema
+      const cleanImage: { assetId?: string; url?: string; alt: string; href?: string } = {
+        alt: altText,
+      };
+      if (
+        slide.image?.assetId &&
+        /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+          slide.image.assetId,
+        )
+      ) {
+        cleanImage.assetId = slide.image.assetId;
+      }
+      if (imageUrlVal) {
+        cleanImage.url = imageUrlVal;
+      }
+      if (bannerLink) {
+        cleanImage.href = bannerLink;
+      }
+
       return {
         ...slide,
+        id: slide.id || `slide-${idx + 1}`,
+        enabled: slide.enabled !== false,
+        title,
         alt: altText,
-        image: {
-          ...(slide.image || {}),
-          alt: altText,
-        },
+        bannerLink,
+        href: bannerLink,
+        imageUrl: imageUrlVal,
+        slideType: slide.slideType || "full_banner",
+        bannerType: slide.bannerType || "without_button",
+        image: cleanImage,
       };
     });
 

@@ -47,8 +47,7 @@ const uuid: Schema = {
 const link: Schema = { ...text(2048), format: 'link' };
 const color: Schema = { type: 'string', pattern: '^#[a-fA-F0-9]{6}$' };
 const button = object({ label: text(80), href: link });
-const image = object({ assetId: uuid, alt: text(200, 0), href: link }, [
-  'assetId',
+const image = object({ assetId: uuid, alt: text(200, 0), href: link, url: text(2048, 0) }, [
   'alt',
 ]);
 const productSource = {
@@ -77,6 +76,7 @@ export const BLOCK_SCHEMAS: Record<string, Schema> = {
       showProgress: bool,
       pauseOnHover: bool,
       slides: array(object({
+        id: text(100, 0),
         slideType: choice('full_banner', 'split_content'),
         enabled: bool,
         title: text(200, 0),
@@ -84,8 +84,11 @@ export const BLOCK_SCHEMAS: Record<string, Schema> = {
         bannerType: choice('with_button', 'without_button'),
         image,
         mobileImage: image,
+        imageUrl: text(2048, 0),
         backgroundGradient: { ...text(300), pattern: '^(linear|radial)-gradient\\([#%(),.\\s\\w-]+\\)$' },
         bannerLink: link,
+        href: link,
+        alt: text(200, 0),
         button,
         secondaryButton: button,
         badge: text(200, 0),

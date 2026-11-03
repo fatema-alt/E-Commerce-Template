@@ -66,7 +66,19 @@ export function CmsWorkspace({
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [, setError] = useToastState("error");
+  const [, setRawError] = useToastState("error");
+  const setError = (msg: string) => {
+    if (!msg) {
+      setRawError("");
+      return;
+    }
+    // Convert 0-indexed slide references to 1-indexed friendly names: slides[0] -> Slide 1
+    const friendly = msg
+      .replace(/slides\[(\d+)\]/g, (_, i) => `Slide ${Number(i) + 1}`)
+      .replace(/section\.hero-campaign\./g, "Hero Section: ")
+      .replace(/section\.([a-zA-Z0-9_-]+)\./g, "Section '$1': ");
+    setRawError(friendly);
+  };
   const [, setNotice] = useToastState("success");
   const [scheduledAt, setScheduledAt] = useState("");
   const [block, setBlock] = useState("hero");
