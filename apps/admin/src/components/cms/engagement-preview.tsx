@@ -53,7 +53,11 @@ export function EngagementPreview({
   scope: string;
   value: Value;
 }) {
-  const data = (value || engagementDefaults[scope]) as Row;
+  const configuredData = (value || engagementDefaults[scope]) as Row;
+  const data =
+    scope === "announcementRibbon"
+      ? { ...configuredData, animation: "marquee" }
+      : configuredData;
   const [mobile, setMobile] = useState(false);
   const [expanded, setExpanded] = useState(true);
   const [index, setIndex] = useState(0);

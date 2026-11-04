@@ -25,6 +25,7 @@ export function announcementDraft(content: Record<string, Value>) {
               : [],
           }
         : {})),
+    animation: "marquee",
   };
 }
 
@@ -41,18 +42,22 @@ export function AnnouncementEditor({
   disabled: boolean;
   onChange: (value: Value) => void;
 }) {
-  const data = { ...engagementDefaults.announcementRibbon, ...value };
+  const data: Record<string, Value> = {
+    ...engagementDefaults.announcementRibbon,
+    ...value,
+    animation: "marquee",
+  };
   const items = (data.items || []) as Record<string, Value>[];
   const globalSchema = {
     ...schema,
     properties: Object.fromEntries(
       Object.entries(schema.properties || {}).filter(
-        ([key]) => key !== "items",
+        ([key]) => !["items", "animation", "intervalSeconds"].includes(key),
       ),
     ),
   };
   const update = (next: Record<string, Value>) =>
-    onChange({ ...data, ...next });
+    onChange({ ...data, ...next, animation: "marquee" });
   const reorder = (index: number, offset: number) => {
     const next = [...items];
     [next[index], next[index + offset]] = [next[index + offset], next[index]];
@@ -74,8 +79,7 @@ export function AnnouncementEditor({
       />
       <p className="text-xs text-slate-500">
         Scroll Speed controls infinite scroll in pixels per second (20–120).
-        Interval Seconds controls the other slide modes. Dates use your local
-        timezone and are saved in UTC.
+        Dates use your local timezone and are saved in UTC.
       </p>
       <h3 className="font-semibold">Messages ({items.length}/20)</h3>
       {!items.length && (

@@ -79,7 +79,7 @@ export function AnnouncementRibbon({
   initialNow: number;
 }) {
   const settings = useSettings(initial);
-  const ribbon: RibbonSettings | undefined =
+  const configuredRibbon: RibbonSettings | undefined =
     settings.announcementRibbon ||
     (settings.announcement?.enabled && settings.announcement.text
       ? {
@@ -97,6 +97,10 @@ export function AnnouncementRibbon({
           ],
         }
       : undefined);
+  // Older published fade/slide settings must also use the continuous ribbon.
+  const ribbon: RibbonSettings | undefined = configuredRibbon
+    ? { ...configuredRibbon, animation: "marquee" }
+    : undefined;
   const mobile = useMedia("(max-width: 767px)");
   const reduced = useMedia("(prefers-reduced-motion: reduce)");
   const [now, setNow] = useState(initialNow);
