@@ -178,7 +178,26 @@ export function ShipmentWorkflow({
               });
             }}
           >
-            <Field name="provider" label="Courier provider" maxLength={80} />
+            <label className="block text-sm">
+              Courier provider
+              <input
+                name="provider"
+                required
+                maxLength={80}
+                list="tracking-courier-providers"
+                className="mt-1 block w-full rounded-lg border p-2"
+              />
+              <datalist id="tracking-courier-providers">
+                <option value="Steadfast" />
+                <option value="Pathao" />
+                <option value="RedX" />
+              </datalist>
+            </label>
+            <p className="text-xs text-slate-500">
+              Use Steadfast, Pathao or RedX for automatic tracking after
+              enabling the courier in Settings. Other couriers can be updated
+              manually.
+            </p>
             <Field
               name="trackingNumber"
               label="Tracking number"

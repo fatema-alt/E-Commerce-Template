@@ -72,7 +72,7 @@ export function Header({ config }: { config: CmsConfig }) {
               <Link href="/shop">Shop all</Link>
               <Link href="/categories">Browse categories</Link>
               <Link href="/wishlist">Your wishlist</Link>
-              <Link href="/orders">Track order</Link>
+              <Link href="/track">Track order</Link>
               <Link href="/help">Shopping help</Link>
             </>
           )}
@@ -120,7 +120,7 @@ export function Footer({ config }: { config: CmsConfig }) {
           <h2>Customer care</h2>
           <Link href="/help">Shopping help</Link>
           <Link href="/contact">Contact us</Link>
-          <Link href="/orders">Track your order</Link>
+          <Link href="/track">Track your order</Link>
           <Link href="/account">Your account</Link>
         </nav>
         <nav aria-label="Explore DS Mart">

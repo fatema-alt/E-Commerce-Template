@@ -16,6 +16,7 @@ import {
   excludedContactRoute,
   type EngagementSettings,
   type RibbonSettings,
+  type AnnouncementItem,
 } from "../lib/engagement";
 import { safeHref } from "../lib/cms";
 
@@ -32,6 +33,7 @@ function useMedia(query: string) {
 }
 function useSettings(initial: EngagementSettings) {
   const [settings, setSettings] = useState(initial);
+  const pathname = usePathname();
   useEffect(() => {
     let live = true;
     let loading = false;
@@ -44,14 +46,18 @@ function useSettings(initial: EngagementSettings) {
           cache: "no-store",
           signal: controller.signal,
         });
-        if (response.ok && live) setSettings(await response.json());
+        if (response.ok) {
+          const next = await response.json();
+          if (live) setSettings(next);
+        }
       } catch {
         /* Keep last known published settings during an outage. */
       } finally {
         loading = false;
       }
     };
-    const timer = setInterval(refresh, 60000);
+    void refresh();
+    const timer = setInterval(refresh, 15000);
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
     return () => {
@@ -61,7 +67,7 @@ function useSettings(initial: EngagementSettings) {
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, []);
+  }, [pathname]);
   return settings;
 }
 
@@ -112,6 +118,7 @@ export function AnnouncementRibbon({
       reduced ||
       !ribbon?.enabled ||
       ribbon.animation === "static" ||
+      ribbon.animation === "marquee" ||
       items.length < 2
     )
       return;
@@ -147,6 +154,7 @@ export function AnnouncementRibbon({
     "--ribbon-bg": ribbon.backgroundColor || "#101917",
     "--ribbon-text": ribbon.textColor || "#ffffff",
     "--ribbon-accent": ribbon.accentColor || "#d8f45a",
+    "--ribbon-play-state": paused || manualPause ? "paused" : "running",
   } as CSSProperties;
   return (
     <section
@@ -162,50 +170,140 @@ export function AnnouncementRibbon({
           setFocused(false);
       }}
     >
-      <div className="smart-ribbon-inner container">
-        <div key={item.id} className="ribbon-message">
-          {item.icon && <span aria-hidden="true">{item.icon}</span>}
-          <span>
-            {href && !item.ctaLabel ? (
-              <Link href={href}>{item.text}</Link>
-            ) : (
-              item.text
+      {ribbon.animation === "marquee" ? (
+        <>
+          <InfiniteRibbon items={items} speed={ribbon.scrollSpeed || 60} />
+          <button
+            className="ribbon-pause ribbon-marquee-pause"
+            type="button"
+            aria-label={
+              manualPause ? "Play announcements" : "Pause announcements"
+            }
+            aria-pressed={manualPause}
+            onClick={() => setManualPause((value) => !value)}
+          >
+            {manualPause ? "▶" : "Ⅱ"}
+          </button>
+        </>
+      ) : (
+        <div className="smart-ribbon-inner container">
+          <div key={item.id} className="ribbon-message">
+            {item.icon && <span aria-hidden="true">{item.icon}</span>}
+            <span>
+              {href && !item.ctaLabel ? (
+                <Link href={href}>{item.text}</Link>
+              ) : (
+                item.text
+              )}
+            </span>
+            {href && item.ctaLabel && (
+              <Link className="ribbon-cta" href={href}>
+                {item.ctaLabel} <span aria-hidden="true">↗</span>
+              </Link>
             )}
-          </span>
-          {href && item.ctaLabel && (
-            <Link className="ribbon-cta" href={href}>
-              {item.ctaLabel} <span aria-hidden="true">↗</span>
-            </Link>
+          </div>
+          {items.length > 1 && (
+            <div className="ribbon-controls">
+              <div className="ribbon-dots">
+                {items.map((row, i) => (
+                  <button
+                    key={row.id}
+                    type="button"
+                    aria-label={`Show announcement ${i + 1}: ${row.text}`}
+                    aria-current={i === active ? "true" : undefined}
+                    onClick={() => setIndex(i)}
+                  />
+                ))}
+              </div>
+              <button
+                className="ribbon-pause"
+                type="button"
+                aria-label={
+                  manualPause ? "Play announcements" : "Pause announcements"
+                }
+                aria-pressed={manualPause}
+                onClick={() => setManualPause((value) => !value)}
+              >
+                {manualPause ? "▶" : "Ⅱ"}
+              </button>
+            </div>
           )}
         </div>
-        {items.length > 1 && (
-          <div className="ribbon-controls">
-            <div className="ribbon-dots">
-              {items.map((row, i) => (
-                <button
-                  key={row.id}
-                  type="button"
-                  aria-label={`Show announcement ${i + 1}: ${row.text}`}
-                  aria-current={i === active ? "true" : undefined}
-                  onClick={() => setIndex(i)}
-                />
-              ))}
-            </div>
-            <button
-              className="ribbon-pause"
-              type="button"
-              aria-label={
-                manualPause ? "Play announcements" : "Pause announcements"
-              }
-              aria-pressed={manualPause}
-              onClick={() => setManualPause((value) => !value)}
-            >
-              {manualPause ? "▶" : "Ⅱ"}
-            </button>
-          </div>
-        )}
-      </div>
+      )}
     </section>
+  );
+}
+
+function InfiniteRibbon({
+  items,
+  speed,
+}: {
+  items: AnnouncementItem[];
+  speed: number;
+}) {
+  const group = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(1200);
+  const contentKey = JSON.stringify(items);
+  useEffect(() => {
+    const element = group.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) =>
+      setWidth(
+        entry.borderBoxSize?.[0]?.inlineSize ||
+          element.getBoundingClientRect().width,
+      ),
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [contentKey]);
+  return (
+    <div className="ribbon-marquee-viewport">
+      <div
+        className="ribbon-marquee-track"
+        style={
+          {
+            "--ribbon-duration": `${width / Math.min(120, Math.max(20, speed))}s`,
+          } as CSSProperties
+        }
+      >
+        {[0, 1].map((copy) => (
+          <div
+            key={copy}
+            ref={copy === 0 ? group : undefined}
+            className="ribbon-marquee-group"
+            aria-hidden={copy === 1 ? true : undefined}
+          >
+            {items.map((item) => {
+              const href = safeHref(item.ctaUrl);
+              return (
+                <div className="ribbon-marquee-item" key={item.id}>
+                  {item.icon && <span aria-hidden="true">{item.icon}</span>}
+                  {href && !item.ctaLabel ? (
+                    <Link href={href} tabIndex={copy ? -1 : undefined}>
+                      {item.text}
+                    </Link>
+                  ) : (
+                    <span>{item.text}</span>
+                  )}
+                  {href && item.ctaLabel && (
+                    <Link
+                      className="ribbon-cta"
+                      href={href}
+                      tabIndex={copy ? -1 : undefined}
+                    >
+                      {item.ctaLabel} <span aria-hidden="true">↗</span>
+                    </Link>
+                  )}
+                  <span className="ribbon-separator" aria-hidden="true">
+                    ✦
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -223,7 +321,10 @@ function ContactIcon({ kind }: { kind: string }) {
       aria-hidden="true"
     >
       {kind === "whatsapp" ? (
-        <><path d="M20.5 11.7a8.5 8.5 0 0 1-12.7 7.4L3 20.5l1.4-4.8a8.5 8.5 0 1 1 16.1-4Z"/><path d="m8 7 2 3-1 1a9 9 0 0 0 4 4l1-1 3 2c-1 3-5 1-7-1s-4-6-2-8Z"/></>
+        <>
+          <path d="M20.5 11.7a8.5 8.5 0 0 1-12.7 7.4L3 20.5l1.4-4.8a8.5 8.5 0 1 1 16.1-4Z" />
+          <path d="m8 7 2 3-1 1a9 9 0 0 0 4 4l1-1 3 2c-1 3-5 1-7-1s-4-6-2-8Z" />
+        </>
       ) : kind === "email" ? (
         <>
           <rect x="3" y="5" width="18" height="14" rx="3" />

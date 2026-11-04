@@ -2,10 +2,13 @@
 import Link from "next/link";
 import { BrandLogo } from "./brand-logo";
 import { OrderDetails } from "./order-details";
+import { GatewayPayment } from "./gateway-payment";
 import { statusLabel } from "./shopping-ui";
 import { useSearchParams } from "next/navigation";
 import { NewsletterPreferences } from "./newsletter";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLiveRefresh } from "../lib/use-live-refresh";
+import { LiveTrackingStatus } from "./order-tracking";
 import {
   money,
   shopRequest,
@@ -313,37 +316,43 @@ export function OrderHistory({ id }: { id?: string }) {
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    let live = true;
-    const load = async () => {
+  const loadOrders = useCallback(
+    async (signal: AbortSignal) => {
       try {
         if (id) {
-          const result = await shopRequest<Order>("orders/" + id);
-          if (live) {
+          const result = await shopRequest<Order>(
+            "orders/" + id,
+            undefined,
+            undefined,
+            signal,
+          );
+          if (!signal.aborted) {
             setOrder(result);
             setError("");
           }
         } else {
           const result = await shopRequest<{ items: Order[]; total: number }>(
             `orders?page=${page}`,
+            undefined,
+            undefined,
+            signal,
           );
-          if (live) {
+          if (!signal.aborted) {
             setError("");
             setItems(result.items);
             setTotal(result.total);
           }
         }
       } catch (e) {
-        if (live) setError((e as Error).message);
+        if (!signal.aborted) setError((e as Error).message);
+        throw e;
       } finally {
-        if (live) setLoading(false);
+        if (!signal.aborted) setLoading(false);
       }
-    };
-    void load();
-    return () => {
-      live = false;
-    };
-  }, [id, page]);
+    },
+    [id, page],
+  );
+  const liveUpdates = useLiveRefresh(loadOrders);
 
   // Confirmation page purchase event: fires once for fresh orders, guarded by localStorage
   useEffect(() => {
@@ -395,9 +404,8 @@ export function OrderHistory({ id }: { id?: string }) {
     void (async () => {
       try {
         const consentState =
-          typeof window !== "undefined" && (window as any).__dsConsentDefault
-            ? (window as any).__dsConsentDefault
-            : "denied";
+          (window as Window & { __dsConsentDefault?: string })
+            .__dsConsentDefault || "denied";
 
         // Privacy rule: customer personal data is loaded from the backend order API response,
         // never stored unhashed in sessionStorage.
@@ -469,6 +477,12 @@ export function OrderHistory({ id }: { id?: string }) {
         <Link href="/orders">Orders</Link>
       </p>
       <h1>{id ? "Order details" : "Your orders"}</h1>
+      <p>
+        <Link href="/track">
+          Track an order using its order number and phone
+        </Link>
+      </p>
+      {(order || items.length > 0) && <LiveTrackingStatus {...liveUpdates} />}
       {loading && <p role="status">Loading orders…</p>}
       {error && (
         <div role="alert" className="shop-error">
@@ -489,7 +503,9 @@ export function OrderHistory({ id }: { id?: string }) {
           order below.
         </div>
       )}
-      {(paymentQuery === "failed" || paymentQuery === "initiate_failed") && (
+      {(paymentQuery === "failed" ||
+        paymentQuery === "error" ||
+        paymentQuery === "initiate_failed") && (
         <div
           role="alert"
           className="shop-error"
@@ -507,11 +523,7 @@ export function OrderHistory({ id }: { id?: string }) {
             !["CANCELLED", "RETURNED"].includes(order.status) &&
             (order.paymentMethod === "BKASH" ||
               order.paymentMethod === "SSLCOMMERZ") && (
-              <div style={{ margin: "1rem 0" }}>
-                <p>
-                  Please contact the store to complete payment for this order.
-                </p>
-              </div>
+              <GatewayPayment order={order} />
             )
           }
         />

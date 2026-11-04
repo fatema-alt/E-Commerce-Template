@@ -603,6 +603,10 @@ model OrderPaymentTransaction {
 }
 
 model OrderShipment {
+  courierStatus String?
+  courierUpdatedAt DateTime?
+  trackingCheckedAt DateTime?
+  trackingError String?
   id String @id @default(uuid())
   orderId String
   order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
@@ -624,6 +628,16 @@ model OrderShipment {
   @@index([orderId, createdAt])
   @@unique([provider, providerBookingId])
   @@map("order_shipments")
+}
+
+model CourierConfig {
+  provider String @id
+  isEnabled Boolean @default(false)
+  isSandbox Boolean @default(true)
+  credentials String?
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+  @@map("courier_configs")
 }
 
 model OrderReturn {

@@ -19,6 +19,7 @@ import { getStandardEcommerceTemplate } from "./standard-template";
 import { VisualHomepageBuilder } from "./visual-homepage-builder";
 import { EngagementPreview, engagementDefaults } from "./engagement-preview";
 import { TrackingEditor } from "./tracking-editor";
+import { AnnouncementEditor, announcementDraft } from "./announcement-editor";
 import { MediaLibraryView } from "./media-library-view";
 
 const tabs = [
@@ -67,7 +68,7 @@ export function CmsWorkspace({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [, setRawError] = useToastState("error");
-  const setError = (msg: string) => {
+  const setError = useCallback((msg: string) => {
     if (!msg) {
       setRawError("");
       return;
@@ -78,7 +79,7 @@ export function CmsWorkspace({
       .replace(/section\.hero-campaign\./g, "Hero Section: ")
       .replace(/section\.([a-zA-Z0-9_-]+)\./g, "Section '$1': ");
     setRawError(friendly);
-  };
+  }, [setRawError]);
   const [, setNotice] = useToastState("success");
   const [scheduledAt, setScheduledAt] = useState("");
   const [block, setBlock] = useState("hero");
@@ -714,6 +715,11 @@ export function CmsWorkspace({
                         disabled={!editable || busy}
                         onChange={(val) => change({ ...content, tracking: val })}
                       />
+                    ) : scope === "announcementRibbon" ? (
+                      <div className="engagement-editor">
+                        <AnnouncementEditor value={announcementDraft(content)} schema={registry.documents.SITE_SETTINGS.properties!.announcementRibbon} assets={assets} disabled={!editable || busy} onChange={(value) => change({ ...content, announcementRibbon: value })} />
+                        <EngagementPreview scope={scope} value={announcementDraft(content)} />
+                      </div>
                     ) : (
                       <div className="engagement-editor">
                         <div><p className="mb-4 text-sm text-slate-500">Settings are part of the selected Site Settings document. Publishing also publishes its other saved changes. Times use your local timezone and are saved in UTC. Array order controls display order.</p><SchemaField name={heading || scope} schema={registry.documents.SITE_SETTINGS.properties![scope]} value={content[scope] ?? engagementDefaults[scope]} assets={assets} onChange={value => change({ ...content, [scope]: value })} /></div>

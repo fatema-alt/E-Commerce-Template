@@ -11,7 +11,8 @@ export type AnnouncementItem = {
 };
 export type RibbonSettings = {
   enabled: boolean;
-  animation: "fade" | "slide_up" | "slide_left" | "static";
+  animation: "marquee" | "fade" | "slide_up" | "slide_left" | "static";
+  scrollSpeed?: number;
   intervalSeconds: number;
   backgroundColor?: string;
   textColor?: string;

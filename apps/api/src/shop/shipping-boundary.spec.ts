@@ -63,6 +63,22 @@ describe('Quoted free-delivery eligibility after discounts', () => {
     expect(result.shipping).toBe('0.00');
     expect(result.shippingRates).toEqual(rates);
   });
+  it.each([1999, 2000, 2500, 5000])(
+    'keeps delivery charges and partial advance available for a %s order without a configured promotion',
+    async (subtotal) => {
+      vi.stubEnv('SHIPPING_FREE_ABOVE', undefined);
+      const result = await quote(subtotal);
+      expect(result.shipping).toBe('93.00');
+      expect(
+        result.plans.find((plan) => plan.plan === 'PARTIAL_ADVANCE'),
+      ).toMatchObject({
+        available: true,
+        shipping: '93.00',
+        payableNow: '93.00',
+        amountDueOnDelivery: subtotal.toFixed(2),
+      });
+    },
+  );
   it('charges delivery one unit below the configured threshold', async () => {
     const rates = getShippingRates();
     expect((await quote(rates.freeAbove - 1)).shipping).toBe(

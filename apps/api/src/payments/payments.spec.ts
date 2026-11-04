@@ -254,7 +254,12 @@ describe('Payments Module Unit Tests', () => {
       await service.updateAdminSetting('BKASH', {
         isEnabled: true,
         isSandbox: true,
-        config: { appKey: 'test_app_key' },
+        config: {
+          appKey: 'test_app_key',
+          appSecret: 'test_secret',
+          username: 'test_user',
+          password: 'test_password',
+        },
       });
       expect(mockDb.paymentGatewayConfig.upsert).toHaveBeenCalled();
 

@@ -2,11 +2,13 @@ export async function shopRequest<T>(
   path: string,
   body?: unknown,
   idempotencyKey?: string,
+  signal?: AbortSignal,
 ): Promise<T> {
   const response = await fetch("/api/shop/" + path, {
     method: body === undefined ? "GET" : "POST",
     credentials: "same-origin",
     cache: "no-store",
+    signal,
     headers: {
       "Content-Type": "application/json",
       "X-Storefront-Request": "1",
@@ -72,6 +74,7 @@ export type Shopper = {
   phone?: string;
 };
 export type Order = {
+  tracking?: TrackingSnapshot;
   manualPayments?: ManualOrderPayment[];
   paymentPlan?: PaymentPlan | null;
   couponDiscount?: string;
@@ -133,6 +136,23 @@ export type Order = {
     deliveredAt?: string | null;
   }[];
 };
+export type TrackingSnapshot = {
+  orderNumber: string;
+  status: string;
+  paymentStatus: string;
+  updatedAt: string;
+  timeline: { id: string; label: string; status: string; at: string }[];
+  shipments: {
+    id: string;
+    provider: string | null;
+    trackingNumber: string | null;
+    status: string;
+    courierStatus: string | null;
+    courierUpdatedAt: string | null;
+    trackingCheckedAt: string | null;
+    refreshDelayed: boolean;
+  }[];
+};
 export type ManualTransfer = {
   id: "MANUAL_BKASH" | "MANUAL_NAGAD" | "BANK_TRANSFER";
   label: string;
@@ -177,6 +197,7 @@ export type PlanQuote = {
   discountMessage: string;
 };
 export type Payments = {
+  gateways?: { id: "BKASH" | "SSLCOMMERZ"; name: string }[];
   methods: CheckoutMethod[];
   settings: { codEnabled: boolean };
 };

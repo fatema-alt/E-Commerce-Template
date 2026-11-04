@@ -65,13 +65,21 @@ const navigation: NavItem[] = [
     href: "/cms",
     icon: Palette,
     children: [
-      { label: "Homepage Builder", href: "/cms/pages?key=home", icon: Sparkles },
+      {
+        label: "Homepage Builder",
+        href: "/cms/pages?key=home",
+        icon: Sparkles,
+      },
       { label: "All Pages", href: "/cms/pages", icon: List },
       { label: "Theme Customizer", href: "/cms/theme", icon: Palette },
       { label: "Navigation Menus", href: "/cms/navigation", icon: FolderTree },
       { label: "Media Library", href: "/cms/media", icon: ImageIcon },
       { label: "Announcement Bar", href: "/cms/announcements", icon: Sparkles },
-      { label: "Floating Contact Widget", href: "/cms/contact-widget", icon: Users },
+      {
+        label: "Floating Contact Widget",
+        href: "/cms/contact-widget",
+        icon: Users,
+      },
     ],
   },
   {
@@ -80,6 +88,11 @@ const navigation: NavItem[] = [
     icon: Settings,
     children: [
       { label: "Payments", href: "/settings/payments", icon: CreditCard },
+      {
+        label: "Couriers & Tracking",
+        href: "/settings/couriers",
+        icon: Activity,
+      },
       { label: "Site Settings", href: "/cms/settings", icon: Settings },
       { label: "Tracking & Pixels", href: "/cms/tracking", icon: Activity },
     ],
@@ -162,7 +175,8 @@ export function Sidebar({
                 ? pathname === "/"
                 : item.href.includes("?")
                   ? pathname === itemPath
-                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                  : pathname === item.href ||
+                    pathname.startsWith(`${item.href}/`);
 
             if (item.children) {
               const isGroupExpanded = expanded[item.href] || active;
@@ -217,7 +231,8 @@ export function Sidebar({
                         const childPath = child.href.split("?")[0];
                         const childActive =
                           pathname === child.href ||
-                          (child.href.includes("?") && pathname === childPath) ||
+                          (child.href.includes("?") &&
+                            pathname === childPath) ||
                           (child.href === item.href &&
                             pathname.startsWith(item.href + "/") &&
                             pathname !== item.href + "/add");
@@ -267,7 +282,9 @@ export function Sidebar({
                       : "text-slate-400 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-200"
                   }`}
                 />
-                <span className="block md:hidden lg:block truncate">{item.label}</span>
+                <span className="block md:hidden lg:block truncate">
+                  {item.label}
+                </span>
               </Link>
             );
           })}
@@ -275,7 +292,9 @@ export function Sidebar({
 
         {/* Footer info */}
         <div className="border-t border-slate-200 p-3 text-[11px] text-slate-400 dark:border-white/10 dark:text-slate-400 block md:hidden lg:block">
-          <p className="font-semibold text-slate-600 dark:text-slate-300">Commerce Suite</p>
+          <p className="font-semibold text-slate-600 dark:text-slate-300">
+            Commerce Suite
+          </p>
           <p className="text-[10px]">v1.0 · Asia/Dhaka (UTC+6)</p>
         </div>
       </aside>

@@ -27,6 +27,10 @@ const contact = {
   mobile: true,
 };
 describe('Engagement CMS validation and roles', () => {
+  it('accepts an infinite scrolling ribbon with speed, links and multiple messages', () => {
+    const content = { ...base, announcementRibbon: { ...ribbon, animation: 'marquee', scrollSpeed: 60, items: [item, { ...item, id: 'second', text: 'Explore offers', ctaLabel: 'Shop', ctaUrl: '/shop' }] } };
+    expect(validateCmsContent('SITE_SETTINGS', content)).toEqual(content);
+  });
   it('preserves old Site Settings documents and validates new optional settings', () => {
     expect(validateCmsContent('SITE_SETTINGS', base)).toEqual(base);
     const content = {
@@ -42,7 +46,8 @@ describe('Engagement CMS validation and roles', () => {
   it.each([
     { ...ribbon, intervalSeconds: 0 },
     { ...ribbon, backgroundColor: 'url(evil)' },
-    { ...ribbon, animation: 'marquee' },
+    { ...ribbon, animation: 'invalid-animation' },
+    { ...ribbon, scrollSpeed: 0 },
     { ...ribbon, items: [item, item] },
     { ...ribbon, items: [{ ...item, ctaLabel: 'Shop' }] },
     { ...ribbon, items: [{ ...item, ctaUrl: 'javascript:alert(1)' }] },

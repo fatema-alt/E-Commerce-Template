@@ -236,6 +236,8 @@ describe('Atomic checkout order and manual submission', () => {
           .mockResolvedValue({ ...defaultPlanSettings, codEnabled: true }),
       },
       paymentMethod: { findUnique: vi.fn().mockResolvedValue(method) },
+      paymentGatewayConfig: { findUnique: vi.fn().mockResolvedValue(null) },
+      orderPaymentTransaction: { create: vi.fn() },
       manualOrderPayment: {
         findUnique: vi.fn().mockResolvedValue(null),
         create: vi.fn(),
@@ -313,6 +315,65 @@ describe('Atomic checkout order and manual submission', () => {
       vi.unstubAllEnvs();
     }
   });
+  it.each(['BKASH', 'SSLCOMMERZ'])(
+    'atomically creates a %s gateway intent without a manual reference',
+    async (gateway) => {
+      vi.stubEnv('SHIPPING_INSIDE_DHAKA', '100');
+      vi.stubEnv('SHIPPING_FREE_ABOVE', '0');
+      try {
+        const { service, tx, dto, input } = checkoutFixture();
+        tx.paymentGatewayConfig.findUnique.mockResolvedValue({
+          provider: gateway,
+          isEnabled: true,
+          config: {
+            appKey: 'key',
+            appSecret: 'secret',
+            username: 'user',
+            password: 'password',
+            storeId: 'store',
+            storePassword: 'password',
+          },
+        });
+        dto.paymentMethod = gateway;
+        dto.paymentOption = 'PARTIAL_ADVANCE';
+        input.checkout = {
+          plan: 'PARTIAL_ADVANCE',
+          gateway,
+          expectedTotal: '1100',
+          expectedNow: '100',
+        };
+        await service.create(
+          dto,
+          'gateway-checkout-idempotency',
+          'customer',
+          input,
+        );
+        expect(tx.manualOrderPayment.create).not.toHaveBeenCalled();
+        expect(tx.orderPaymentTransaction.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            provider: gateway,
+            amount: new D(100),
+            status: 'PENDING',
+            metadata: { checkoutIntent: true, paymentPlan: 'PARTIAL_ADVANCE' },
+          }),
+        });
+        expect(tx.order.create.mock.calls[0][0].data).toMatchObject({
+          paymentMethod: gateway,
+          paymentPlan: 'PARTIAL_ADVANCE',
+        });
+        tx.paymentGatewayConfig.findUnique.mockResolvedValue({
+          provider: gateway,
+          isEnabled: false,
+          config: {},
+        });
+        await expect(
+          service.create(dto, 'disabled-gateway-checkout', 'customer', input),
+        ).rejects.toThrow('gateway is unavailable');
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    },
+  );
   it('blocks disabled methods and duplicate references before inserting an order', async () => {
     vi.stubEnv('SHIPPING_INSIDE_DHAKA', '100');
     vi.stubEnv('SHIPPING_FREE_ABOVE', '5000');

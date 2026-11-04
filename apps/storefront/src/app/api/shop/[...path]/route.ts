@@ -9,8 +9,8 @@ async function proxy(
   const path = (await context.params).path.join("/");
   const allowed =
     req.method === "GET"
-      ? /^(me|newsletter|payment-methods|orders(?:\/[a-f0-9-]{36})?|payments\/methods|payments\/status\/[a-f0-9-]{36}|products\/[a-f0-9-]{36}\/(?:reviews|reviews\/summary|qa))$/
-      : /^(register|login|logout|password|quote|orders(?:\/[a-f0-9-]{36}\/manual-payment)?|coupons\/validate|newsletter(?:\/preferences)?|products\/[a-f0-9-]{36}\/(?:reviews|qa)|reviews\/[a-f0-9-]{36}\/helpful)$/;
+      ? /^(me|newsletter|payment-methods|tracking\/[A-Za-z0-9_-]+\.[a-f0-9]{64}|orders(?:\/[a-f0-9-]{36})?|payments\/methods|payments\/status\/[a-f0-9-]{36}|products\/[a-f0-9-]{36}\/(?:reviews|reviews\/summary|qa))$/
+      : /^(register|login|logout|password|quote|tracking|orders(?:\/[a-f0-9-]{36}\/(?:manual-payment|gateway-payment))?|coupons\/validate|newsletter(?:\/preferences)?|products\/[a-f0-9-]{36}\/(?:reviews|qa)|reviews\/[a-f0-9-]{36}\/helpful)$/;
   if (!allowed.test(path))
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   let body: string | undefined;
@@ -41,6 +41,7 @@ async function proxy(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "X-Commerce-Admin": "1",
+    "X-Storefront-Origin": req.nextUrl.origin,
   };
   if (cookie && /^[a-f0-9]{64}$/.test(cookie))
     headers.Cookie = `commerce_shopper=${cookie}`;

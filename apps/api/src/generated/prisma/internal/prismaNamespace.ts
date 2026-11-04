@@ -414,6 +414,7 @@ export const ModelName = {
   OrderAddress: 'OrderAddress',
   OrderPaymentTransaction: 'OrderPaymentTransaction',
   OrderShipment: 'OrderShipment',
+  CourierConfig: 'CourierConfig',
   OrderReturn: 'OrderReturn',
   OrderReturnItem: 'OrderReturnItem',
   OrderEvent: 'OrderEvent',
@@ -454,7 +455,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "analyticsSession" | "analyticsEvent" | "dashboardTarget" | "adminUser" | "dashboardLayout" | "adminSession" | "category" | "product" | "productImage" | "productVariant" | "inventory" | "inventoryMovement" | "catalogAuditLog" | "catalogRedirect" | "catalogSku" | "customer" | "customerAddress" | "customerNote" | "customerAuditEvent" | "order" | "orderItem" | "orderAddress" | "orderPaymentTransaction" | "orderShipment" | "orderReturn" | "orderReturnItem" | "orderEvent" | "orderAdminNote" | "orderStockReservation" | "orderIdempotencyKey" | "cmsDocument" | "cmsVersion" | "cmsAuditEvent" | "cmsMediaAsset" | "cmsAssetReference" | "cmsPublicationEvent" | "shopperAccount" | "shopperSession" | "shopperOrderAccess" | "newsletterSubscription" | "storefrontThrottle" | "coupon" | "couponUsage" | "paymentGatewayConfig" | "productReview" | "productQuestion" | "paymentSettings" | "paymentMethod" | "manualOrderPayment"
+    modelProps: "analyticsSession" | "analyticsEvent" | "dashboardTarget" | "adminUser" | "dashboardLayout" | "adminSession" | "category" | "product" | "productImage" | "productVariant" | "inventory" | "inventoryMovement" | "catalogAuditLog" | "catalogRedirect" | "catalogSku" | "customer" | "customerAddress" | "customerNote" | "customerAuditEvent" | "order" | "orderItem" | "orderAddress" | "orderPaymentTransaction" | "orderShipment" | "courierConfig" | "orderReturn" | "orderReturnItem" | "orderEvent" | "orderAdminNote" | "orderStockReservation" | "orderIdempotencyKey" | "cmsDocument" | "cmsVersion" | "cmsAuditEvent" | "cmsMediaAsset" | "cmsAssetReference" | "cmsPublicationEvent" | "shopperAccount" | "shopperSession" | "shopperOrderAccess" | "newsletterSubscription" | "storefrontThrottle" | "coupon" | "couponUsage" | "paymentGatewayConfig" | "productReview" | "productQuestion" | "paymentSettings" | "paymentMethod" | "manualOrderPayment"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2231,6 +2232,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.OrderShipmentCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.OrderShipmentCountAggregateOutputType> | number
+        }
+      }
+    }
+    CourierConfig: {
+      payload: Prisma.$CourierConfigPayload<ExtArgs>
+      fields: Prisma.CourierConfigFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CourierConfigFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourierConfigPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CourierConfigFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourierConfigPayload>
+        }
+        findFirst: {
+          args: Prisma.CourierConfigFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourierConfigPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CourierConfigFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourierConfigPayload>
+        }
+        findMany: {
+          args: Prisma.CourierConfigFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourierConfigPayload>[]
+        }
+        create: {
+          args: Prisma.CourierConfigCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourierConfigPayload>
+        }
+        createMany: {
+          args: Prisma.CourierConfigCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CourierConfigCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourierConfigPayload>[]
+        }
+        delete: {
+          args: Prisma.CourierConfigDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourierConfigPayload>
+        }
+        update: {
+          args: Prisma.CourierConfigUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourierConfigPayload>
+        }
+        deleteMany: {
+          args: Prisma.CourierConfigDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CourierConfigUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CourierConfigUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourierConfigPayload>[]
+        }
+        upsert: {
+          args: Prisma.CourierConfigUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CourierConfigPayload>
+        }
+        aggregate: {
+          args: Prisma.CourierConfigAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCourierConfig>
+        }
+        groupBy: {
+          args: Prisma.CourierConfigGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CourierConfigGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CourierConfigCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CourierConfigCountAggregateOutputType> | number
         }
       }
     }
@@ -4528,6 +4603,10 @@ export type OrderPaymentTransactionScalarFieldEnum = (typeof OrderPaymentTransac
 
 
 export const OrderShipmentScalarFieldEnum = {
+  courierStatus: 'courierStatus',
+  courierUpdatedAt: 'courierUpdatedAt',
+  trackingCheckedAt: 'trackingCheckedAt',
+  trackingError: 'trackingError',
   id: 'id',
   orderId: 'orderId',
   provider: 'provider',
@@ -4548,6 +4627,18 @@ export const OrderShipmentScalarFieldEnum = {
 } as const
 
 export type OrderShipmentScalarFieldEnum = (typeof OrderShipmentScalarFieldEnum)[keyof typeof OrderShipmentScalarFieldEnum]
+
+
+export const CourierConfigScalarFieldEnum = {
+  provider: 'provider',
+  isEnabled: 'isEnabled',
+  isSandbox: 'isSandbox',
+  credentials: 'credentials',
+  updatedAt: 'updatedAt',
+  updatedBy: 'updatedBy'
+} as const
+
+export type CourierConfigScalarFieldEnum = (typeof CourierConfigScalarFieldEnum)[keyof typeof CourierConfigScalarFieldEnum]
 
 
 export const OrderReturnScalarFieldEnum = {
@@ -5481,6 +5572,7 @@ export type GlobalOmitConfig = {
   orderAddress?: Prisma.OrderAddressOmit
   orderPaymentTransaction?: Prisma.OrderPaymentTransactionOmit
   orderShipment?: Prisma.OrderShipmentOmit
+  courierConfig?: Prisma.CourierConfigOmit
   orderReturn?: Prisma.OrderReturnOmit
   orderReturnItem?: Prisma.OrderReturnItemOmit
   orderEvent?: Prisma.OrderEventOmit

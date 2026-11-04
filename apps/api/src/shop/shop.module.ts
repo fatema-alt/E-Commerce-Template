@@ -5,9 +5,16 @@ import { ShopController } from './shop.controller.js';
 import { OrdersService } from '../orders/orders.service.js';
 import { CheckoutPaymentsModule } from '../payments/checkout-payments.module.js';
 import { PromotionsModule } from '../promotions/promotions.module.js';
+import { PaymentsModule } from '../payments/payments.module.js';
+import { TrackingModule } from '../tracking/tracking.module.js';
 
 @Module({
-  imports: [CheckoutPaymentsModule, PromotionsModule],
+  imports: [
+    CheckoutPaymentsModule,
+    PromotionsModule,
+    PaymentsModule,
+    TrackingModule,
+  ],
   controllers: [ShopController],
   providers: [ShopService, OrdersService, ManualPaymentsService],
   exports: [ShopService],

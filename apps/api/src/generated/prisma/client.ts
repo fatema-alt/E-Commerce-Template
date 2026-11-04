@@ -169,6 +169,11 @@ export type OrderPaymentTransaction = Prisma.OrderPaymentTransactionModel
  */
 export type OrderShipment = Prisma.OrderShipmentModel
 /**
+ * Model CourierConfig
+ *
+ */
+export type CourierConfig = Prisma.CourierConfigModel
+/**
  * Model OrderReturn
  *
  */

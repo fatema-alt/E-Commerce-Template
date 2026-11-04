@@ -17,6 +17,8 @@ import {
 import type { Request, Response } from 'express';
 import { getCookie } from '../auth/auth.guard.js';
 import { SHOP_COOKIE, ShopService } from './shop.service.js';
+import { PaymentsService } from '../payments/payments.service.js';
+import { OnlinePaymentMethod } from '../payments/payments.dto.js';
 import {
   ChangeShopPasswordDto,
   LoginShopperDto,
@@ -27,11 +29,15 @@ import {
   ShopCheckoutDto,
   SubscribeDto,
   ValidateCouponDto,
+  GatewayPaymentDto,
 } from './shop.dto.js';
 @Controller('shop')
 @SetMetadata('public', true)
 export class ShopController {
-  constructor(private readonly shop: ShopService) {}
+  constructor(
+    private readonly shop: ShopService,
+    private readonly paymentsService: PaymentsService,
+  ) {}
   @Get('newsletter') @Header('Cache-Control', 'no-store') newsletterStatus(
     @Req() req: Request,
   ) {
@@ -146,6 +152,21 @@ export class ShopController {
     if (page < 1 || page > 100000)
       throw new BadRequestException('Invalid page');
     return this.shop.listOrders(this.cookie(req), page);
+  }
+  @Post('orders/:id/gateway-payment') async gatewayPayment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request,
+    @Body() dto: GatewayPaymentDto,
+  ) {
+    await this.shop.order(id, this.cookie(req));
+    await this.shop.throttle('gateway-payment', id, 10, 60);
+    return this.paymentsService.initiate(
+      id,
+      dto.gateway as OnlinePaymentMethod,
+      req.get('x-storefront-origin'),
+      undefined,
+      true,
+    );
   }
   @Post('orders/:id/manual-payment') async manualPayment(
     @Param('id', ParseUUIDPipe) id: string,

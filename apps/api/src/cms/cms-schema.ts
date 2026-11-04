@@ -331,7 +331,8 @@ export const SETTINGS_SCHEMA = object(
     ]),
     announcementRibbon: object({
       enabled: bool,
-      animation: choice('fade', 'slide_up', 'slide_left', 'static'),
+      animation: choice('marquee', 'fade', 'slide_up', 'slide_left', 'static'),
+      scrollSpeed: number(20, 120),
       intervalSeconds: number(3, 30),
       backgroundColor: color, textColor: color, accentColor: color,
       items: array(object({ id, enabled: bool, text: text(240), icon: text(12, 0), ctaLabel: text(60, 0), ctaUrl: link,

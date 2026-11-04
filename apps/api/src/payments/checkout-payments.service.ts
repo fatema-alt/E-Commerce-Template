@@ -10,6 +10,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { assertVersion, paymentStatus } from '../orders/order.rules.js';
 import { paymentHandlers, validMethod } from './manual-payment-handler.js';
 import { defaultPlanSettings } from './plan-pricing.js';
+import { checkoutGatewayReady } from './checkout-gateways.js';
 import type {
   PaymentMethodDto,
   PlanSettingsDto,
@@ -57,11 +58,24 @@ export class CheckoutPaymentsService {
       : methods;
   }
   async publicConfig() {
-    const [settings, methods] = await Promise.all([
+    const [settings, methods, gatewayRows] = await Promise.all([
       this.settings(),
       this.methods(true),
+      this.db.paymentGatewayConfig.findMany({
+        where: { provider: { in: ['BKASH', 'SSLCOMMERZ'] }, isEnabled: true },
+      }),
     ]);
-    return { settings, methods };
+    return {
+      settings,
+      methods,
+      gateways: gatewayRows.filter(checkoutGatewayReady).map((row) => ({
+        id: row.provider,
+        name:
+          row.provider === 'BKASH'
+            ? 'bKash'
+            : 'SSLCommerz (Cards / Mobile Banking)',
+      })),
+    };
   }
   async saveMethod(dto: PaymentMethodDto, id?: string) {
     if (id) {

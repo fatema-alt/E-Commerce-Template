@@ -97,6 +97,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
     CheckoutPaymentOption | ""
   >("");
   const [chosenMethodId, setChosenMethodId] = useState<string>("");
+  const [chosenGateway, setChosenGateway] = useState("");
   const [user, setUser] = useState<Shopper | null>(null);
   const [placed, setPlaced] = useState("");
   const [couponCode, setCouponCode] = useState("");
@@ -157,7 +158,8 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       plan.available &&
       (plan.plan === "COD" ||
         Number(plan.payableNow) === 0 ||
-        (payments?.methods.length || 0) > 0),
+        (payments?.methods.length || 0) > 0 ||
+        (payments?.gateways?.length || 0) > 0),
   );
   const availableOptionIds = availablePlans.map((plan) => plan.plan);
   const paymentOption: CheckoutPaymentOption =
@@ -166,6 +168,11 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       : (availableOptionIds[0] ?? "FULL_PAYMENT");
   const needsPrepayment =
     paymentOption !== "COD" && Number(quote?.payableNow || 0) > 0;
+  const gateways = payments?.gateways || [];
+  const gateway =
+    gateways.find((method) => method.id === chosenGateway) ||
+    (!payments?.methods.length ? gateways[0] : undefined);
+  const needsManualPayment = needsPrepayment && !gateway;
   const selectedMethodId =
     chosenMethodId &&
     paymentChannels.some((method) => method.id === chosenMethodId)
@@ -463,7 +470,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       submissionLock.current ||
       mutationLock.current ||
       !availableOptionIds.includes(paymentOption) ||
-      (needsPrepayment &&
+      (needsManualPayment &&
         (!selectedMethodId || !senderInfo.trim() || !reference.trim()))
     )
       return;
@@ -477,7 +484,9 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       customerPhone: phone,
       paymentMethod: effectivePaymentMethod,
       ...(needsPrepayment
-        ? { paymentMethodId: selectedMethodId, senderInfo, reference }
+        ? gateway
+          ? { paymentGateway: gateway.id }
+          : { paymentMethodId: selectedMethodId, senderInfo, reference }
         : {}),
       paymentOption,
       shippingAddress: {
@@ -546,14 +555,24 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
             tax: Number(order.taxTotal) || 0,
             coupon: order.couponCode || appliedCoupon || undefined,
             items,
-            paymentMethod: effectivePaymentMethod,
-            createdAt: Date.now(),
+            paymentMethod: order.paymentMethod,
+            createdAt: new Date(order.createdAt).getTime(),
           }),
         );
       } catch {
         /* Storage non-fatal */
       }
-      router.push(`/orders/${order.id}`);
+      if (needsPrepayment && gateway) {
+        try {
+          const payment = await shopRequest<{ redirectUrl: string }>(
+            `orders/${order.id}/gateway-payment`,
+            { gateway: gateway.id },
+          );
+          window.location.assign(payment.redirectUrl);
+        } catch {
+          router.push(`/orders/${order.id}?payment=initiate_failed`);
+        }
+      } else router.push(`/orders/${order.id}`);
     } catch (e) {
       setCheckoutError((e as Error).message);
       setReview((v) => v + 1);
@@ -910,7 +929,36 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                       </label>
                     ))}
                   </div>
-                  {needsPrepayment && (
+                  {needsPrepayment && gateways.length > 0 && (
+                    <div className="shopping-stack" style={{ marginTop: 16 }}>
+                      <label>
+                        Payment method
+                        <select
+                          value={gateway?.id || "manual"}
+                          onChange={(event) =>
+                            setChosenGateway(event.target.value)
+                          }
+                        >
+                          {(payments?.methods.length || 0) > 0 && (
+                            <option value="manual">Manual transfer</option>
+                          )}
+                          {gateways.map((method) => (
+                            <option key={method.id} value={method.id}>
+                              {method.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {gateway && (
+                        <p>
+                          You will be redirected to {gateway.name} to pay{" "}
+                          {money(quote?.payableNow || 0)} securely after placing
+                          your order.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {needsManualPayment && (
                     <div className="shopping-stack" style={{ marginTop: 16 }}>
                       <label>
                         Method category
@@ -1068,7 +1116,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                       !validQuote ||
                       locked ||
                       !availableOptionIds.includes(paymentOption) ||
-                      (needsPrepayment &&
+                      (needsManualPayment &&
                         (!selectedMethodId ||
                           !senderInfo.trim() ||
                           !reference.trim()))

@@ -1,4 +1,8 @@
 import {
+  checkoutGatewayReady,
+  type CheckoutGateway,
+} from '../payments/checkout-gateways.js';
+import {
   pricePlan,
   defaultPlanSettings,
   type Plan,
@@ -272,6 +276,7 @@ export class OrdersService {
       manualAccount?: ManualTransfer;
       checkout?: {
         plan: Plan;
+        gateway?: CheckoutGateway;
         paymentMethodId?: string;
         senderInfo?: string;
         reference?: string;
@@ -615,9 +620,29 @@ export class OrdersService {
                 throw new ConflictException(
                   'Pricing settings changed. Review checkout again.',
                 );
+              if (input.gateway) {
+                if (
+                  input.plan === 'COD' ||
+                  checkoutPrice.payableNow.lessThanOrEqualTo(0) ||
+                  input.paymentMethodId ||
+                  input.senderInfo ||
+                  input.reference
+                )
+                  throw new BadRequestException(
+                    'Choose either an online gateway or a manual payment method for a prepaid plan',
+                  );
+                const gateway = await tx.paymentGatewayConfig.findUnique({
+                  where: { provider: input.gateway },
+                });
+                if (!gateway || !checkoutGatewayReady(gateway))
+                  throw new BadRequestException(
+                    'The selected online gateway is unavailable',
+                  );
+              }
               if (
                 input.plan !== 'COD' &&
-                checkoutPrice.payableNow.greaterThan(0)
+                checkoutPrice.payableNow.greaterThan(0) &&
+                !input.gateway
               ) {
                 if (!input.paymentMethodId)
                   throw new BadRequestException('Select a payment method');
@@ -741,6 +766,23 @@ export class OrdersService {
               },
               include: { items: true },
             });
+            if (checkoutPrice && storefront?.checkout?.gateway) {
+              await tx.orderPaymentTransaction.create({
+                data: {
+                  orderId: order.id,
+                  type: 'PAYMENT',
+                  status: 'PENDING',
+                  provider: storefront.checkout.gateway,
+                  idempotencyKey: `checkout-gateway:${order.id}`,
+                  amount: checkoutPrice.payableNow,
+                  currency: 'BDT',
+                  metadata: {
+                    checkoutIntent: true,
+                    paymentPlan: storefront.checkout.plan,
+                  },
+                },
+              });
+            }
             if (checkoutPrice && checkoutMethod && submission) {
               await tx.manualOrderPayment.create({
                 data: {

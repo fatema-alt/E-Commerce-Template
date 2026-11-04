@@ -80,10 +80,15 @@ export class ShopCheckoutDto extends OmitType(CreateOrderDto, [
   paymentMethod: 'COD' | 'BANK_TRANSFER' | 'MANUAL' = 'COD';
   @IsIn(['FULL_PAYMENT', 'PARTIAL_ADVANCE', 'COD'])
   paymentOption!: string;
+  @IsOptional() @IsIn(['BKASH', 'SSLCOMMERZ']) paymentGateway?:
+    'BKASH' | 'SSLCOMMERZ';
   @IsOptional() @IsUUID() paymentMethodId?: string;
   @IsOptional() @Trim() @IsString() @Length(3, 120) senderInfo?: string;
   @IsOptional() @Trim() @IsString() @Length(3, 100) reference?: string;
   @IsString() @MaxLength(10000) quoteToken!: string;
+}
+export class GatewayPaymentDto {
+  @IsIn(['BKASH', 'SSLCOMMERZ']) gateway!: 'BKASH' | 'SSLCOMMERZ';
 }
 export class ManualPaymentSubmissionDto {
   @Trim()

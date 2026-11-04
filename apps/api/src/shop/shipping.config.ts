@@ -50,13 +50,13 @@ export const DHAKA_ZONES = new Set([
 ]);
 
 export function getShippingRates(): ShippingRates {
-  const freeAbove = parseFloat(process.env.SHIPPING_FREE_ABOVE ?? '2000');
+  // Free delivery is opt-in; an unset threshold must not waive delivery fees
+  // or remove the delivery-charge-only advance plan on larger orders.
+  const freeAbove = Number(process.env.SHIPPING_FREE_ABOVE ?? '0');
   const insideDhaka = parseFloat(process.env.SHIPPING_INSIDE_DHAKA ?? '80');
-  const outsideDhaka = parseFloat(
-    process.env.SHIPPING_OUTSIDE_DHAKA ?? '150',
-  );
+  const outsideDhaka = parseFloat(process.env.SHIPPING_OUTSIDE_DHAKA ?? '150');
   return {
-    freeAbove: isFinite(freeAbove) && freeAbove >= 0 ? freeAbove : 2000,
+    freeAbove: isFinite(freeAbove) && freeAbove >= 0 ? freeAbove : 0,
     insideDhaka: isFinite(insideDhaka) && insideDhaka >= 0 ? insideDhaka : 80,
     outsideDhaka:
       isFinite(outsideDhaka) && outsideDhaka >= 0 ? outsideDhaka : 150,

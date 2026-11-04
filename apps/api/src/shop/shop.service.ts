@@ -1,4 +1,8 @@
 import { CheckoutPaymentsService } from '../payments/checkout-payments.service.js';
+import {
+  trackingSelect,
+  trackingSnapshot,
+} from '../tracking/tracking.rules.js';
 import { pricePlan, publicPrice, type Plan } from '../payments/plan-pricing.js';
 import {
   BadRequestException,
@@ -481,6 +485,7 @@ export class ShopService {
       paymentMethodId,
       senderInfo,
       reference,
+      paymentGateway,
       ...data
     } = dto;
     const order = await this.orders.create(
@@ -488,9 +493,10 @@ export class ShopService {
         ...data,
         customerId: session.customerId || undefined,
         paymentMethod:
-          paymentPlan === 'COD' || paymentPlan === 'PARTIAL_ADVANCE'
+          paymentGateway ??
+          (paymentPlan === 'COD' || paymentPlan === 'PARTIAL_ADVANCE'
             ? 'COD'
-            : 'MANUAL',
+            : 'MANUAL'),
         paymentOption: paymentPlan,
         onlineDiscount: undefined,
       },
@@ -501,6 +507,7 @@ export class ShopService {
         expectedSubtotal: fresh.subtotal,
         checkout: {
           plan: paymentPlan,
+          gateway: paymentGateway,
           paymentMethodId,
           senderInfo,
           reference,
@@ -569,6 +576,7 @@ export class ShopService {
     const order = await this.db.order.findFirst({
       where: { id, ...(await this.scope(token)) },
       select: {
+        ...trackingSelect,
         id: true,
         orderNumber: true,
         status: true,
@@ -578,6 +586,15 @@ export class ShopService {
         paymentPlan: true,
         couponDiscount: true,
         prepaidDiscount: true,
+        payments: {
+          where: {
+            provider: { in: ['BKASH', 'SSLCOMMERZ'] },
+            metadata: { path: ['checkoutIntent'], equals: true },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { amount: true },
+        },
         manualPayments: {
           orderBy: { createdAt: 'desc' },
           select: {
@@ -636,15 +653,6 @@ export class ShopService {
             postalCode: true,
           },
         },
-        shipments: {
-          select: {
-            provider: true,
-            trackingNumber: true,
-            status: true,
-            shippedAt: true,
-            deliveredAt: true,
-          },
-        },
       },
     });
     if (!order) throw new NotFoundException('Order not found');
@@ -652,6 +660,12 @@ export class ShopService {
     const paidTotal = new Prisma.Decimal(order.paidTotal ?? 0);
     const refundedTotal = new Prisma.Decimal(order.refundedTotal ?? 0);
     const netPaid = paidTotal.minus(refundedTotal);
+    const {
+      payments: gatewayPayments,
+      events: _trackingEvents,
+      ...publicOrder
+    } = order;
+    const gatewayAdvance = gatewayPayments?.[0]?.amount;
     const due =
       order.paymentStatus === 'PAID'
         ? new Prisma.Decimal(0)
@@ -663,27 +677,36 @@ export class ShopService {
         ? await this.manualPayments.details(id)
         : null;
     return {
-      ...order,
-      amountDueOnDelivery: order.manualPayments?.length
-        ? order.paymentPlan === 'COD'
-          ? due.toFixed(2)
-          : Prisma.Decimal.min(
-              due,
-              order.manualPayments[0]?.amountDueOnDelivery ?? 0,
-            ).toFixed(2)
-        : order.paymentOption === 'OPTION_A'
-          ? Prisma.Decimal.max(
-              0,
-              grandTotal.minus(
-                Prisma.Decimal.max(
-                  paidTotal,
-                  new Prisma.Decimal(order.shippingTotal ?? 0),
-                ),
-              ),
-            ).toFixed(2)
-          : usesManualTransfer(order)
+      ...publicOrder,
+      tracking: trackingSnapshot(order),
+      amountDueOnDelivery:
+        order.paymentPlan && gatewayAdvance != null
+          ? order.paymentPlan === 'FULL_PAYMENT'
             ? '0.00'
-            : due.toFixed(2),
+            : Prisma.Decimal.max(
+                0,
+                grandTotal.minus(Prisma.Decimal.max(netPaid, gatewayAdvance)),
+              ).toFixed(2)
+          : order.manualPayments?.length
+            ? order.paymentPlan === 'COD'
+              ? due.toFixed(2)
+              : Prisma.Decimal.min(
+                  due,
+                  order.manualPayments[0]?.amountDueOnDelivery ?? 0,
+                ).toFixed(2)
+            : order.paymentOption === 'OPTION_A'
+              ? Prisma.Decimal.max(
+                  0,
+                  grandTotal.minus(
+                    Prisma.Decimal.max(
+                      paidTotal,
+                      new Prisma.Decimal(order.shippingTotal ?? 0),
+                    ),
+                  ),
+                ).toFixed(2)
+              : usesManualTransfer(order)
+                ? '0.00'
+                : due.toFixed(2),
       ...(!order.paymentPlan && usesManualTransfer(order) && this.manualPayments
         ? {
             manualPayment: manualDetails

@@ -20,6 +20,7 @@ import {
   UpdatePaymentSettingDto,
 } from './payments.dto.js';
 import type { PaymentProvider } from './payment-provider.interface.js';
+import { checkoutGatewayReady } from './checkout-gateways.js';
 import {
   manualTransfer,
   type ManualTransfer,
@@ -397,6 +398,15 @@ export class PaymentsService implements OnModuleInit {
       }
     }
 
+    if (
+      ['BKASH', 'SSLCOMMERZ'].includes(provider) &&
+      (dto.isEnabled ?? existing?.isEnabled) &&
+      !checkoutGatewayReady({ provider, isEnabled: true, config: mergedConfig })
+    )
+      throw new BadRequestException(
+        'Complete the gateway API credentials before enabling checkout payments',
+      );
+
     const updated = await this.db.paymentGatewayConfig.upsert({
       where: { provider },
       create: {
@@ -415,7 +425,12 @@ export class PaymentsService implements OnModuleInit {
     });
 
     await this.syncAdaptersWithDatabase();
-    return updated;
+    return {
+      provider: updated.provider,
+      isEnabled: updated.isEnabled,
+      isSandbox: updated.isSandbox,
+      updatedAt: updated.updatedAt,
+    };
   }
 
   async testGateway(provider: string, dto: TestGatewayDto) {
@@ -483,7 +498,45 @@ export class PaymentsService implements OnModuleInit {
     method: OnlinePaymentMethod,
     origin?: string,
     requestedOption?: string,
+    authorizedCheckout = false,
   ) {
+    if (authorizedCheckout) {
+      // Serialize retries across API instances and commit the provider reference
+      // before a callback can credit this order.
+      return this.db.$transaction(
+        async (tx) => {
+          await tx.$executeRaw`SELECT 1 FROM "orders" WHERE "id" = ${orderId} FOR UPDATE`;
+          return this.initiatePayment(
+            orderId,
+            method,
+            origin,
+            requestedOption,
+            true,
+            tx,
+          );
+        },
+        { timeout: 45000 },
+      );
+    }
+    return this.initiatePayment(
+      orderId,
+      method,
+      origin,
+      requestedOption,
+      false,
+      this.db,
+    );
+  }
+
+  private async initiatePayment(
+    orderId: string,
+    method: OnlinePaymentMethod,
+    origin: string | undefined,
+    requestedOption: string | undefined,
+    authorizedCheckout: boolean,
+    db: Prisma.TransactionClient,
+  ) {
+    await this.syncAdaptersWithDatabase();
     const adapter = this.adapters.get(method);
     if (!adapter || !adapter.isEnabled()) {
       throw new BadRequestException(
@@ -491,7 +544,7 @@ export class PaymentsService implements OnModuleInit {
       );
     }
 
-    const order = await this.db.order.findUnique({
+    const order = await db.order.findUnique({
       where: { id: orderId },
       include: {
         payments: true,
@@ -502,15 +555,48 @@ export class PaymentsService implements OnModuleInit {
       throw new NotFoundException('Order not found');
     }
 
-    if (order.paymentPlan)
-      throw new BadRequestException(
-        'Online gateways are disabled for this checkout',
-      );
+    const checkoutIntent = order.paymentPlan
+      ? order.payments.find(
+          (payment) =>
+            payment.provider === method &&
+            (payment.metadata as { checkoutIntent?: boolean } | null)
+              ?.checkoutIntent,
+        )
+      : undefined;
+    if (order.paymentPlan) {
+      if (!authorizedCheckout)
+        throw new UnauthorizedException(
+          'Use the authenticated storefront payment endpoint',
+        );
+      const gateway = await db.paymentGatewayConfig.findUnique({
+        where: { provider: method },
+      });
+      if (
+        !gateway ||
+        !checkoutGatewayReady(gateway) ||
+        !checkoutIntent ||
+        order.paymentMethod !== method ||
+        order.paymentPlan === 'COD' ||
+        (requestedOption && requestedOption !== order.paymentPlan)
+      )
+        throw new BadRequestException(
+          'The selected online gateway is unavailable for this order',
+        );
+      if (
+        order.payments.some(
+          (payment) =>
+            payment.status === 'SUCCEEDED' && payment.provider === method,
+        )
+      )
+        throw new ConflictException(
+          'The online payment for this order has already been received',
+        );
+    }
     if (order.paymentStatus === 'PAID') {
       throw new ConflictException('Order is already paid');
     }
 
-    if (order.status === 'CANCELLED') {
+    if (['CANCELLED', 'RETURNED', 'DELIVERED'].includes(order.status)) {
       throw new ConflictException(
         'Cannot initiate payment for a cancelled order',
       );
@@ -526,7 +612,9 @@ export class PaymentsService implements OnModuleInit {
 
     // Server strictly re-derives payable amount; never trust client amount
     let payableAmount: number;
-    if (paymentOption === 'OPTION_A') {
+    if (checkoutIntent) {
+      payableAmount = Number(checkoutIntent.amount);
+    } else if (paymentOption === 'OPTION_A') {
       payableAmount = Number(order.shippingTotal);
     } else {
       payableAmount = Number(order.grandTotal);
@@ -536,6 +624,29 @@ export class PaymentsService implements OnModuleInit {
       throw new BadRequestException(
         'Invalid payable amount for payment initiation',
       );
+    }
+    if (checkoutIntent) {
+      const outstanding = new Prisma.Decimal(order.grandTotal)
+        .minus(order.paidTotal || 0)
+        .plus(order.refundedTotal || 0);
+      if (outstanding.lessThan(payableAmount))
+        throw new ConflictException(
+          'The order balance has changed. Review your payment status.',
+        );
+      const pending = order.payments.find(
+        (payment) =>
+          payment.provider === method &&
+          payment.status === 'PENDING' &&
+          (payment.metadata as { initiateUrl?: string } | null)?.initiateUrl,
+      );
+      if (pending)
+        return {
+          redirectUrl: (pending.metadata as { initiateUrl: string })
+            .initiateUrl,
+          provider: method,
+          amount: Number(pending.amount),
+          paymentOption,
+        };
     }
 
     const storefrontOrigin =
@@ -565,29 +676,40 @@ export class PaymentsService implements OnModuleInit {
 
     // Record pending transaction with exact payable amount and paymentOption
     const idempotencyKey = `pay:${method}:${order.id}:${randomUUID().slice(0, 16)}`;
-    await this.db.orderPaymentTransaction.create({
-      data: {
-        orderId: order.id,
-        type: 'PAYMENT',
-        status: 'PENDING',
-        provider: method,
-        providerReference:
-          result.transactionReference || result.providerSessionId,
-        idempotencyKey,
-        amount: new Prisma.Decimal(payableAmount),
-        currency: order.currency,
-        metadata: {
-          ...result.metadata,
-          paymentOption,
-          payableAmount,
-          initiateUrl: result.redirectUrl,
-          storefrontOrigin,
-        },
+    const transactionData = {
+      orderId: order.id,
+      type: 'PAYMENT' as const,
+      status: 'PENDING' as const,
+      provider: method,
+      providerReference:
+        result.transactionReference || result.providerSessionId,
+      idempotencyKey,
+      amount: new Prisma.Decimal(payableAmount),
+      currency: order.currency,
+      metadata: {
+        ...(checkoutIntent
+          ? { checkoutIntent: true, paymentPlan: order.paymentPlan }
+          : {}),
+        ...result.metadata,
+        paymentOption,
+        payableAmount,
+        initiateUrl: result.redirectUrl,
+        storefrontOrigin,
       },
-    });
+    };
+    if (
+      checkoutIntent &&
+      checkoutIntent.status === 'PENDING' &&
+      !checkoutIntent.providerReference
+    )
+      await db.orderPaymentTransaction.update({
+        where: { id: checkoutIntent.id },
+        data: transactionData,
+      });
+    else await db.orderPaymentTransaction.create({ data: transactionData });
 
     if (requestedOption && order.paymentOption !== requestedOption) {
-      await this.db.order.update({
+      await db.order.update({
         where: { id: order.id },
         data: { paymentOption: requestedOption, paymentMethod: method },
       });
@@ -880,13 +1002,25 @@ export class PaymentsService implements OnModuleInit {
         where: {
           orderId: order.id,
           provider: providerName,
-          OR: [
-            ...(txnRef ? [{ providerReference: String(txnRef) }] : []),
-            { status: 'PENDING' },
-          ],
+          OR: currentOrder.paymentPlan
+            ? [{ providerReference: String(txnRef || '') }]
+            : [
+                ...(txnRef ? [{ providerReference: String(txnRef) }] : []),
+                { status: 'PENDING' },
+              ],
         },
         orderBy: { createdAt: 'desc' },
       });
+      if (
+        currentOrder.paymentPlan &&
+        (!targetTxn ||
+          !targetTxn.providerReference ||
+          !(targetTxn.metadata as { checkoutIntent?: boolean } | null)
+            ?.checkoutIntent)
+      )
+        throw new BadRequestException(
+          'No matching checkout gateway payment was found',
+        );
 
       // Idempotency: if THIS transaction already succeeded, return early without crediting again
       if (targetTxn && targetTxn.status === 'SUCCEEDED') {
@@ -894,6 +1028,15 @@ export class PaymentsService implements OnModuleInit {
           redirectUrl: `${storefrontOrigin}/orders/${order.id}?payment=success`,
         };
       }
+      if (
+        currentOrder.paymentPlan &&
+        new Prisma.Decimal(currentOrder.paidTotal).greaterThanOrEqualTo(
+          targetTxn!.amount,
+        )
+      )
+        return {
+          redirectUrl: `${storefrontOrigin}/orders/${order.id}?payment=success`,
+        };
 
       if (!verification.success) {
         this.logger.error(
@@ -1021,6 +1164,9 @@ export class PaymentsService implements OnModuleInit {
         where: { id: order.id },
         data: {
           paymentStatus: nextPaymentStatus,
+          ...(currentOrder.paymentPlan === 'PARTIAL_ADVANCE'
+            ? { paymentMethod: 'COD' as const }
+            : {}),
           status:
             updatedOrder.status === 'PENDING'
               ? 'CONFIRMED'
@@ -1100,23 +1246,44 @@ export class PaymentsService implements OnModuleInit {
         where: { id: order.id },
       });
 
-      const ipnRef = verification.bankTrxId || valId;
+      const ipnRef = currentOrder.paymentPlan
+        ? verification.transactionReference
+        : verification.bankTrxId || valId;
       const existingTxn = await tx.orderPaymentTransaction.findFirst({
         where: {
           orderId: order.id,
           provider: providerName,
-          OR: [
-            ...(ipnRef ? [{ providerReference: String(ipnRef) }] : []),
-            { status: 'PENDING' },
-          ],
+          OR: currentOrder.paymentPlan
+            ? [{ providerReference: String(ipnRef || '') }]
+            : [
+                ...(ipnRef ? [{ providerReference: String(ipnRef) }] : []),
+                { status: 'PENDING' },
+              ],
         },
         orderBy: { createdAt: 'desc' },
       });
+      if (
+        currentOrder.paymentPlan &&
+        (!existingTxn ||
+          !existingTxn.providerReference ||
+          !(existingTxn.metadata as { checkoutIntent?: boolean } | null)
+            ?.checkoutIntent)
+      )
+        throw new BadRequestException(
+          'No matching checkout gateway payment was found',
+        );
 
       // Idempotency: if this transaction already succeeded, return immediately without double crediting
       if (existingTxn && existingTxn.status === 'SUCCEEDED') {
         return;
       }
+      if (
+        currentOrder.paymentPlan &&
+        new Prisma.Decimal(currentOrder.paidTotal).greaterThanOrEqualTo(
+          existingTxn!.amount,
+        )
+      )
+        return;
 
       const verifiedAmount = new Prisma.Decimal(verification.amount);
       const expectedAmount = existingTxn
@@ -1214,6 +1381,9 @@ export class PaymentsService implements OnModuleInit {
         where: { id: order.id },
         data: {
           paymentStatus: nextPaymentStatus,
+          ...(currentOrder.paymentPlan === 'PARTIAL_ADVANCE'
+            ? { paymentMethod: 'COD' as const }
+            : {}),
           status:
             updatedOrder.status === 'PENDING'
               ? 'CONFIRMED'

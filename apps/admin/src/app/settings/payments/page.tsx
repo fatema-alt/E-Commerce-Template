@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import ProductRichEditor from "@/components/catalog/product-rich-editor";
+import ApiGatewaySettings from "@/components/payments/api-gateway-settings";
 
 const base = (
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1"
@@ -78,7 +79,7 @@ async function api(path: string, method = "GET", body?: unknown) {
   return data;
 }
 export default function PaymentSettingsPage() {
-  const [tab, setTab] = useState<"Plans" | "Methods">("Plans");
+  const [tab, setTab] = useState<"Plans" | "Methods" | "API Gateways">("Plans");
   const [settings, setSettings] = useState<Settings>(defaults);
   const [methods, setMethods] = useState<Method[]>([]);
   const [editing, setEditing] = useState<Method | null>(null);
@@ -93,9 +94,28 @@ export default function PaymentSettingsPage() {
     setMethods(data.methods);
   }
   useEffect(() => {
-    load()
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+    let live = true;
+    api("/admin/checkout-payments")
+      .then((data) => {
+        if (!live) return;
+        const values = Object.fromEntries(
+          Object.keys(defaults).map((key) => [
+            key,
+            data.settings[key] ?? defaults[key as keyof Settings],
+          ]),
+        );
+        setSettings({ ...defaults, ...values });
+        setMethods(data.methods);
+      })
+      .catch((e) => {
+        if (live) setError(e.message);
+      })
+      .finally(() => {
+        if (live) setLoading(false);
+      });
+    return () => {
+      live = false;
+    };
   }, []);
   async function act(work: () => Promise<void>) {
     if (busy) return;
@@ -168,8 +188,12 @@ export default function PaymentSettingsPage() {
           Configure payment plans and accounts used at checkout.
         </p>
       </div>
-      <div role="tablist" aria-label="Payment settings" className="flex gap-2">
-        {(["Plans", "Methods"] as const).map((value) => (
+      <div
+        role="tablist"
+        aria-label="Payment settings"
+        className="flex flex-wrap gap-2"
+      >
+        {(["Plans", "Methods", "API Gateways"] as const).map((value) => (
           <button
             key={value}
             role="tab"
@@ -191,7 +215,9 @@ export default function PaymentSettingsPage() {
           {message}
         </p>
       )}
-      {loading ? (
+      {tab === "API Gateways" ? (
+        <ApiGatewaySettings request={api} />
+      ) : loading ? (
         <p>Loading payment settings...</p>
       ) : tab === "Plans" ? (
         <form

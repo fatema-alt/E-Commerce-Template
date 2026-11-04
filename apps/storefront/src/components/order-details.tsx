@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ManualPayment } from "./manual-payment";
+import { OrderTracking } from "./order-tracking";
 import type { ReactNode } from "react";
 import { money, type Order } from "../lib/shop-client";
 import {
@@ -93,34 +94,38 @@ export function OrderDetails({
             }
             order={order}
           />
-          <SectionCard title="Order Progress">
-            <ol className="order-timeline">
-              {events.map((event, i) => (
-                <li key={`${event.label}:${event.date}:${i}`}>
-                  <span className="timeline-dot" aria-hidden="true" />
-                  <div>
-                    <strong>{event.label}</strong>
-                    <time dateTime={event.date}>
-                      {new Date(event.date).toLocaleString("en-BD", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })}
-                    </time>
-                  </div>
-                </li>
-              ))}
-            </ol>
-            <p className="muted small">
-              Current status: {statusLabel(order.status)}.{" "}
-              {order.status === "CANCELLED"
-                ? "This order has been cancelled."
-                : order.status.startsWith("RETURN")
-                  ? "Contact support for help with your return."
-                  : events.length === 1
-                    ? "Further tracking updates will appear when the store provides them."
-                    : "Only recorded shipment updates are shown."}
-            </p>
-          </SectionCard>
+          {order.tracking ? (
+            <OrderTracking tracking={order.tracking} />
+          ) : (
+            <SectionCard title="Order Progress">
+              <ol className="order-timeline">
+                {events.map((event, i) => (
+                  <li key={`${event.label}:${event.date}:${i}`}>
+                    <span className="timeline-dot" aria-hidden="true" />
+                    <div>
+                      <strong>{event.label}</strong>
+                      <time dateTime={event.date}>
+                        {new Date(event.date).toLocaleString("en-BD", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}
+                      </time>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <p className="muted small">
+                Current status: {statusLabel(order.status)}.{" "}
+                {order.status === "CANCELLED"
+                  ? "This order has been cancelled."
+                  : order.status.startsWith("RETURN")
+                    ? "Contact support for help with your return."
+                    : events.length === 1
+                      ? "Further tracking updates will appear when the store provides them."
+                      : "Only recorded shipment updates are shown."}
+              </p>
+            </SectionCard>
+          )}
           <SectionCard title="Items Ordered">
             <div className="ordered-products">
               {order.items.map((item, i) => (
@@ -230,34 +235,36 @@ export function OrderDetails({
             </dl>
             {paymentAction}
           </SectionCard>
-          <SectionCard title="Shipment Tracking">
-            {order.shipments.length ? (
-              order.shipments.map((shipment, i) => (
-                <dl className="shipment-details" key={i}>
-                  <div>
-                    <dt>Courier</dt>
-                    <dd>{shipment.provider || "Not assigned"}</dd>
-                  </div>
-                  <div>
-                    <dt>Shipment status</dt>
-                    <dd>{statusLabel(shipment.status)}</dd>
-                  </div>
-                  <div>
-                    <dt>Tracking number</dt>
-                    <dd>{shipment.trackingNumber || "Not available yet"}</dd>
-                  </div>
-                </dl>
-              ))
-            ) : (
-              <p className="muted">
-                {preparing
-                  ? "Your order is being prepared. Tracking information will appear when it becomes available."
-                  : order.status === "CANCELLED"
-                    ? "This order is cancelled."
-                    : "No shipment tracking information is available. Contact support for an update."}
-              </p>
-            )}
-          </SectionCard>
+          {!order.tracking && (
+            <SectionCard title="Shipment Tracking">
+              {order.shipments.length ? (
+                order.shipments.map((shipment, i) => (
+                  <dl className="shipment-details" key={i}>
+                    <div>
+                      <dt>Courier</dt>
+                      <dd>{shipment.provider || "Not assigned"}</dd>
+                    </div>
+                    <div>
+                      <dt>Shipment status</dt>
+                      <dd>{statusLabel(shipment.status)}</dd>
+                    </div>
+                    <div>
+                      <dt>Tracking number</dt>
+                      <dd>{shipment.trackingNumber || "Not available yet"}</dd>
+                    </div>
+                  </dl>
+                ))
+              ) : (
+                <p className="muted">
+                  {preparing
+                    ? "Your order is being prepared. Tracking information will appear when it becomes available."
+                    : order.status === "CANCELLED"
+                      ? "This order is cancelled."
+                      : "No shipment tracking information is available. Contact support for an update."}
+                </p>
+              )}
+            </SectionCard>
+          )}
           <SectionCard title="Need Help With This Order?">
             <p className="muted small">
               Our team can help with payment, delivery and order questions.

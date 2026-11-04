@@ -4,7 +4,8 @@ import type { Value } from "./cms-api";
 export const engagementDefaults: Record<string, Record<string, Value>> = {
   announcementRibbon: {
     enabled: false,
-    animation: "fade",
+    animation: "marquee",
+    scrollSpeed: 60,
     intervalSeconds: 6,
     backgroundColor: "#101917",
     textColor: "#ffffff",
@@ -68,6 +69,7 @@ export function EngagementPreview({
       scope !== "announcementRibbon" ||
       paused ||
       data.animation === "static" ||
+      data.animation === "marquee" ||
       rows.length < 2
     )
       return;
@@ -125,39 +127,84 @@ export function EngagementPreview({
               fontSize: 13,
             }}
           >
-            <span>
-              {item
-                ? `${item.icon || ""} ${item.text}`
-                : "Add an enabled announcement to preview it."}
-            </span>
-            {item?.ctaLabel && (
-              <span
-                style={{
-                  color: String(data.accentColor || "#d8f45a"),
-                  marginLeft: 12,
-                }}
-              >
-                {String(item.ctaLabel)} ↗
-              </span>
-            )}
-            {rows.length > 1 && (
-              <div className="mt-2 flex justify-center gap-2">
-                {rows.map((row, i) => (
-                  <button
-                    type="button"
-                    key={String(row.id)}
-                    aria-label={`Preview announcement ${i + 1}`}
-                    onClick={() => setIndex(i)}
-                    style={{
-                      padding: 0,
-                      width: i === index % rows.length ? 18 : 6,
-                      height: 6,
-                      borderRadius: 8,
-                      background: String(data.accentColor || "#d8f45a"),
-                    }}
-                  />
-                ))}
+            {data.animation === "marquee" && rows.length ? (
+              <div className="announcement-preview-viewport">
+                <div
+                  className="announcement-preview-track"
+                  style={{
+                    animationPlayState: paused ? "paused" : "running",
+                    animationDuration: `${(mobile ? 650 : 1200) / Math.max(20, Number(data.scrollSpeed) || 60)}s`,
+                  }}
+                >
+                  {[0, 1].map((copy) => (
+                    <div
+                      className="announcement-preview-group"
+                      aria-hidden={copy === 1 ? true : undefined}
+                      key={copy}
+                      style={{ minWidth: mobile ? 320 : 640 }}
+                    >
+                      {rows.map((row) => (
+                        <span key={String(row.id)}>
+                          {String(row.icon || "")} {String(row.text)}
+                          {row.ctaLabel && (
+                            <strong
+                              style={{
+                                color: String(data.accentColor || "#d8f45a"),
+                                marginLeft: 12,
+                              }}
+                            >
+                              {String(row.ctaLabel)} ↗
+                            </strong>
+                          )}
+                          <span
+                            aria-hidden="true"
+                            style={{ paddingInline: 24 }}
+                          >
+                            ✦
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  ))}
+                </div>
               </div>
+            ) : (
+              <>
+                <span>
+                  {item
+                    ? `${item.icon || ""} ${item.text}`
+                    : "Add an enabled announcement to preview it."}
+                </span>
+                {item?.ctaLabel && (
+                  <span
+                    style={{
+                      color: String(data.accentColor || "#d8f45a"),
+                      marginLeft: 12,
+                    }}
+                  >
+                    {String(item.ctaLabel)} ↗
+                  </span>
+                )}
+                {rows.length > 1 && (
+                  <div className="mt-2 flex justify-center gap-2">
+                    {rows.map((row, i) => (
+                      <button
+                        type="button"
+                        key={String(row.id)}
+                        aria-label={`Preview announcement ${i + 1}`}
+                        onClick={() => setIndex(i)}
+                        style={{
+                          padding: 0,
+                          width: i === index % rows.length ? 18 : 6,
+                          height: 6,
+                          borderRadius: 8,
+                          background: String(data.accentColor || "#d8f45a"),
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         ) : (

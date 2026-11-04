@@ -216,3 +216,9 @@ html[data-theme=dark] .product-gallery-tile>img{background:#0B1020}
 
 .payment-instruction-editor .product-rich-content{height:200px;min-height:200px;overflow-y:auto}
 .payment-instruction-editor .product-rich-loading{min-height:200px}
+
+.announcement-preview-viewport { overflow: hidden; }
+.announcement-preview-track { display: flex; width: max-content; animation: announcement-preview-scroll 20s linear infinite; }
+.announcement-preview-group { display: flex; align-items: center; justify-content: space-around; flex: 0 0 auto; white-space: nowrap; gap: 24px; }
+@keyframes announcement-preview-scroll { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .announcement-preview-track { animation: none; width: 100%; } .announcement-preview-group { flex-wrap: wrap; white-space: normal; min-width: 0 !important; } .announcement-preview-group[aria-hidden] { display: none; } }

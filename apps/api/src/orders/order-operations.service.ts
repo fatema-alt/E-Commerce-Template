@@ -201,6 +201,15 @@ export class OrderOperationsService extends OrdersService {
       async (tx, order) => {
         if (
           dto.status === 'CONFIRMED' &&
+          order.paymentPlan &&
+          ['BKASH', 'SSLCOMMERZ'].includes(order.paymentMethod) &&
+          order.paymentStatus !== 'PAID'
+        )
+          throw new ConflictException(
+            'Complete the online payment before confirming the order',
+          );
+        if (
+          dto.status === 'CONFIRMED' &&
           order.manualPayments?.length &&
           order.manualPayments[0].status !== 'confirmed'
         )
@@ -442,6 +451,14 @@ export class OrderOperationsService extends OrdersService {
       async (tx, order) => {
         if (!['CONFIRMED', 'PROCESSING'].includes(order.status))
           throw new ConflictException('Order must be confirmed or processing');
+        if (
+          order.paymentPlan &&
+          ['BKASH', 'SSLCOMMERZ'].includes(order.paymentMethod) &&
+          order.paymentStatus !== 'PAID'
+        )
+          throw new ConflictException(
+            'Complete the online payment before booking shipment',
+          );
         if (
           order.manualPayments?.length &&
           order.manualPayments[0].status !== 'confirmed'
