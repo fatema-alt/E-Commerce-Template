@@ -148,6 +148,30 @@ describe('Storefront order access and checkout boundaries', () => {
     ).rejects.toThrow('cart changed or quote expired');
     expect(orders.create).not.toHaveBeenCalled();
   });
+  it('rejects a delivery-area change after the quote was signed', async () => {
+    const { service, orders, dto } = fixture();
+    dto.quoteToken = signed({ deliveryArea: 'inside_dhaka' });
+    dto.deliveryArea = 'outside_dhaka';
+    await expect(
+      service.checkout(dto, token, 'checkout-key-123456'),
+    ).rejects.toThrow('changed');
+    expect(orders.create).not.toHaveBeenCalled();
+  });
+
+  it('binds the chosen delivery area to quote revalidation and transactional pricing', async () => {
+    const { service, orders, dto } = fixture();
+    dto.deliveryArea = 'outside_dhaka';
+    dto.quoteToken = signed({ deliveryArea: 'outside_dhaka' });
+    await service.checkout(dto, token, 'checkout-key-123456');
+    expect(service.quote).toHaveBeenCalledWith(
+      expect.objectContaining({ deliveryArea: 'outside_dhaka' }),
+      session.id,
+    );
+    expect(orders.create.mock.calls[0][3].checkout.deliveryArea).toBe(
+      'outside_dhaka',
+    );
+  });
+
   it('rejects tampered quote signatures', async () => {
     const { service, orders, dto } = fixture();
     dto.quoteToken += '00';

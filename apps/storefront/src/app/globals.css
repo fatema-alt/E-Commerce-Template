@@ -1381,3 +1381,8 @@ body:has(.cart-drawer[open]) { overflow:hidden; }
 
 .order-success .success-facts > div { display:block; }
 .order-success .success-facts dd { text-align:left; }
+
+/* Keep checkout controls aligned when one field has helper text. */
+.checkout-form .form-grid { align-items:start; }
+.checkout-form .form-grid > label { align-content:start; }
+.checkout-form .form-grid :is(input,select) { height:48px; min-height:48px; margin:0; width:100%; border-radius:10px; }

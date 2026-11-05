@@ -322,7 +322,7 @@ export class ShopService {
         : 'COD'
     ) as Plan;
     const delivery = (base: Prisma.Decimal) =>
-      calcShipping(base.toNumber(), dto.city, dto.district);
+      calcShipping(base.toNumber(), dto.city, dto.district, dto.deliveryArea);
     const price = pricePlan(subtotal, selectedPlan, settings, delivery, coupon);
     const plans = (['FULL_PAYMENT', 'PARTIAL_ADVANCE', 'COD'] as Plan[]).map(
       (plan) =>
@@ -353,6 +353,7 @@ export class ShopService {
         amountDueOnDelivery: amountDueOnDelivery.toFixed(2),
         city: dto.city,
         district: dto.district,
+        deliveryArea: dto.deliveryArea,
         couponCode: appliedCoupon?.code,
         paymentOption: dto.paymentOption,
         expires: Date.now() + 10 * 60000,
@@ -434,6 +435,7 @@ export class ShopService {
       district?: string;
       couponCode?: string;
       paymentOption?: string;
+      deliveryArea?: 'inside_dhaka' | 'outside_dhaka';
       expires: number;
     };
     try {
@@ -455,6 +457,7 @@ export class ShopService {
       throw new BadRequestException('Select an available payment plan');
     if (
       quote.paymentOption !== paymentPlan ||
+      quote.deliveryArea !== dto.deliveryArea ||
       (quote.couponCode || '') !== (dto.couponCode || '').trim().toUpperCase()
     )
       throw new ConflictException(
@@ -467,6 +470,7 @@ export class ShopService {
         paymentOption: paymentPlan,
         city: dto.shippingAddress.city,
         district: dto.shippingAddress.district,
+        deliveryArea: dto.deliveryArea,
       },
       session.id,
     );
@@ -482,6 +486,7 @@ export class ShopService {
       );
     const {
       quoteToken: _quote,
+      deliveryArea,
       paymentMethodId,
       senderInfo,
       reference,
@@ -507,6 +512,7 @@ export class ShopService {
         expectedSubtotal: fresh.subtotal,
         checkout: {
           plan: paymentPlan,
+          deliveryArea,
           gateway: paymentGateway,
           paymentMethodId,
           senderInfo,

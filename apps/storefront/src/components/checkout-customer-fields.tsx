@@ -7,11 +7,15 @@ export function CheckoutCustomerFields({
   user,
   onCityChange,
   onDistrictChange,
+  deliveryArea,
+  onDeliveryAreaChange,
 }: {
   payment: boolean;
   user: Shopper | null;
   onCityChange: (value: string) => void;
   onDistrictChange: (value: string) => void;
+  deliveryArea: "inside_dhaka" | "outside_dhaka" | "";
+  onDeliveryAreaChange: (value: "inside_dhaka" | "outside_dhaka" | "") => void;
 }) {
   return (
     <div hidden={payment} className="shopping-stack">
@@ -64,6 +68,23 @@ export function CheckoutCustomerFields({
       </SectionCard>
       <SectionCard title="Delivery Address">
         <div className="form-grid">
+          <label className="full-field">
+            Delivery area
+            <select
+              name="deliveryArea"
+              required
+              value={deliveryArea}
+              onChange={(event) =>
+                onDeliveryAreaChange(event.target.value as typeof deliveryArea)
+              }
+            >
+              <option value="" disabled>
+                Select your delivery area
+              </option>
+              <option value="inside_dhaka">Inside Dhaka</option>
+              <option value="outside_dhaka">Outside Dhaka</option>
+            </select>
+          </label>
           <label className="full-field">
             Full address
             <input

@@ -30,6 +30,8 @@ export class RegisterShopperDto extends LoginShopperDto {
   @Trim() @IsString() @Length(2, 120) name!: string;
 }
 export class QuoteDto {
+  @IsOptional() @IsIn(['inside_dhaka', 'outside_dhaka']) deliveryArea?:
+    'inside_dhaka' | 'outside_dhaka';
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(100)
@@ -75,6 +77,8 @@ export class ShopCheckoutDto extends OmitType(CreateOrderDto, [
   'shippingTotal',
   'onlineDiscount',
 ] as const) {
+  @IsOptional() @IsIn(['inside_dhaka', 'outside_dhaka']) deliveryArea?:
+    'inside_dhaka' | 'outside_dhaka';
   @IsOptional()
   @IsIn(['COD', 'BANK_TRANSFER', 'MANUAL'])
   paymentMethod: 'COD' | 'BANK_TRANSFER' | 'MANUAL' = 'COD';

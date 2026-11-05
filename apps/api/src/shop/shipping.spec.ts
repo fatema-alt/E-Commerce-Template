@@ -46,6 +46,17 @@ describe('Bangladesh Shipping Calculation Rules', () => {
     expect(calcShipping(500, '', '')).toBe(150);
   });
 
+  it('uses an explicitly chosen delivery area instead of inferring it from address text', () => {
+    expect(calcShipping(500, 'Dhaka', 'Dhaka', 'outside_dhaka')).toBe(150);
+    expect(calcShipping(500, undefined, undefined, 'inside_dhaka')).toBe(80);
+  });
+
+  it('preserves configured free delivery for either explicit area', () => {
+    vi.stubEnv('SHIPPING_FREE_ABOVE', '2000');
+    expect(calcShipping(2000, 'Dhaka', 'Dhaka', 'outside_dhaka')).toBe(0);
+    expect(calcShipping(2000, undefined, undefined, 'inside_dhaka')).toBe(0);
+  });
+
   it('grants free delivery (0 BDT) when order subtotal meets or exceeds threshold', () => {
     vi.stubEnv('SHIPPING_FREE_ABOVE', '2000');
     expect(calcShipping(2000, 'Chittagong')).toBe(0);

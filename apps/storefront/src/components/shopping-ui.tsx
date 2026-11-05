@@ -84,6 +84,8 @@ export function PriceSummary({
   coupon,
   onlinePaymentDiscount,
   couponDiscount,
+  shippingPending = false,
+  totalLabel,
 }: {
   subtotal: string;
   shipping: string;
@@ -93,6 +95,8 @@ export function PriceSummary({
   coupon?: string;
   onlinePaymentDiscount?: string;
   couponDiscount?: string;
+  shippingPending?: boolean;
+  totalLabel?: string;
 }) {
   return (
     <dl className="summary-details">
@@ -114,15 +118,23 @@ export function PriceSummary({
       )}
       <div>
         <dt>Delivery</dt>
-        <dd>{Number(shipping) === 0 ? "Free" : money(shipping)}</dd>
+        <dd>
+          {shippingPending
+            ? "Select delivery area"
+            : Number(shipping) === 0
+              ? "Free"
+              : money(shipping)}
+        </dd>
       </div>
       <div>
         <dt>Tax</dt>
         <dd>{money(tax)}</dd>
       </div>
       <div className="summary-total">
-        <dt>Grand total</dt>
-        <dd>{money(total)}</dd>
+        <dt>{totalLabel || "Grand total"}</dt>
+        <dd>
+          {money(shippingPending ? Number(total) - Number(shipping) : total)}
+        </dd>
       </div>
     </dl>
   );

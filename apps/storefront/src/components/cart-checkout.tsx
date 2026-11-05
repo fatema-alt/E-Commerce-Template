@@ -56,13 +56,15 @@ function requestQuote(
   city?: string,
   district?: string,
   paymentOption?: string,
+  deliveryArea?: string,
 ) {
   const cacheKey =
     serialized +
     (couponCode ? `::${couponCode.trim().toUpperCase()}` : "") +
     (city ? `::city:${city.trim().toLowerCase()}` : "") +
     (district ? `::dist:${district.trim().toLowerCase()}` : "") +
-    (paymentOption ? `::opt:${paymentOption}` : "");
+    (paymentOption ? `::opt:${paymentOption}` : "") +
+    (deliveryArea ? `::area:${deliveryArea}` : "");
   let promise = pending.get(cacheKey);
   if (!promise) {
     promise = shopRequest<Quote>("quote", {
@@ -71,6 +73,7 @@ function requestQuote(
       ...(city ? { city: city.trim() } : {}),
       ...(district ? { district: district.trim() } : {}),
       ...(paymentOption ? { paymentOption } : {}),
+      ...(deliveryArea ? { deliveryArea } : {}),
     }).finally(() => pending.delete(cacheKey));
     pending.set(cacheKey, promise);
   }
@@ -132,6 +135,7 @@ export function CartCheckout({
     "address",
     "city",
     "district",
+    "deliveryArea",
     "postalCode",
     "note",
   ];
@@ -167,6 +171,21 @@ export function CartCheckout({
     }
   });
 
+  const [deliveryArea, setDeliveryArea] = useState<
+    "inside_dhaka" | "outside_dhaka" | ""
+  >(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      const draft = JSON.parse(
+        sessionStorage.getItem("ds-checkout-draft") || "{}",
+      );
+      return ["inside_dhaka", "outside_dhaka"].includes(draft.deliveryArea)
+        ? draft.deliveryArea
+        : "";
+    } catch {
+      return "";
+    }
+  });
   const paymentChannels = (payments?.methods || []).filter(
     (method) => method.type === category,
   );
@@ -178,13 +197,15 @@ export function CartCheckout({
         (payments?.methods.length || 0) > 0 ||
         (payments?.gateways?.length || 0) > 0),
   );
-  const availableOptionIds = availablePlans.map((plan) => plan.plan);
-  const paymentOption: CheckoutPaymentOption =
-    selectedOption && availableOptionIds.includes(selectedOption)
-      ? selectedOption
-      : (availableOptionIds[0] ?? "FULL_PAYMENT");
+
+  const paymentOption = selectedOption;
+  const planSelected = availablePlans.some(
+    (plan) => plan.plan === paymentOption,
+  );
   const needsPrepayment =
-    paymentOption !== "COD" && Number(quote?.payableNow || 0) > 0;
+    !!paymentOption &&
+    paymentOption !== "COD" &&
+    Number(quote?.payableNow || 0) > 0;
   const gateways = payments?.gateways || [];
   const gateway =
     gateways.find((method) => method.id === chosenGateway) ||
@@ -205,7 +226,7 @@ export function CartCheckout({
     "::" +
     appliedCoupon +
     (checkout
-      ? `::city:${addrCity.trim()}::dist:${addrDistrict.trim()}::opt:${paymentOption}`
+      ? `::city:${addrCity.trim()}::dist:${addrDistrict.trim()}::opt:${paymentOption}::area:${deliveryArea}`
       : "");
   const validQuote = quote && quotedKey === currentKey;
   const locked = busy || updating || couponBusy;
@@ -242,6 +263,7 @@ export function CartCheckout({
           !draft.address ||
           !draft.city ||
           !draft.district ||
+          !["inside_dhaka", "outside_dhaka"].includes(draft.deliveryArea) ||
           Array.from(
             formRef.current?.querySelectorAll<HTMLInputElement>(
               "[hidden] input",
@@ -295,6 +317,7 @@ export function CartCheckout({
         checkout && addrCity.trim() ? addrCity.trim() : undefined,
         checkout && addrDistrict.trim() ? addrDistrict.trim() : undefined,
         checkout ? paymentOption : undefined,
+        checkout ? deliveryArea : undefined,
       )
         .then((result) => {
           if (live) {
@@ -334,46 +357,8 @@ export function CartCheckout({
     addrCity,
     addrDistrict,
     paymentOption,
+    deliveryArea,
   ]);
-
-  // On the checkout page, re-request a quote whenever the city/district changes
-  // so the shipping fee updates live as the customer fills the address form.
-  useEffect(() => {
-    if (!checkout || serialized === "[]") return;
-    const cityVal = addrCity.trim();
-    const districtVal = addrDistrict.trim();
-    if (!cityVal && !districtVal) return;
-    let live = true;
-    const timer = setTimeout(() => {
-      void requestQuote(
-        serialized,
-        appliedCoupon,
-        cityVal,
-        districtVal,
-        paymentOption,
-      )
-        .then((result) => {
-          if (live) {
-            setQuote(result);
-            setQuotedKey(
-              serialized +
-                "::" +
-                appliedCoupon +
-                `::city:${cityVal}::dist:${districtVal}::opt:${paymentOption}`,
-            );
-            setError("");
-          }
-        })
-        .catch(() => {
-          /* Silently ignore transient address-hint errors. */
-        });
-    }, 600);
-    return () => {
-      live = false;
-      clearTimeout(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addrCity, addrDistrict, checkout, paymentOption]);
 
   useEffect(() => {
     let live = true;
@@ -483,6 +468,7 @@ export function CartCheckout({
         checkout ? addrCity : undefined,
         checkout ? addrDistrict : undefined,
         checkout ? paymentOption : undefined,
+        checkout ? deliveryArea : undefined,
       );
       if (!result.coupon) throw new Error("Coupon code could not be applied.");
       setAppliedCoupon(code);
@@ -492,7 +478,7 @@ export function CartCheckout({
           "::" +
           code +
           (checkout
-            ? `::city:${addrCity.trim()}::dist:${addrDistrict.trim()}::opt:${paymentOption}`
+            ? `::city:${addrCity.trim()}::dist:${addrDistrict.trim()}::opt:${paymentOption}::area:${deliveryArea}`
             : ""),
       );
       try {
@@ -512,6 +498,7 @@ export function CartCheckout({
   async function placeOrder(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!payment) {
+      if (!validQuote || !deliveryArea || locked) return;
       try {
         const data = new FormData(e.currentTarget);
         sessionStorage.setItem(
@@ -540,9 +527,10 @@ export function CartCheckout({
         : "MANUAL";
     if (
       !validQuote ||
+      !deliveryArea ||
       submissionLock.current ||
       mutationLock.current ||
-      !availableOptionIds.includes(paymentOption) ||
+      !planSelected ||
       (needsManualPayment &&
         (!selectedMethodId || !senderInfo.trim() || !reference.trim()))
     )
@@ -562,6 +550,7 @@ export function CartCheckout({
           : { paymentMethodId: selectedMethodId, senderInfo, reference }
         : {}),
       paymentOption,
+      deliveryArea,
       shippingAddress: {
         recipientName: value("name"),
         phone,
@@ -910,6 +899,8 @@ export function CartCheckout({
                   user={user}
                   onCityChange={setAddrCity}
                   onDistrictChange={setAddrDistrict}
+                  deliveryArea={deliveryArea}
+                  onDeliveryAreaChange={setDeliveryArea}
                 />
                 {!payment && (
                   <SectionCard title="Delivery Information">
@@ -953,6 +944,7 @@ export function CartCheckout({
                             <input
                               type="radio"
                               name="paymentPlan"
+                              required
                               value={plan.plan}
                               checked={paymentOption === plan.plan}
                               onChange={() => setPaymentOption(plan.plan)}
@@ -1088,7 +1080,13 @@ export function CartCheckout({
                           {checkoutError}
                         </p>
                       )}
-                      {validQuote && (
+                      {!planSelected && (
+                        <p className="muted small">
+                          Choose a payment plan above to see the amount payable
+                          now and on delivery.
+                        </p>
+                      )}
+                      {validQuote && planSelected && (
                         <div
                           className="confirmation-total-block"
                           style={{ marginBottom: 12 }}
@@ -1115,8 +1113,9 @@ export function CartCheckout({
                         className="primary-button place-order"
                         disabled={
                           !validQuote ||
+                          !deliveryArea ||
                           locked ||
-                          !availableOptionIds.includes(paymentOption) ||
+                          !planSelected ||
                           (needsManualPayment &&
                             (!selectedMethodId ||
                               !senderInfo.trim() ||
@@ -1139,7 +1138,7 @@ export function CartCheckout({
                     <button
                       type="submit"
                       className="primary-button place-order"
-                      disabled={!validQuote || locked}
+                      disabled={!validQuote || !deliveryArea || locked}
                     >
                       Continue to Payment →
                     </button>
@@ -1205,12 +1204,32 @@ export function CartCheckout({
                     discount={quote.discount}
                     couponDiscount={quote.couponDiscount}
                     coupon={quote.coupon?.code}
-                    onlinePaymentDiscount={quote.prepaidDiscount}
+                    onlinePaymentDiscount={
+                      paymentOption ? quote.prepaidDiscount : undefined
+                    }
+                    shippingPending={!deliveryArea}
+                    totalLabel={
+                      !deliveryArea
+                        ? "Subtotal after discounts"
+                        : !paymentOption
+                          ? "Estimated total"
+                          : undefined
+                    }
                   />
                 ) : (
                   <p className="confirmation-total">
                     <span>Product total</span>
                     <strong>{money(quote.subtotal)}</strong>
+                  </p>
+                )}
+                {checkout && (
+                  <p className="muted small">
+                    {!deliveryArea
+                      ? "Select your delivery area to see the delivery charge. "
+                      : ""}
+                    {!paymentOption
+                      ? "Payment-plan discounts are applied after you choose a plan on the payment page."
+                      : ""}
                   </p>
                 )}
                 {checkout && (

@@ -12,7 +12,11 @@ describe('Quoted free-delivery eligibility after discounts', () => {
   });
   afterEach(() => vi.unstubAllEnvs());
 
-  async function quote(subtotal: number, couponDiscount = 0) {
+  async function quote(
+    subtotal: number,
+    couponDiscount = 0,
+    paymentOption?: 'FULL_PAYMENT',
+  ) {
     const db = {
       product: {
         findFirst: vi.fn().mockResolvedValue({
@@ -42,13 +46,18 @@ describe('Quoted free-delivery eligibility after discounts', () => {
     const service = new ShopService(
       db as never,
       {} as never,
-      { settings: vi.fn().mockResolvedValue(defaultPlanSettings) } as never,
+      {
+        settings: vi
+          .fn()
+          .mockResolvedValue({ ...defaultPlanSettings, discountValue: 5 }),
+      } as never,
       promotions as never,
     );
     const result = await service.quote(
       {
         items: [{ productId: 'boundary-product', quantity: 1 }],
         city: 'Dhaka',
+        paymentOption,
         ...(couponDiscount ? { couponCode: 'BOUNDARY' } : {}),
       },
       'boundary-session',
@@ -62,6 +71,15 @@ describe('Quoted free-delivery eligibility after discounts', () => {
     const result = await quote(rates.freeAbove);
     expect(result.shipping).toBe('0.00');
     expect(result.shippingRates).toEqual(rates);
+  });
+
+  it('does not apply a prepaid discount until full payment is explicitly selected', async () => {
+    const neutral = await quote(1000);
+    expect(neutral.prepaidDiscount).toBe('0.00');
+    expect(neutral.discount).toBe('0.00');
+    const prepaid = await quote(1000, 0, 'FULL_PAYMENT');
+    expect(prepaid.prepaidDiscount).toBe('50.00');
+    expect(Number(prepaid.total)).toBeLessThan(Number(neutral.total));
   });
   it.each([1999, 2000, 2500, 5000])(
     'keeps delivery charges and partial advance available for a %s order without a configured promotion',

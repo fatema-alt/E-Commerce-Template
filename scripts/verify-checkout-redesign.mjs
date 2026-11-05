@@ -169,13 +169,13 @@ let created = 0,
   rejected = 0,
   attempts = 0,
   statusUpdates = 0;
-function plans() {
+function plans(shipping = 60) {
   return [
     {
       plan: "FULL_PAYMENT",
       available: true,
-      total: "535.00",
-      payableNow: "535.00",
+      total: (475 + shipping).toFixed(2),
+      payableNow: (475 + shipping).toFixed(2),
       amountDueOnDelivery: "0.00",
       prepaidDiscount: "25.00",
       couponDiscount: "0.00",
@@ -183,8 +183,8 @@ function plans() {
     {
       plan: "PARTIAL_ADVANCE",
       available: true,
-      total: "560.00",
-      payableNow: "60.00",
+      total: (500 + shipping).toFixed(2),
+      payableNow: shipping.toFixed(2),
       amountDueOnDelivery: "500.00",
       prepaidDiscount: "0.00",
       couponDiscount: "0.00",
@@ -192,9 +192,9 @@ function plans() {
     {
       plan: "COD",
       available: settings.codEnabled,
-      total: "560.00",
+      total: (500 + shipping).toFixed(2),
       payableNow: "0.00",
-      amountDueOnDelivery: "560.00",
+      amountDueOnDelivery: (500 + shipping).toFixed(2),
       prepaidDiscount: "0.00",
       couponDiscount: "0.00",
     },
@@ -267,12 +267,14 @@ async function response(path, method, body) {
   if (p === "/shop/payment-methods") return { settings, methods };
   if (p === "/shop/me") return { user: null };
   if (p === "/shop/quote") {
+    const shipping = body.deliveryArea === "outside_dhaka" ? 90 : 60;
     const plan =
-      plans().find((plan) => plan.plan === body.paymentOption) || plans()[0];
+      plans(shipping).find((plan) => plan.plan === body.paymentOption) ||
+      plans(shipping).find((plan) => plan.plan === "COD");
     return {
       ...plan,
       paymentOption: plan.plan,
-      plans: plans(),
+      plans: plans(shipping),
       items: body.items.map((line) => ({
         ...line,
         name: "Fixture item",
@@ -282,11 +284,11 @@ async function response(path, method, body) {
       subtotal: String(
         body.items.reduce((sum, line) => sum + 500 * line.quantity, 0),
       ),
-      shipping: "60.00",
+      shipping: shipping.toFixed(2),
       tax: "0.00",
       discount: plan.prepaidDiscount,
       onlinePaymentDiscount: plan.prepaidDiscount,
-      shippingRates: { insideDhaka: 60, outsideDhaka: 60, freeAbove: null },
+      shippingRates: { insideDhaka: 60, outsideDhaka: 90, freeAbove: null },
       quoteToken: "fixture-only",
     };
   }
@@ -298,6 +300,7 @@ async function response(path, method, body) {
         message: "This transaction reference has already been submitted.",
       };
     assert.equal(body.paymentOption, "FULL_PAYMENT");
+    assert.equal(body.deliveryArea, "inside_dhaka");
     assert.equal(body.senderInfo, "01711111111");
     assert.equal(body.reference, "TX123");
     order.manualPayments = [
@@ -753,11 +756,78 @@ try {
     await evaluate('!!document.querySelector("input[value=FULL_PAYMENT]")'),
     false,
   );
+  await until(
+    '!!document.querySelector(".summary-details")',
+    "neutral checkout quote",
+  );
+  assert.equal(
+    await evaluate('document.querySelector("[name=deliveryArea]").value'),
+    "",
+  );
+  assert.equal(
+    await evaluate(
+      'document.querySelector(".order-summary").innerText.includes("Full Payment discount")',
+    ),
+    false,
+  );
+  assert.equal(
+    await evaluate(
+      'document.querySelector(".order-summary").innerText.includes("Select delivery area")',
+    ),
+    true,
+  );
+  assert.equal(
+    await evaluate(
+      'document.querySelector(".order-summary").innerText.includes("Grand total")',
+    ),
+    false,
+  );
+  assert.equal(
+    await evaluate(
+      'document.querySelector(".checkout-form button[type=submit]").disabled',
+    ),
+    true,
+  );
+  await command("Emulation.setDeviceMetricsOverride", {
+    width: 1366,
+    height: 950,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+  assert(
+    await evaluate(
+      '(() => { const a = document.querySelector("[name=name]").getBoundingClientRect(); const b = document.querySelector("[name=phone]").getBoundingClientRect(); return Math.abs(a.y-b.y)<1 && Math.abs(a.height-b.height)<1; })()',
+    ),
+    "Name and phone inputs must align and have equal heights",
+  );
+  await shot("checkout-unselected", 1366);
   await fill("[name=name]", "Fixture customer");
   await fill("[name=phone]", "01711111111");
   await fill("[name=address]", "Fixture address");
   await fill("[name=city]", "Dhaka");
   await fill("[name=district]", "Dhaka");
+  assert.equal(
+    await evaluate('document.querySelector("[name=deliveryArea]").value'),
+    "",
+    "Typing an address must not select a delivery area",
+  );
+  await evaluate(
+    '(() => { const select = document.querySelector("[name=deliveryArea]"); select.value = "inside_dhaka"; select.dispatchEvent(new Event("change", { bubbles:true })); })()',
+  );
+  await until(
+    'document.querySelector(".summary-details")?.innerText.includes("60.00")',
+    "inside delivery quote",
+  );
+  await evaluate(
+    '(() => { const select = document.querySelector("[name=deliveryArea]"); select.value = "outside_dhaka"; select.dispatchEvent(new Event("change", { bubbles:true })); })()',
+  );
+  await until(
+    'document.querySelector(".summary-details")?.innerText.includes("90.00")',
+    "outside delivery quote overrides typed Dhaka",
+  );
+  await evaluate(
+    '(() => { const select = document.querySelector("[name=deliveryArea]"); select.value = "inside_dhaka"; select.dispatchEvent(new Event("change", { bubbles:true })); })()',
+  );
   await until(
     '!document.querySelector(".checkout-form button[type=submit]")?.disabled',
     "checkout ready",
@@ -774,6 +844,30 @@ try {
     "separate payment page",
   );
   assert.equal(created, 0, "Continuing to payment must not create an order");
+  assert.equal(
+    await evaluate(
+      '!!document.querySelector("input[name=paymentPlan]:checked")',
+    ),
+    false,
+    "No payment plan may be selected by default",
+  );
+  assert.equal(
+    await evaluate('!!document.querySelector(".confirmation-total-block")'),
+    false,
+    "No assumed COD/prepaid breakdown before plan selection",
+  );
+  assert.equal(
+    await evaluate(
+      'document.querySelector(".order-summary").innerText.includes("Full Payment discount")',
+    ),
+    false,
+  );
+  assert.equal(
+    await evaluate(
+      'document.querySelector(".checkout-form button[type=submit]").disabled',
+    ),
+    true,
+  );
   for (const id of ["FULL_PAYMENT", "PARTIAL_ADVANCE", "COD"])
     assert(await evaluate(`!!document.querySelector('input[value=${id}]')`));
   assert.equal(
@@ -794,8 +888,8 @@ try {
   );
   await evaluate('document.querySelector("input[value=FULL_PAYMENT]").click()');
   await until(
-    '!!document.querySelector("[name=senderInfo]")',
-    "prepaid fields",
+    '!!document.querySelector("[name=senderInfo]") && document.querySelector(".order-summary").innerText.includes("Full Payment discount")',
+    "explicit full payment applies discount",
   );
   await click("Bank Transfer");
   await until(
@@ -1032,7 +1126,7 @@ try {
   );
   if (interceptionError) throw interceptionError;
   console.log(
-    "PASS: Cart and checkout flow, payment plans, order image loading, All Orders payment review/reject/approve, resubmission, single status mutation on rapid clicks, refreshed list, compact detail view, gateway returns and invalid-order handling; desktop/mobile overflow checks and screenshots. Fixtures only; no real database or transfers.",
+    "PASS: Explicit delivery/payment selection, neutral previews, field alignment, cart and checkout flow, order image loading, All Orders payment review/reject/approve, resubmission, single status mutation on rapid clicks, refreshed list, compact detail view, gateway returns and invalid-order handling; desktop/mobile overflow checks and screenshots. Fixtures only; no real database or transfers.",
   );
 } catch (error) {
   console.error(error);

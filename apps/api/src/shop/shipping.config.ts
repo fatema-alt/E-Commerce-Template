@@ -3,8 +3,8 @@
  *
  * Rules (evaluated top-to-bottom, first match wins):
  *  1. freeAbove  – if order subtotal (after coupon) >= this value, shipping = 0.
- *  2. Dhaka city zones  (insideDhaka)  → INSIDE rate.
- *  3. All other districts              → OUTSIDE rate.
+ *  2. An explicitly selected delivery area uses its configured rate.
+ *  3. Legacy requests infer the rate from Dhaka city zones or other districts.
  *
  * Admin can override these in .env; no DB migration needed for the MVP.
  * Values are in BDT, stored as plain numbers (converted to Decimal in service).
@@ -75,6 +75,7 @@ export function calcShipping(
   subtotalAfterDiscount: number,
   city?: string,
   district?: string,
+  deliveryArea?: 'inside_dhaka' | 'outside_dhaka',
 ): number {
   const rates = getShippingRates();
 
@@ -82,6 +83,9 @@ export function calcShipping(
   if (rates.freeAbove > 0 && subtotalAfterDiscount >= rates.freeAbove) {
     return 0;
   }
+
+  if (deliveryArea === 'inside_dhaka') return rates.insideDhaka;
+  if (deliveryArea === 'outside_dhaka') return rates.outsideDhaka;
 
   const normalize = (s?: string) => (s ?? '').trim().toLowerCase();
   const loc = normalize(city);

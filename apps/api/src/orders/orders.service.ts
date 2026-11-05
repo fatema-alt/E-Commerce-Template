@@ -281,6 +281,7 @@ export class OrdersService {
       manualAccount?: ManualTransfer;
       checkout?: {
         plan: Plan;
+        deliveryArea?: 'inside_dhaka' | 'outside_dhaka';
         gateway?: CheckoutGateway;
         paymentMethodId?: string;
         senderInfo?: string;
@@ -611,6 +612,7 @@ export class OrdersService {
                     base.toNumber(),
                     dto.shippingAddress.city,
                     dto.shippingAddress.district,
+                    input.deliveryArea,
                   ),
                 pricingCoupon,
               );
