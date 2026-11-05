@@ -36,6 +36,8 @@ export function ShoppingLinks() {
         data-cart-target="true"
         data-cart-icon="true"
         id="header-cart-link"
+        aria-haspopup="dialog"
+        aria-controls="shopping-bag-drawer"
       >
         <svg {...iconProps} className="cart-icon-svg">
           <path d="M5 8h14l-1 12H6L5 8z" />

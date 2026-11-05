@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { BrandLogo } from "./brand-logo";
+import { OrderSuccess } from "./order-success";
 import { OrderDetails } from "./order-details";
 import { GatewayPayment } from "./gateway-payment";
 import { statusLabel } from "./shopping-ui";
@@ -306,7 +307,7 @@ export function Account() {
     </main>
   );
 }
-export function OrderHistory({ id }: { id?: string }) {
+export function OrderHistory({ id, success = false }: { id?: string; success?: boolean }) {
   const searchParams = useSearchParams();
   const paymentQuery = searchParams.get("payment");
 
@@ -472,17 +473,18 @@ export function OrderHistory({ id }: { id?: string }) {
   }, [order, id]);
   return (
     <main id="main" className="container main-content shopping-page">
-      <p>
+      {!success && <p>
         <Link href="/account">Account</Link> /{" "}
         <Link href="/orders">Orders</Link>
-      </p>
-      <h1>{id ? "Order details" : "Your orders"}</h1>
-      <p>
+      </p>}
+      {!success && <h1>{id ? "Order details" : "Your orders"}</h1>}
+      {success && order && order.id === id && <OrderSuccess order={order} />}
+      {!success && <p>
         <Link href="/track">
           Track an order using its order number and phone
         </Link>
-      </p>
-      {(order || items.length > 0) && <LiveTrackingStatus {...liveUpdates} />}
+      </p>}
+      {!success && (order || items.length > 0) && <LiveTrackingStatus {...liveUpdates} />}
       {loading && <p role="status">Loading orders…</p>}
       {error && (
         <div role="alert" className="shop-error">
@@ -515,7 +517,7 @@ export function OrderHistory({ id }: { id?: string }) {
           the store if payment is still due.
         </div>
       )}
-      {order && order.id === id && (
+      {!success && order && order.id === id && (
         <OrderDetails
           order={order}
           paymentAction={

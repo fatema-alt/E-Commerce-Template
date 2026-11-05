@@ -1337,3 +1337,47 @@ input[type=checkbox],input[type=radio]{width:auto;accent-color:var(--c-ink)}
   .ribbon-marquee-item { white-space: normal; flex-shrink: 1; flex-wrap: wrap; }
   .ribbon-marquee-pause { display: none; }
 }
+
+/* Purchasing flow */
+.cart-drawer { position:fixed; inset:0 0 0 auto; margin:0; width:min(100%, 560px); height:100dvh; max-height:100dvh; max-width:100%; padding:0; border:0; background:var(--glass-solid,white); color:var(--c-ink,#202923); box-shadow:-12px 0 48px #12271c26; }
+.cart-drawer::backdrop { background:#10251e80; }
+.cart-drawer[open] { animation:cart-slide-in .24s ease-out; }
+.cart-drawer-content { min-height:100%; }
+.cart-drawer-heading { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--c-line); position:sticky; top:0; z-index:2; background:var(--glass-solid,white); }
+.drawer-shopping.container { width:100%; padding:24px; margin:0; }
+.drawer-shopping .breadcrumbs, .drawer-shopping .shopping-header { display:none; }
+.drawer-shopping .checkout-grid { display:flex; flex-direction:column; gap:16px; }
+.drawer-shopping .cart-items, .drawer-shopping .order-summary { width:100%; padding:16px; position:static; }
+.drawer-shopping .cart-line { grid-template-columns:64px minmax(0,1fr); }
+.drawer-shopping .cart-line > * { min-width:0; }
+.drawer-shopping .order-summary .primary-button { width:100%; }
+body:has(.cart-drawer[open]) { overflow:hidden; }
+.payment-categories { display:flex; flex-wrap:wrap; gap:10px; }
+.payment-categories [aria-pressed=true] { background:var(--lime); color:#172116; }
+.payment-method-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.payment-method-card { position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:12px; padding:18px; border:1px solid var(--c-line); border-radius:14px; cursor:pointer; transition:background .15s,border-color .15s; }
+.payment-method-card input { position:absolute; right:14px; top:14px; width:18px; height:18px; accent-color:var(--lime); }
+.payment-method-card img { object-fit:contain; max-width:calc(100% - 24px); }
+.payment-method-card small { display:block; color:var(--c-muted); margin-top:5px; font-size:.8rem; }
+.payment-method-card:hover,.payment-method-card:focus-within { border-color:var(--c-ink); }
+.payment-method-card.is-selected { border-color:var(--lime); background:color-mix(in srgb,var(--lime) 12%,var(--glass-solid)); box-shadow:0 0 0 1px var(--lime); }
+.payment-brand { min-height:40px; display:flex; align-items:center; padding-right:20px; }
+.checkout-form [hidden] { display:none !important; }
+.order-success { margin-bottom:24px; padding:clamp(20px,4vw,40px); }
+.order-success h1 { font-size:clamp(24px,3vw,36px); max-width:760px; }
+.success-symbol { display:grid; place-items:center; width:60px; height:60px; border-radius:50%; font-size:30px; background:var(--lime); color:#172116; margin-bottom:18px; }
+.success-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; margin:24px 0; }
+.success-facts dt { font-size:.85rem; color:var(--c-muted); margin-bottom:4px; }
+.success-facts dd { margin:0; font-weight:600; overflow-wrap:anywhere; }
+@keyframes cart-slide-in { from { transform:translateX(100%); } to { transform:translateX(0); } }
+@media(max-width:600px) { .payment-method-grid,.success-facts { grid-template-columns:1fr; } .drawer-shopping.container { padding:14px; } .order-success .payment-categories > a { width:100%; text-align:center; } }
+@media(prefers-reduced-motion:reduce) { .cart-drawer[open] { animation:none; } }
+
+.drawer-shopping .cart-row-actions { grid-column:2; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; }
+
+.cart-drawer { transform:translateX(100%); transition:transform .24s ease, display .24s allow-discrete, overlay .24s allow-discrete; }
+.cart-drawer[open] { transform:translateX(0); }
+@media(prefers-reduced-motion:reduce) { .cart-drawer { transition:none; } }
+
+.order-success .success-facts > div { display:block; }
+.order-success .success-facts dd { text-align:left; }

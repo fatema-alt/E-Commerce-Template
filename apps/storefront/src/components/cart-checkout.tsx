@@ -1,5 +1,6 @@
 "use client";
-import { toProductHtml } from "@commerce/product-content";
+import { CheckoutCustomerFields } from "./checkout-customer-fields";
+import { PaymentInstructions } from "./payment-instructions";
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -14,6 +15,7 @@ import {
   type Quote,
   type Shopper,
 } from "../lib/shop-client";
+import { PaymentMethodSelector } from "./payment-method-selector";
 import { SectionCard, PriceSummary, ProductThumbnail } from "./shopping-ui";
 import { shippingSummary } from "../lib/shipping-copy";
 import {
@@ -75,7 +77,15 @@ function requestQuote(
   return promise;
 }
 
-export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
+export function CartCheckout({
+  checkout = false,
+  payment = false,
+  drawer = false,
+}: {
+  checkout?: boolean;
+  payment?: boolean;
+  drawer?: boolean;
+}) {
   const cart = useCart();
   const router = useRouter();
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -101,7 +111,14 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
   const [user, setUser] = useState<Shopper | null>(null);
   const [placed, setPlaced] = useState("");
   const [couponCode, setCouponCode] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState(() => {
+    if (typeof window === "undefined" || !checkout) return "";
+    try {
+      return sessionStorage.getItem("ds-checkout-coupon") || "";
+    } catch {
+      return "";
+    }
+  });
   const [couponError, setCouponError] = useState("");
   const [couponBusy, setCouponBusy] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
@@ -194,7 +211,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
   const locked = busy || updating || couponBusy;
 
   useEffect(() => {
-    if (!checkout) return;
+    if (!checkout || placed || submissionLock.current) return;
     try {
       const draft = JSON.parse(
         sessionStorage.getItem("ds-checkout-draft") || "{}",
@@ -218,10 +235,25 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
         )
           field.value = draft[name];
       }
+      if (
+        payment &&
+        (!draft.name ||
+          !draft.phone ||
+          !draft.address ||
+          !draft.city ||
+          !draft.district ||
+          Array.from(
+            formRef.current?.querySelectorAll<HTMLInputElement>(
+              "[hidden] input",
+            ) || [],
+          ).some((field) => !field.checkValidity()))
+      )
+        router.replace("/checkout");
     } catch {
+      if (payment) router.replace("/checkout");
       /* Storage is optional; the form remains usable. */
     }
-  }, [checkout, cart.lines.length]);
+  }, [checkout, payment, router, cart.lines.length, placed]);
 
   const beginCheckoutFired = useRef(false);
   useEffect(() => {
@@ -445,11 +477,29 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
     setCouponError("");
     try {
       const code = couponCode.trim().toUpperCase();
-      const result = await requestQuote(serialized, code);
+      const result = await requestQuote(
+        serialized,
+        code,
+        checkout ? addrCity : undefined,
+        checkout ? addrDistrict : undefined,
+        checkout ? paymentOption : undefined,
+      );
       if (!result.coupon) throw new Error("Coupon code could not be applied.");
       setAppliedCoupon(code);
       setQuote(result);
-      setQuotedKey(serialized + "::" + code);
+      setQuotedKey(
+        serialized +
+          "::" +
+          code +
+          (checkout
+            ? `::city:${addrCity.trim()}::dist:${addrDistrict.trim()}::opt:${paymentOption}`
+            : ""),
+      );
+      try {
+        sessionStorage.setItem("ds-checkout-coupon", code);
+      } catch {
+        /* Optional storage. */
+      }
       setCouponCode("");
     } catch (e) {
       setCouponError((e as Error).message || "Invalid coupon code.");
@@ -461,6 +511,29 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
 
   async function placeOrder(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!payment) {
+      try {
+        const data = new FormData(e.currentTarget);
+        sessionStorage.setItem(
+          "ds-checkout-draft",
+          JSON.stringify(
+            Object.fromEntries(
+              draftFields.map((name) => [
+                name,
+                String(data.get(name) || "").trim(),
+              ]),
+            ),
+          ),
+        );
+        sessionStorage.setItem("ds-checkout-coupon", appliedCoupon);
+        router.push("/checkout/payment");
+      } catch {
+        setCheckoutError(
+          "Please allow session storage to continue securely to payment.",
+        );
+      }
+      return;
+    }
     const effectivePaymentMethod =
       paymentOption === "COD" || paymentOption === "PARTIAL_ADVANCE"
         ? "COD"
@@ -507,6 +580,29 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
     setBusy(true);
     setCheckoutError("");
     try {
+      const digest = Array.from(
+        new Uint8Array(
+          await crypto.subtle.digest(
+            "SHA-256",
+            new TextEncoder().encode(fingerprint),
+          ),
+        ),
+      )
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
+      try {
+        const previous = JSON.parse(
+          sessionStorage.getItem("ds-checkout-attempt") || "null",
+        );
+        if (previous?.digest === digest && typeof previous.key === "string")
+          attempt.current.key = previous.key;
+        sessionStorage.setItem(
+          "ds-checkout-attempt",
+          JSON.stringify({ digest, key: attempt.current.key }),
+        );
+      } catch {
+        /* In-memory submission locking still applies. */
+      }
       const order = await shopRequest<Order>(
         "orders",
         { ...payload, quoteToken: quote.quoteToken },
@@ -521,6 +617,8 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
       }
       try {
         sessionStorage.removeItem("ds-checkout-draft");
+        sessionStorage.removeItem("ds-checkout-coupon");
+        sessionStorage.removeItem("ds-checkout-attempt");
       } catch {
         /* Optional draft storage. */
       }
@@ -572,7 +670,7 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
         } catch {
           router.push(`/orders/${order.id}?payment=initiate_failed`);
         }
-      } else router.push(`/orders/${order.id}`);
+      } else router.push(`/order-success/${order.id}`);
     } catch (e) {
       setCheckoutError((e as Error).message);
       setReview((v) => v + 1);
@@ -584,13 +682,16 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
 
   if (placed)
     return (
-      <main id="main" className="container main-content shopping-page">
+      <main
+        id={drawer ? undefined : "main"}
+        className={`container main-content shopping-page ${drawer ? "drawer-shopping" : ""}`}
+      >
         <SectionCard title="Thank you for your order">
           <p>
             Your order has been created. Review its payment and delivery status
             below.
           </p>
-          <Link className="primary-button" href={`/orders/${placed}`}>
+          <Link className="primary-button" href={`/order-success/${placed}`}>
             View order confirmation
           </Link>
         </SectionCard>
@@ -598,19 +699,39 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
     );
 
   return (
-    <main id="main" className="container main-content shopping-page">
+    <main
+      id={drawer ? undefined : "main"}
+      className={`container main-content shopping-page ${drawer ? "drawer-shopping" : ""}`}
+    >
       <nav className="breadcrumbs" aria-label="Breadcrumb">
         <Link href="/">Home</Link> / <Link href="/cart">Cart</Link>
         {checkout && " / Checkout"}
+        {payment && " / Payment"}
       </nav>
       <header className="shopping-header">
-        <h1>{checkout ? "Checkout" : "Your cart"}</h1>
+        <h1>
+          {payment
+            ? "Choose Your Payment Method"
+            : checkout
+              ? "Checkout"
+              : "Your cart"}
+        </h1>
         <p className="muted">
           {checkout
             ? "Complete your details and review your order."
             : `${cart.count} ${cart.count === 1 ? "item" : "items"} in your shopping bag`}
         </p>
       </header>
+      {payment && (
+        <p>
+          <Link href="/checkout">← Back to Checkout</Link>
+          <br />
+          <span className="muted small">
+            Payments are verified securely. A transfer reference is reviewed
+            before payment is confirmed.
+          </span>
+        </p>
+      )}
       {notice && (
         <p className="shopping-notice" role="status">
           {notice}
@@ -784,351 +905,251 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
               }}
             >
               <fieldset disabled={locked}>
-                <SectionCard title="Contact Information">
-                  {!user && (
+                <CheckoutCustomerFields
+                  payment={payment}
+                  user={user}
+                  onCityChange={setAddrCity}
+                  onDistrictChange={setAddrDistrict}
+                />
+                {!payment && (
+                  <SectionCard title="Delivery Information">
+                    <p>
+                      {quote?.shippingRates
+                        ? shippingSummary(quote.shippingRates)
+                        : "Delivery is calculated from your address in the order overview."}
+                    </p>
                     <p className="muted small">
-                      Checkout as a guest, or{" "}
-                      <Link href="/account">sign in</Link> to keep orders in
-                      your account.
+                      Review your details before continuing to payment.
                     </p>
-                  )}
-                  <div className="form-grid">
-                    <label>
-                      Full name
-                      <input
-                        name="name"
-                        autoComplete="name"
-                        required
-                        minLength={2}
-                        maxLength={120}
-                        defaultValue={[user?.firstName, user?.lastName]
-                          .filter(Boolean)
-                          .join(" ")}
-                      />
-                    </label>
-                    <label>
-                      Mobile number
-                      <input
-                        name="phone"
-                        type="tel"
-                        autoComplete="tel"
-                        required
-                        pattern="(?:\+?88)?01[3-9][0-9]{8}"
-                        title="Enter a Bangladesh mobile number: 01712345678 or +8801712345678"
-                        maxLength={14}
-                        defaultValue={user?.phone || ""}
-                      />
-                      <small className="muted">For example, 01712345678</small>
-                    </label>
-                    <label className="full-field">
-                      Email address (optional)
-                      <input
-                        name="email"
-                        type="email"
-                        autoComplete="email"
-                        maxLength={254}
-                        defaultValue={user?.email}
-                      />
-                    </label>
-                  </div>
-                </SectionCard>
-                <SectionCard title="Delivery Address">
-                  <div className="form-grid">
-                    <label className="full-field">
-                      Full address
-                      <input
-                        name="address"
-                        autoComplete="street-address"
-                        required
-                        minLength={3}
-                        maxLength={240}
-                      />
-                    </label>
-                    <label>
-                      City
-                      <input
-                        name="city"
-                        autoComplete="address-level2"
-                        required
-                        minLength={2}
-                        maxLength={120}
-                        onChange={(e) => setAddrCity(e.target.value)}
-                      />
-                    </label>
-                    <label>
-                      District (optional)
-                      <input
-                        name="district"
-                        autoComplete="address-level1"
-                        maxLength={120}
-                        onChange={(e) => setAddrDistrict(e.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Postal code (optional)
-                      <input
-                        name="postalCode"
-                        autoComplete="postal-code"
-                        maxLength={20}
-                      />
-                    </label>
-                    <label className="full-field">
-                      Delivery instructions (optional)
-                      <textarea name="note" rows={3} maxLength={2000} />
-                    </label>
-                  </div>
-                </SectionCard>
-                <SectionCard title="Payment plan">
-                  {paymentError && (
-                    <p className="shop-error" role="alert">
-                      {paymentError}
-                    </p>
-                  )}
-                  {!payments && !paymentError && (
-                    <p role="status">Loading payment options...</p>
-                  )}
-                  {payments && !availablePlans.length && (
-                    <p role="alert">
-                      No payment option is available for this order. Please
-                      contact the store.
-                    </p>
-                  )}
-                  <div
-                    className="payment-options"
-                    role="radiogroup"
-                    aria-label="Payment plan"
-                  >
-                    {availablePlans.map((plan) => (
-                      <label
-                        key={plan.plan}
-                        className={`payment-option-card ${paymentOption === plan.plan ? "is-selected" : ""}`}
+                  </SectionCard>
+                )}
+                {payment && (
+                  <>
+                    <SectionCard title="Payment plan">
+                      {paymentError && (
+                        <p className="shop-error" role="alert">
+                          {paymentError}
+                        </p>
+                      )}
+                      {!payments && !paymentError && (
+                        <p role="status">Loading payment options...</p>
+                      )}
+                      {payments && !availablePlans.length && (
+                        <p role="alert">
+                          No payment option is available for this order. Please
+                          contact the store.
+                        </p>
+                      )}
+                      <div
+                        className="payment-options"
+                        role="radiogroup"
+                        aria-label="Payment plan"
                       >
-                        <input
-                          type="radio"
-                          name="paymentPlan"
-                          value={plan.plan}
-                          checked={paymentOption === plan.plan}
-                          onChange={() => setPaymentOption(plan.plan)}
-                        />
+                        {availablePlans.map((plan) => (
+                          <label
+                            key={plan.plan}
+                            className={`payment-option-card ${paymentOption === plan.plan ? "is-selected" : ""}`}
+                          >
+                            <input
+                              type="radio"
+                              name="paymentPlan"
+                              value={plan.plan}
+                              checked={paymentOption === plan.plan}
+                              onChange={() => setPaymentOption(plan.plan)}
+                            />
+                            <span>
+                              <strong>
+                                {plan.plan === "FULL_PAYMENT"
+                                  ? "Full Payment"
+                                  : plan.plan === "PARTIAL_ADVANCE"
+                                    ? "Partial Advance + Cash on Delivery"
+                                    : "Cash on Delivery"}
+                              </strong>
+                              <small>
+                                Pay now {money(plan.payableNow)}
+                                {Number(plan.prepaidDiscount) > 0
+                                  ? `, save ${money(plan.prepaidDiscount)}`
+                                  : ""}{" "}
+                                | Pay on delivery{" "}
+                                {money(plan.amountDueOnDelivery)}
+                              </small>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                      {needsPrepayment && gateways.length > 0 && (
+                        <div
+                          className="shopping-stack"
+                          style={{ marginTop: 16 }}
+                        >
+                          <label>
+                            Payment method
+                            <select
+                              value={gateway?.id || "manual"}
+                              onChange={(event) =>
+                                setChosenGateway(event.target.value)
+                              }
+                            >
+                              {(payments?.methods.length || 0) > 0 && (
+                                <option value="manual">Manual transfer</option>
+                              )}
+                              {gateways.map((method) => (
+                                <option key={method.id} value={method.id}>
+                                  {method.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          {gateway && (
+                            <p>
+                              You will be redirected to {gateway.name} to pay{" "}
+                              {money(quote?.payableNow || 0)} securely after
+                              placing your order.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {needsManualPayment && (
+                        <div
+                          className="shopping-stack"
+                          style={{ marginTop: 16 }}
+                        >
+                          <PaymentMethodSelector
+                            methods={payments?.methods || []}
+                            selectedId={selectedMethodId}
+                            category={category}
+                            onCategoryChange={(value) => {
+                              setCategory(value);
+                              setChosenMethodId("");
+                              setSenderInfo("");
+                              setReference("");
+                            }}
+                            onSelect={(id) => {
+                              setChosenMethodId(id);
+                              setSenderInfo("");
+                              setReference("");
+                            }}
+                          />
+                          {!paymentChannels.length && (
+                            <p>
+                              No methods are available in this category. Choose
+                              another category.
+                            </p>
+                          )}
+                          {selectedMethod && (
+                            <>
+                              <PaymentInstructions
+                                method={selectedMethod}
+                                amount={quote?.payableNow || 0}
+                              />
+                              <label>
+                                {category === "mobile_banking"
+                                  ? "Sender mobile number"
+                                  : "Sender name / account"}
+                                <input
+                                  name="senderInfo"
+                                  required
+                                  value={senderInfo}
+                                  maxLength={120}
+                                  type={
+                                    category === "mobile_banking"
+                                      ? "tel"
+                                      : "text"
+                                  }
+                                  onChange={(e) =>
+                                    setSenderInfo(e.target.value)
+                                  }
+                                />
+                              </label>
+                              <label>
+                                {category === "mobile_banking"
+                                  ? "Transaction ID"
+                                  : "Bank reference"}
+                                <input
+                                  name="reference"
+                                  required
+                                  value={reference}
+                                  minLength={3}
+                                  maxLength={100}
+                                  onChange={(e) => setReference(e.target.value)}
+                                />
+                              </label>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      {quote?.discountMessage && (
+                        <p role="status">{quote.discountMessage}</p>
+                      )}
+                    </SectionCard>
+                    <SectionCard title="Confirm your order">
+                      {checkoutError && (
+                        <p className="shop-error" role="alert">
+                          {checkoutError}
+                        </p>
+                      )}
+                      {validQuote && (
+                        <div
+                          className="confirmation-total-block"
+                          style={{ marginBottom: 12 }}
+                        >
+                          <p className="confirmation-total">
+                            <span>Pay now</span>
+                            <strong>{money(quote.payableNow || 0)}</strong>
+                          </p>
+                          <p>
+                            Pay on delivery:{" "}
+                            {money(quote.amountDueOnDelivery || 0)}
+                          </p>
+                        </div>
+                      )}
+                      <label className="consent-row">
+                        <input type="checkbox" required />{" "}
                         <span>
-                          <strong>
-                            {plan.plan === "FULL_PAYMENT"
-                              ? "Full Payment"
-                              : plan.plan === "PARTIAL_ADVANCE"
-                                ? "Partial Advance + Cash on Delivery"
-                                : "Cash on Delivery"}
-                          </strong>
-                          <small>
-                            Pay now {money(plan.payableNow)}
-                            {Number(plan.prepaidDiscount) > 0
-                              ? `, save ${money(plan.prepaidDiscount)}`
-                              : ""}{" "}
-                            | Pay on delivery {money(plan.amountDueOnDelivery)}
-                          </small>
+                          I confirm my delivery details and agree to place this
+                          order.
                         </span>
                       </label>
-                    ))}
-                  </div>
-                  {needsPrepayment && gateways.length > 0 && (
-                    <div className="shopping-stack" style={{ marginTop: 16 }}>
-                      <label>
-                        Payment method
-                        <select
-                          value={gateway?.id || "manual"}
-                          onChange={(event) =>
-                            setChosenGateway(event.target.value)
-                          }
-                        >
-                          {(payments?.methods.length || 0) > 0 && (
-                            <option value="manual">Manual transfer</option>
-                          )}
-                          {gateways.map((method) => (
-                            <option key={method.id} value={method.id}>
-                              {method.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      {gateway && (
-                        <p>
-                          You will be redirected to {gateway.name} to pay{" "}
-                          {money(quote?.payableNow || 0)} securely after placing
-                          your order.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  {needsManualPayment && (
-                    <div className="shopping-stack" style={{ marginTop: 16 }}>
-                      <label>
-                        Method category
-                        <select
-                          name="methodCategory"
-                          value={category}
-                          onChange={(e) => {
-                            setCategory(
-                              e.target.value as "mobile_banking" | "bank",
-                            );
-                            setChosenMethodId("");
-                            setSenderInfo("");
-                            setReference("");
-                          }}
-                        >
-                          <option value="mobile_banking">Mobile Banking</option>
-                          <option value="bank">Bank</option>
-                        </select>
-                      </label>
-                      <label>
-                        Payment method
-                        <select
-                          name="paymentMethodId"
-                          required
-                          value={selectedMethodId}
-                          onChange={(e) => {
-                            setChosenMethodId(e.target.value);
-                            setSenderInfo("");
-                            setReference("");
-                          }}
-                        >
-                          <option value="" disabled>
-                            Select a method
-                          </option>
-                          {paymentChannels.map((method) => (
-                            <option key={method.id} value={method.id}>
-                              {method.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      {!paymentChannels.length && (
-                        <p>
-                          No methods are available in this category. Choose
-                          another category.
-                        </p>
-                      )}
-                      {selectedMethod && (
-                        <>
-                          <div
-                            className="bank-details"
-                            style={{ overflowWrap: "anywhere" }}
-                          >
-                            {selectedMethod.logo && (
-                              <img
-                                src={selectedMethod.logo}
-                                alt={selectedMethod.name}
-                                width={64}
-                                height={48}
-                                style={{ objectFit: "contain" }}
-                              />
-                            )}
-                            <strong>{selectedMethod.name}</strong>
-                            <dl>
-                              {Object.entries(selectedMethod.details).map(
-                                ([key, value]) => (
-                                  <div key={key}>
-                                    <dt>{key.replace(/([A-Z])/g, " $1")}</dt>
-                                    <dd>{value}</dd>
-                                  </div>
-                                ),
-                              )}
-                            </dl>
-                            <div
-                              className="product-rich-content"
-                              dangerouslySetInnerHTML={{
-                                __html: toProductHtml(
-                                  selectedMethod.instruction,
-                                ),
-                              }}
-                            />
-                            <p>
-                              Transfer {money(quote?.payableNow || 0)} using the
-                              instructions above, then submit your reference.
-                              Your payment will await verification.
-                            </p>
-                          </div>
-                          <label>
-                            {category === "mobile_banking"
-                              ? "Sender mobile number"
-                              : "Sender name / account"}
-                            <input
-                              name="senderInfo"
-                              required
-                              value={senderInfo}
-                              maxLength={120}
-                              type={
-                                category === "mobile_banking" ? "tel" : "text"
-                              }
-                              onChange={(e) => setSenderInfo(e.target.value)}
-                            />
-                          </label>
-                          <label>
-                            {category === "mobile_banking"
-                              ? "Transaction ID"
-                              : "Bank reference"}
-                            <input
-                              name="reference"
-                              required
-                              value={reference}
-                              minLength={3}
-                              maxLength={100}
-                              onChange={(e) => setReference(e.target.value)}
-                            />
-                          </label>
-                        </>
-                      )}
-                    </div>
-                  )}
-                  {quote?.discountMessage && (
-                    <p role="status">{quote.discountMessage}</p>
-                  )}
-                </SectionCard>
-                <SectionCard title="Confirm your order">
-                  {checkoutError && (
-                    <p className="shop-error" role="alert">
-                      {checkoutError}
-                    </p>
-                  )}
-                  {validQuote && (
-                    <div
-                      className="confirmation-total-block"
-                      style={{ marginBottom: 12 }}
+                      <button
+                        type="submit"
+                        className="primary-button place-order"
+                        disabled={
+                          !validQuote ||
+                          locked ||
+                          !availableOptionIds.includes(paymentOption) ||
+                          (needsManualPayment &&
+                            (!selectedMethodId ||
+                              !senderInfo.trim() ||
+                              !reference.trim()))
+                        }
+                      >
+                        {busy
+                          ? "Confirming your order..."
+                          : "Confirm & Place Order"}
+                      </button>
+                      <p className="muted small">
+                        Your final price and stock are checked before the order
+                        is created.
+                      </p>
+                    </SectionCard>
+                  </>
+                )}
+                {!payment && (
+                  <SectionCard title="Ready for the next step?">
+                    <button
+                      type="submit"
+                      className="primary-button place-order"
+                      disabled={!validQuote || locked}
                     >
-                      <p className="confirmation-total">
-                        <span>Pay now</span>
-                        <strong>{money(quote.payableNow || 0)}</strong>
+                      Continue to Payment →
+                    </button>
+                    {checkoutError && (
+                      <p role="alert" className="shop-error">
+                        {checkoutError}
                       </p>
-                      <p>
-                        Pay on delivery: {money(quote.amountDueOnDelivery || 0)}
-                      </p>
-                    </div>
-                  )}
-                  <label className="consent-row">
-                    <input type="checkbox" required />{" "}
-                    <span>
-                      I confirm my delivery details and agree to place this
-                      order.
-                    </span>
-                  </label>
-                  <button
-                    type="submit"
-                    className="primary-button place-order"
-                    disabled={
-                      !validQuote ||
-                      locked ||
-                      !availableOptionIds.includes(paymentOption) ||
-                      (needsManualPayment &&
-                        (!selectedMethodId ||
-                          !senderInfo.trim() ||
-                          !reference.trim()))
-                    }
-                  >
-                    {busy ? "Confirming your order..." : "Confirm My Order"}
-                  </button>
-                  <p className="muted small">
-                    Your final price and stock are checked before the order is
-                    created.
-                  </p>
-                </SectionCard>
+                    )}
+                  </SectionCard>
+                )}
               </fieldset>
             </form>
           )}
@@ -1175,71 +1196,88 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
             )}
             {validQuote ? (
               <>
-                <PriceSummary
-                  subtotal={quote.subtotal}
-                  shipping={quote.shipping}
-                  tax={quote.tax}
-                  total={quote.total}
-                  discount={quote.discount}
-                  couponDiscount={quote.couponDiscount}
-                  coupon={quote.coupon?.code}
-                  onlinePaymentDiscount={quote.prepaidDiscount}
-                />
-                <div className="coupon-section">
-                  {appliedCoupon ? (
-                    <div className="applied-coupon">
-                      <span>
-                        {appliedCoupon}
-                        <small>Discount applied</small>
-                      </span>
-                      <button
-                        type="button"
-                        className="text-button"
-                        disabled={locked}
-                        onClick={() => {
-                          setAppliedCoupon("");
-                          setCouponError("");
-                          setCouponCode("");
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ) : (
-                    <form className="coupon-form" onSubmit={applyCoupon}>
-                      <label className="sr-only" htmlFor="coupon-code">
-                        Coupon code
-                      </label>
-                      <input
-                        id="coupon-code"
-                        placeholder="Coupon code"
-                        value={couponCode}
-                        onChange={(e) =>
-                          setCouponCode(e.target.value.toUpperCase())
-                        }
-                        maxLength={32}
-                        disabled={locked}
-                      />
-                      <button
-                        type="submit"
-                        className="secondary-button"
-                        disabled={!couponCode.trim() || locked}
-                      >
-                        {couponBusy ? "Applying…" : "Apply"}
-                      </button>
-                    </form>
-                  )}
-                  {couponError && (
-                    <p className="coupon-error" role="alert">
-                      {couponError}
-                    </p>
-                  )}
-                </div>
-                <p className="muted small">
-                  Review delivery charges and available payment methods at
-                  checkout. Your final total is checked when placing the order.
-                </p>
-                {validQuote && quote.shippingRates && (
+                {checkout ? (
+                  <PriceSummary
+                    subtotal={quote.subtotal}
+                    shipping={quote.shipping}
+                    tax={quote.tax}
+                    total={quote.total}
+                    discount={quote.discount}
+                    couponDiscount={quote.couponDiscount}
+                    coupon={quote.coupon?.code}
+                    onlinePaymentDiscount={quote.prepaidDiscount}
+                  />
+                ) : (
+                  <p className="confirmation-total">
+                    <span>Product total</span>
+                    <strong>{money(quote.subtotal)}</strong>
+                  </p>
+                )}
+                {checkout && (
+                  <div className="coupon-section">
+                    {appliedCoupon ? (
+                      <div className="applied-coupon">
+                        <span>
+                          {appliedCoupon}
+                          <small>Discount applied</small>
+                        </span>
+                        <button
+                          type="button"
+                          className="text-button"
+                          disabled={locked}
+                          onClick={() => {
+                            setAppliedCoupon("");
+                            try {
+                              sessionStorage.removeItem("ds-checkout-coupon");
+                            } catch {
+                              /* Optional storage. */
+                            }
+                            setCouponError("");
+                            setCouponCode("");
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <form className="coupon-form" onSubmit={applyCoupon}>
+                        <label className="sr-only" htmlFor="coupon-code">
+                          Coupon code
+                        </label>
+                        <input
+                          id="coupon-code"
+                          placeholder="Coupon code"
+                          value={couponCode}
+                          onChange={(e) =>
+                            setCouponCode(e.target.value.toUpperCase())
+                          }
+                          maxLength={32}
+                          disabled={locked}
+                        />
+                        <button
+                          type="submit"
+                          className="secondary-button"
+                          disabled={!couponCode.trim() || locked}
+                        >
+                          {couponBusy ? "Applying…" : "Apply"}
+                        </button>
+                      </form>
+                    )}
+                    {couponError && (
+                      <p className="coupon-error" role="alert">
+                        {couponError}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {checkout && (
+                  <p className="muted small">
+                    Review delivery charges and available payment methods at
+                    checkout. Your final total is checked when placing the
+                    order.
+                  </p>
+                )}
+                {checkout && validQuote && quote.shippingRates && (
                   <p className="muted small" style={{ marginTop: "4px" }}>
                     {shippingSummary(quote.shippingRates)}
                   </p>
@@ -1271,6 +1309,11 @@ export function CartCheckout({ checkout = false }: { checkout?: boolean }) {
                 disabled={locked}
                 onClick={() => {
                   setAppliedCoupon("");
+                  try {
+                    sessionStorage.removeItem("ds-checkout-coupon");
+                  } catch {
+                    /* Optional storage. */
+                  }
                   setCouponError("");
                 }}
               >

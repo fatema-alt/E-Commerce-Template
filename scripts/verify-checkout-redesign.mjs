@@ -249,9 +249,11 @@ async function response(path, method, body) {
         ...line,
         name: "Fixture item",
         unitPrice: "500.00",
-        lineTotal: "500.00",
+        lineTotal: String(500 * line.quantity),
       })),
-      subtotal: "500.00",
+      subtotal: String(
+        body.items.reduce((sum, line) => sum + 500 * line.quantity, 0),
+      ),
       shipping: "60.00",
       tax: "0.00",
       discount: plan.prepaidDiscount,
@@ -301,6 +303,8 @@ async function response(path, method, body) {
   }
   if (p === `/shop/orders/${orderId}` || p === `/orders/${orderId}`)
     return order;
+  if (p.startsWith("/shop/orders/"))
+    return { status: 404, message: "Order unavailable" };
   if (p.includes("/cms/")) return { status: 404, message: "No fixture CMS" };
   return { items: [], total: 0 };
 }
@@ -621,21 +625,121 @@ try {
   await evaluate(
     `localStorage.setItem('commerce-cart-v1', ${JSON.stringify(JSON.stringify([{ productId, slug: "fixture", name: "Fixture item", quantity: 1, price: 500 }]))})`,
   );
-  await navigate(3038, "/checkout");
+  await navigate(3038, "/");
+  await until('!!document.querySelector("#header-cart-link")', "cart icon");
+  await evaluate('document.querySelector("#header-cart-link").click()');
   await until(
-    '!!document.querySelector("input[value=FULL_PAYMENT]")',
-    "payment plans",
+    '!!document.querySelector(".cart-drawer[open] .confirmation-total")',
+    "cart drawer prices",
   );
-  for (const id of ["FULL_PAYMENT", "PARTIAL_ADVANCE", "COD"])
-    assert(await evaluate(`!!document.querySelector('input[value=${id}]')`));
   assert.equal(
-    await evaluate('document.body.innerText.includes("SSLCommerz")'),
+    await evaluate(
+      'document.querySelector(".cart-drawer").innerText.includes("Delivery")',
+    ),
+    false,
+  );
+  assert.equal(
+    await evaluate(
+      'document.querySelector(".cart-drawer").innerText.includes("Tax")',
+    ),
+    false,
+  );
+  await evaluate(
+    'document.querySelector(".cart-drawer button[aria-label^=Increase]").click()',
+  );
+  await until(
+    'document.querySelector(".cart-drawer .quantity-stepper output")?.textContent === "2"',
+    "quantity increment",
+  );
+  await until(
+    'document.querySelector(".cart-drawer .confirmation-total")?.innerText.includes("1,000")',
+    "product only total",
+  );
+  await evaluate(
+    'document.querySelector(".cart-drawer button[aria-label^=Decrease]").click()',
+  );
+  await until(
+    'document.querySelector(".cart-drawer .quantity-stepper output")?.textContent === "1"',
+    "quantity decrement",
+  );
+  for (const width of [1366, 390, 320]) await shot("cart-drawer", width);
+  await evaluate('document.documentElement.dataset.theme="light"');
+  await shot("cart-drawer-light", 390);
+  await evaluate('document.documentElement.dataset.theme="dark"');
+  await evaluate(
+    'document.querySelector(".cart-drawer button[aria-label^=Close]").click()',
+  );
+  await until('!document.querySelector(".cart-drawer[open]")', "close cart");
+  await evaluate(
+    'document.querySelector("#header-cart-link").focus(); document.querySelector("#header-cart-link").click()',
+  );
+  await until('!!document.querySelector(".cart-drawer[open]")', "reopen cart");
+  await command("Input.dispatchKeyEvent", {
+    type: "keyDown",
+    key: "Escape",
+    code: "Escape",
+    windowsVirtualKeyCode: 27,
+  });
+  await command("Input.dispatchKeyEvent", {
+    type: "keyUp",
+    key: "Escape",
+    code: "Escape",
+    windowsVirtualKeyCode: 27,
+  });
+  await until(
+    '!document.querySelector(".cart-drawer[open]")',
+    "Escape closes drawer",
+  );
+  assert.equal(await evaluate("document.activeElement.id"), "header-cart-link");
+  await evaluate('document.querySelector("#header-cart-link").click()');
+  await until(
+    '!document.querySelector(".cart-drawer .remove-item")?.disabled',
+    "remove ready",
+  );
+  await evaluate('document.querySelector(".cart-drawer .remove-item").click()');
+  await until(
+    'document.querySelector(".cart-drawer").innerText.includes("Your cart is empty")',
+    "empty cart",
+  );
+  await evaluate(
+    `localStorage.setItem('commerce-cart-v1', ${JSON.stringify(JSON.stringify([{ productId, slug: "fixture", name: "Fixture item", quantity: 1, price: 500 }]))}); window.dispatchEvent(new Event('commerce-cart-change'))`,
+  );
+  await evaluate(
+    'document.querySelector(".cart-drawer button[aria-label^=Close]").click()',
+  );
+  await navigate(3038, "/checkout");
+  await until('!!document.querySelector("[name=name]")', "checkout form");
+  assert.equal(
+    await evaluate('!!document.querySelector("input[value=FULL_PAYMENT]")'),
     false,
   );
   await fill("[name=name]", "Fixture customer");
   await fill("[name=phone]", "01711111111");
   await fill("[name=address]", "Fixture address");
   await fill("[name=city]", "Dhaka");
+  await fill("[name=district]", "Dhaka");
+  await until(
+    '!document.querySelector(".checkout-form button[type=submit]")?.disabled',
+    "checkout ready",
+  );
+  for (const width of [1366, 390]) await shot("checkout", width);
+  await evaluate('document.documentElement.dataset.theme="light"');
+  await shot("checkout-light", 1366);
+  await evaluate('document.documentElement.dataset.theme="dark"');
+  await evaluate(
+    'document.querySelector(".checkout-form button[type=submit]").click()',
+  );
+  await until(
+    'location.pathname === "/checkout/payment" && !!document.querySelector("input[value=FULL_PAYMENT]")',
+    "separate payment page",
+  );
+  assert.equal(created, 0, "Continuing to payment must not create an order");
+  for (const id of ["FULL_PAYMENT", "PARTIAL_ADVANCE", "COD"])
+    assert(await evaluate(`!!document.querySelector('input[value=${id}]')`));
+  assert.equal(
+    await evaluate('document.body.innerText.includes("SSLCommerz")'),
+    false,
+  );
   await evaluate('document.querySelector("input[value=COD]").click()');
   await until(
     '!document.querySelector("[name=senderInfo]")',
@@ -653,25 +757,21 @@ try {
     '!!document.querySelector("[name=senderInfo]")',
     "prepaid fields",
   );
-  await evaluate(
-    '(()=>{const el=document.querySelector("[name=methodCategory]");el.value="bank";el.dispatchEvent(new Event("change",{bubbles:true}))})()',
-  );
+  await click("Bank Transfer");
   await until(
     'document.body.innerText.includes("123456789")',
     "bank routing details",
   );
-  await evaluate(
-    '(()=>{const el=document.querySelector("[name=methodCategory]");el.value="mobile_banking";el.dispatchEvent(new Event("change",{bubbles:true}))})()',
-  );
+  await click("Mobile Banking");
   await fill("[name=senderInfo]", "01711111111");
   await fill("[name=reference]", "DUPLICATE");
   await until(
     '!document.querySelector(".checkout-form button[type=submit]")?.disabled',
     "ready",
   );
-  for (const width of [1366, 390]) await shot("checkout", width);
+  for (const width of [1366, 390]) await shot("payment", width);
   await evaluate('document.querySelector(".consent-row input").click()');
-  await click("Confirm My Order");
+  await click("Confirm & Place Order");
   await until(
     'document.body.innerText.includes("already been submitted")',
     "duplicate reference feedback",
@@ -685,14 +785,16 @@ try {
     '!document.querySelector(".checkout-form button[type=submit]")?.disabled',
     "retry ready",
   );
-  await click("Confirm My Order");
+  await click("Confirm & Place Order");
   await until(
-    'location.pathname.includes("/orders/") && document.body.innerText.includes("Awaiting Verification")',
+    'location.pathname.includes("/order-success/") && document.body.innerText.includes("Awaiting Verification")',
     "created awaiting order",
   );
   assert.equal(created, 1);
   assert.equal(order.paidTotal, "0.00");
   for (const width of [1366, 390]) await shot("awaiting-verification", width);
+  await evaluate('document.documentElement.dataset.theme="light"');
+  await shot("success-light", 1366);
   await navigate(3039, `/orders/${orderId}`);
   await until(
     'document.body.innerText.includes("Submit payment review")',
@@ -797,6 +899,29 @@ try {
     await evaluate(
       '!!document.querySelector("#order-courier input[name=trackingNumber]")',
     ),
+  );
+  await navigate(3038, `/orders/${orderId}?payment=success`);
+  await until('location.pathname.includes("/order-success/") && !!document.querySelector(".order-success")', "gateway return uses actual order confirmation");
+  await navigate(3038, "/cart");
+  await until('!!document.querySelector(".cart-drawer[open]")', "legacy cart entry opens drawer");
+  await command("Emulation.setDeviceMetricsOverride", { width:1366, height:950, deviceScaleFactor:1, mobile:false });
+  await pause(300);
+  await command("Input.dispatchMouseEvent", { type:"mousePressed", x:10, y:300, button:"left", clickCount:1 });
+  await command("Input.dispatchMouseEvent", { type:"mouseReleased", x:10, y:300, button:"left", clickCount:1 });
+  await until('!document.querySelector(".cart-drawer[open]")', "outside click closes drawer");
+  await navigate(3038, "/order-success/invalid-order");
+  await until(
+    '!!document.querySelector("[role=alert]")',
+    "invalid order handled",
+  );
+  assert.equal(
+    await evaluate('!!document.querySelector(".order-success")'),
+    false,
+  );
+  await navigate(3038, "/checkout/payment");
+  await until(
+    'location.pathname === "/checkout"',
+    "payment without draft returns to checkout",
   );
   if (interceptionError) throw interceptionError;
   console.log(

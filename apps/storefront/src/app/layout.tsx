@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { Suspense, type CSSProperties, type ReactNode } from "react";
 import { Hanken_Grotesk, Hind_Siliguri } from "next/font/google";
@@ -5,6 +6,7 @@ import { getCmsConfig, type CmsConfig } from "../lib/cms";
 import { fallbackConfig } from "../lib/storefront";
 import { unstable_rethrow } from "next/navigation";
 import { Footer, Header } from "../components/store-shell";
+import { CartDrawer } from "../components/cart-drawer";
 import { StoreBenefits } from "../components/store-benefits";
 import { themeScript } from "../lib/theme-init";
 import { connection } from "next/server";
@@ -75,8 +77,9 @@ async function StoreFrame({ children }: { children: ReactNode }) {
         Skip to content
       </a>
       <Header config={config} />
+      <CartDrawer />
       <StoreAnalytics tracking={trackingConfig} />
-      {unavailable ? <main id="main" className="container main-content"><div className="shop-panel store-unavailable"><p className="eyebrow">DS Mart</p><h1>We’ll be right back.</h1><p>Our store is temporarily unavailable. Please try again shortly.</p><a className="primary-button" href="/">Try again</a><a className="secondary-button" href="/help">Shopping help</a></div></main> : children}
+      {unavailable ? <main id="main" className="container main-content"><div className="shop-panel store-unavailable"><p className="eyebrow">DS Mart</p><h1>We’ll be right back.</h1><p>Our store is temporarily unavailable. Please try again shortly.</p><Link className="primary-button" href="/">Try again</Link><Link className="secondary-button" href="/help">Shopping help</Link></div></main> : children}
       <StoreBenefits />
       <Footer config={config} />
       <FloatingContact initial={config.settings} />
