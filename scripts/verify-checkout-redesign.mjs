@@ -1110,6 +1110,69 @@ try {
     '!document.querySelector(".cart-drawer[open]")',
     "outside click closes drawer",
   );
+  // Actual backend snapshots distinguish the submitted advance from credited payment.
+  order.paymentPlan = "PARTIAL_ADVANCE";
+  order.paymentOption = "PARTIAL_ADVANCE";
+  order.paymentStatus = "UNPAID";
+  order.grandTotal = "560.00";
+  order.paidTotal = "0.00";
+  order.amountDueOnDelivery = "500.00";
+  order.manualPayments = [
+    {
+      ...order.manualPayments[0],
+      plan: "PARTIAL_ADVANCE",
+      status: "awaiting_verification",
+      amountDueNow: "60.00",
+      amountDueOnDelivery: "500.00",
+      reference: "ADVANCE60",
+    },
+  ];
+  await navigate(3038, `/order-success/${orderId}`);
+  await until(
+    'document.querySelector(".order-success")?.innerText.includes("Advance submitted")',
+    "partial advance confirmation",
+  );
+  const confirmationFacts = await evaluate(
+    'Object.fromEntries([...document.querySelectorAll(".success-facts > div")].map(element => [element.querySelector("dt").textContent, element.querySelector("dd").textContent]))',
+  );
+  assert.match(
+    Object.entries(confirmationFacts).find(([key]) =>
+      key.startsWith("Advance submitted"),
+    )[1],
+    /60\.00/,
+  );
+  assert.match(confirmationFacts["Verified amount paid"], /0\.00/);
+  assert.match(
+    Object.entries(confirmationFacts).find(([key]) =>
+      key.startsWith("Pay on delivery"),
+    )[1],
+    /500\.00/,
+  );
+  assert.equal(
+    confirmationFacts["Remaining amount"],
+    undefined,
+    "Do not present the pending advance as another delivery balance",
+  );
+  for (const width of [1366, 390]) await shot("partial-advance-pending", width);
+  order.manualPayments[0].status = "confirmed";
+  order.paymentStatus = "PARTIALLY_PAID";
+  order.paidTotal = "60.00";
+  await navigate(3038, `/order-success/${orderId}`);
+  await until(
+    'document.querySelector(".order-success")?.innerText.includes("Order Placed Successfully!")',
+    "verified partial advance confirmation",
+  );
+  assert.equal(
+    await evaluate(
+      'document.querySelector(".success-facts").innerText.includes("Advance submitted")',
+    ),
+    false,
+  );
+  assert(
+    await evaluate(
+      '[...document.querySelectorAll(".success-facts > div")].some(element => element.querySelector("dt").textContent === "Verified amount paid" && element.querySelector("dd").textContent.includes("60.00"))',
+    ),
+  );
   await navigate(3038, "/order-success/invalid-order");
   await until(
     '!!document.querySelector("[role=alert]")',

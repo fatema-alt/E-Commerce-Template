@@ -5,6 +5,10 @@ import { statusLabel } from "./shopping-ui";
 export function OrderSuccess({ order }: { order: Order }) {
   const submission = order.manualPayments?.[0];
   const pending = submission?.status === "awaiting_verification";
+  const partial = order.paymentPlan === "PARTIAL_ADVANCE";
+  const submitted = Number(submission?.amountDueNow || 0);
+  const deliveryDue =
+    order.amountDueOnDelivery ?? submission?.amountDueOnDelivery;
   const cancelled = ["CANCELLED", "RETURNED"].includes(order.status);
   const paid = Number(order.paidTotal || 0);
   const address = order.addresses?.[0];
@@ -26,7 +30,9 @@ export function OrderSuccess({ order }: { order: Order }) {
       </h1>
       <p>
         {pending
-          ? "Your order is received. We will confirm your payment after verifying the transfer."
+          ? partial
+            ? `Your advance of ${money(submitted)} has been submitted for verification. After verification, ${money(deliveryDue || 0)} will be payable on delivery.`
+            : "Your payment reference has been received. We will confirm your payment after verifying the transfer."
           : cancelled
             ? "Review the current order details below."
             : "Thank you for shopping with us. Your current payment and delivery details are below."}
@@ -66,14 +72,43 @@ export function OrderSuccess({ order }: { order: Order }) {
           <dt>Order total</dt>
           <dd>{money(order.grandTotal)}</dd>
         </div>
+        {pending && (
+          <div>
+            <dt>
+              {partial
+                ? "Advance submitted — verification pending"
+                : "Payment submitted — verification pending"}
+            </dt>
+            <dd>{money(submitted)}</dd>
+          </div>
+        )}
         <div>
-          <dt>Amount paid</dt>
+          <dt>Verified amount paid</dt>
           <dd>{money(paid)}</dd>
         </div>
-        <div>
-          <dt>Remaining amount</dt>
-          <dd>{money(Math.max(0, Number(order.grandTotal) - paid))}</dd>
-        </div>
+        {pending ||
+        ((partial || order.paymentPlan === "COD") &&
+          submission?.status !== "rejected") ? (
+          <div>
+            <dt>
+              {pending && partial
+                ? "Pay on delivery — after advance verification"
+                : "Pay on delivery"}
+            </dt>
+            <dd>{money(deliveryDue || 0)}</dd>
+          </div>
+        ) : (
+          <div>
+            <dt>Remaining balance</dt>
+            <dd>{money(Math.max(0, Number(order.grandTotal) - paid))}</dd>
+          </div>
+        )}
+        {pending && (
+          <div>
+            <dt>Submitted transaction reference</dt>
+            <dd>{submission.reference}</dd>
+          </div>
+        )}
         {address && (
           <div>
             <dt>Delivery address</dt>
