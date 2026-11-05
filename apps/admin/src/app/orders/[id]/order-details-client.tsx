@@ -40,15 +40,12 @@ import {
   orderFetch,
   type OrderDetail,
 } from "../orders-client";
-import {
-  PaymentWorkflow,
-  ReturnsWorkflow,
-  ShipmentWorkflow,
-} from "../order-workflows";
+import { ReturnsWorkflow, ShipmentWorkflow } from "../order-workflows";
 
 export default function OrderDetailsClient() {
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [loadedAt, setLoadedAt] = useState(0);
   const [role, setRole] = useState("");
   const [error, setError] = useToastState("error");
   const [, setSuccess] = useToastState("success");
@@ -71,6 +68,7 @@ export default function OrderDetailsClient() {
       .then(([result, admin]) => {
         if (sequence !== loadSequence.current) return;
         setOrder(result);
+        setLoadedAt(Date.now());
         setRole(admin.user?.role || admin.role || "");
         setError("");
       })
@@ -176,7 +174,7 @@ export default function OrderDetailsClient() {
   const units = order.items.reduce((sum, item) => sum + item.quantity, 0);
   const hoursAgo = Math.max(
     0,
-    Math.floor((Date.now() - Date.parse(order.createdAt)) / 3600000),
+    Math.floor((loadedAt - Date.parse(order.createdAt)) / 3600000),
   );
   const age =
     hoursAgo < 1
@@ -200,7 +198,12 @@ export default function OrderDetailsClient() {
       <header className="od-hero">
         <div>
           <p className="od-eyebrow">ORDER DETAILS</p>
-          <h1>Order {order.orderNumber}</h1>
+          <h1 title={order.orderNumber}>
+            Order{" "}
+            {/^[a-z]+-[a-f0-9]{8}-[a-f0-9-]{27}$/i.test(order.orderNumber)
+              ? order.id.slice(-8).toUpperCase()
+              : order.orderNumber}
+          </h1>
           <p className="od-order-meta">
             {formatDate(order.createdAt)}
             <span>·</span>
@@ -329,7 +332,9 @@ export default function OrderDetailsClient() {
               dispatching this order.
             </p>
           </div>
-          <a href="#payment-review">Review payment →</a>
+          <a href={`/orders?manage=${encodeURIComponent(id)}`}>
+            Review payment →
+          </a>
         </div>
       ) : latest?.status === "rejected" ? (
         <div className="od-notice od-notice-danger">
@@ -357,30 +362,20 @@ export default function OrderDetailsClient() {
           <div id="order-payment">
             <PaymentOverview order={order} />
           </div>
-          <details
-            id="payment-review"
-            className="od-workflow od-no-print"
-            open={awaiting || undefined}
+          <Link
+            className="od-button od-no-print"
+            href={`/orders?manage=${encodeURIComponent(id)}`}
           >
+            Manage payment in All Orders
+          </Link>
+          <details className="od-workflow">
             <summary>
-              <CreditCard size={16} />
-              <span>Payment review & accounting</span>
-              <small>
-                {awaiting
-                  ? "Action needed"
-                  : "Verification, COD collection & refunds"}
-              </small>
+              <span>Order timeline</span>
+              <small>{order.events.length} events</small>
             </summary>
-            <PaymentWorkflow
-              key={`${order.id}:${order.paymentMethod}`}
-              order={order}
-              compact
-              financial={role === "SUPER_ADMIN"}
-              busy={busy}
-              act={act}
-            />
+            <OrderTimeline order={order} />
           </details>
-          <OrderTimeline order={order} />
+
           <OrderCard
             title="Notes"
             icon={<FileText size={17} />}
@@ -689,14 +684,20 @@ export default function OrderDetailsClient() {
           </OrderCard>
         </aside>
       </div>
-      <div className="od-context-heading">
-        <div>
-          <p className="od-eyebrow">BEHIND THE ORDER</p>
-          <h2>Source & verification</h2>
+      <details className="od-workflow od-no-print">
+        <summary>
+          <span>Source, verification & technical details</span>
+          <small>View saved information</small>
+        </summary>
+        <div className="od-context-heading">
+          <div>
+            <p className="od-eyebrow">BEHIND THE ORDER</p>
+            <h2>Source & verification</h2>
+          </div>
+          <p>Attribution, tracking and saved technical details</p>
         </div>
-        <p>Attribution, tracking and saved technical details</p>
-      </div>
-      <OrderInsights order={order} />
+        <OrderInsights order={order} />
+      </details>
       <p className="od-footer">
         Order ID <span className="od-mono">{order.id}</span> · Revision{" "}
         {order.version}

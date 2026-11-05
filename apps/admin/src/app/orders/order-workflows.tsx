@@ -404,6 +404,7 @@ export function PaymentWorkflow({
   act: OrderAction;
   compact?: boolean;
 }) {
+  const [reviewAction, setReviewAction] = useState("confirm");
   const [kind, setKind] = useState(
     order.paymentMethod === "COD"
       ? "COD_COLLECTION"
@@ -473,6 +474,8 @@ export function PaymentWorkflow({
                   Action
                   <select
                     name="action"
+                    value={reviewAction}
+                    onChange={event => setReviewAction(event.target.value)}
                     className="block w-full min-w-0 rounded border p-2"
                   >
                     <option value="confirm">Confirm verified payment</option>
@@ -485,6 +488,8 @@ export function PaymentWorkflow({
                   Reason for rejection
                   <input
                     name="reason"
+                    required={reviewAction === "reject"}
+                    minLength={3}
                     maxLength={500}
                     className="block w-full rounded border p-2"
                   />

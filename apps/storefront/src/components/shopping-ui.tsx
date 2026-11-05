@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { money } from "../lib/shop-client";
+import { imageUrl } from "../lib/storefront";
 
 export function SectionCard({
   title,
@@ -31,18 +32,21 @@ export function ProductThumbnail({
   href?: string;
 }) {
   const [failed, setFailed] = useState<string | null>(null);
+  const resolvedSrc = imageUrl(src);
   // Catalog media can come from merchant-configured origins; keep the existing
   // direct-media behavior while reserving dimensions with Next Image.
   const image =
-    src && failed !== src && /^(https?:\/\/|\/(?!\/))/.test(src) ? (
+    resolvedSrc &&
+    failed !== resolvedSrc &&
+    /^(https?:\/\/|\/(?!\/))/.test(resolvedSrc) ? (
       <Image
-        src={src}
+        src={resolvedSrc}
         alt={name}
         width={112}
         height={112}
         className="cart-thumbnail"
         unoptimized
-        onError={() => setFailed(src)}
+        onError={() => setFailed(resolvedSrc)}
       />
     ) : (
       <span

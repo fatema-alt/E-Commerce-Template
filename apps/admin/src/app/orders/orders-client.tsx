@@ -3,6 +3,7 @@ import { useToastState } from "@/components/admin/toast-provider";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
+import { OrderQuickActions } from "./order-quick-actions";
 import { OrdersReports } from "./orders-reports";
 
 const API = (
@@ -26,10 +27,11 @@ export type OrderRow = {
   customerPhone: string;
   status: OrderStatus;
   paymentStatus: string;
+  manualPayments?: Array<{ status: string }>;
   grandTotal: string | number;
   createdAt: string;
 };
-export type OrderDetail = OrderRow & {
+export type OrderDetail = Omit<OrderRow, "manualPayments"> & {
   updatedAt?: string;
   source?: string | null;
   campaign?: unknown;
@@ -217,7 +219,16 @@ export function StatusPill({ status }: { status: string }) {
     </span>
   );
 }
-export default function OrdersClient() {
+export default function OrdersClient({
+  initialManageId = "",
+}: {
+  initialManageId?: string;
+}) {
+  const [manage, setManage] = useState<{
+    id: string;
+    tab: "status" | "payment";
+  } | null>(initialManageId ? { id: initialManageId, tab: "payment" } : null);
+  const [reportRevision, setReportRevision] = useState(0);
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("");
@@ -465,18 +476,35 @@ export default function OrdersClient() {
         </div>
         <p className="mt-3 text-sm text-slate-500">{total} matching orders</p>
       </div>
-      <OrdersReports
-        filters={{
-          ...(status ? { status } : {}),
-          ...(search ? { q: search } : {}),
-          ...(paymentStatus ? { paymentStatus } : {}),
-          ...(paymentMethod ? { paymentMethod } : {}),
-          ...(from ? { from } : {}),
-          ...(to ? { to } : {}),
-          sort,
-        }}
-      />
-
+      <details className="rounded-xl border bg-white p-4">
+        <summary className="cursor-pointer text-sm font-semibold">
+          Sales reports & summaries
+        </summary>
+        <OrdersReports
+          key={reportRevision}
+          filters={{
+            ...(status ? { status } : {}),
+            ...(search ? { q: search } : {}),
+            ...(paymentStatus ? { paymentStatus } : {}),
+            ...(paymentMethod ? { paymentMethod } : {}),
+            ...(from ? { from } : {}),
+            ...(to ? { to } : {}),
+            sort,
+          }}
+        />
+      </details>
+      {manage && (
+        <OrderQuickActions
+          key={manage.id}
+          id={manage.id}
+          initialTab={manage.tab}
+          onClose={() => setManage(null)}
+          onUpdated={() => {
+            void load();
+            setReportRevision((value) => value + 1);
+          }}
+        />
+      )}
       <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -500,7 +528,11 @@ export default function OrdersClient() {
             {items.map((o) => (
               <tr key={o.id} className="hover:bg-slate-50">
                 <td className="px-5 py-4 font-semibold text-slate-900">
-                  {o.orderNumber}
+                  <span title={o.orderNumber}>
+                    {/^ORD-[a-f0-9]{8}-[a-f0-9-]{27}$/i.test(o.orderNumber)
+                      ? `ORD-${o.id.slice(-8).toUpperCase()}`
+                      : o.orderNumber}
+                  </span>
                 </td>
                 <td className="px-5 py-4">
                   <div>{o.customerName}</div>
@@ -509,10 +541,37 @@ export default function OrdersClient() {
                   </div>
                 </td>
                 <td className="px-5 py-4">
-                  <StatusPill status={o.status} />
+                  <div className="space-y-2">
+                    <StatusPill status={o.status} />
+                    <button
+                      type="button"
+                      className="block text-xs font-semibold text-indigo-600 hover:underline"
+                      onClick={() => setManage({ id: o.id, tab: "status" })}
+                    >
+                      Update status
+                    </button>
+                  </div>
                 </td>
                 <td className="px-5 py-4">
-                  <StatusPill status={o.paymentStatus} />
+                  <div className="space-y-2">
+                    <StatusPill
+                      status={
+                        o.manualPayments?.[0]?.status ===
+                        "awaiting_verification"
+                          ? "AWAITING_VERIFICATION"
+                          : o.manualPayments?.[0]?.status === "rejected"
+                            ? "PAYMENT_REJECTED"
+                            : o.paymentStatus
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="block text-xs font-semibold text-indigo-600 hover:underline"
+                      onClick={() => setManage({ id: o.id, tab: "payment" })}
+                    >
+                      Manage payment
+                    </button>
+                  </div>
                 </td>
                 <td className="px-5 py-4 font-medium">
                   {formatMoney(o.grandTotal)}

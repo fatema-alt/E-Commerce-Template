@@ -94,6 +94,10 @@ const order = {
       id: productId,
       nameSnapshot: "Fixture item",
       skuSnapshot: "TEST",
+      product: {
+        slug: "fixture",
+        images: [{ url: "/uploads/order-fixture.png" }],
+      },
       quantity: 1,
       unitPrice: "500.00",
       lineTotal: "500.00",
@@ -163,7 +167,8 @@ let created = 0,
   saved = 0,
   approved = 0,
   rejected = 0,
-  attempts = 0;
+  attempts = 0,
+  statusUpdates = 0;
 function plans() {
   return [
     {
@@ -233,6 +238,29 @@ async function response(path, method, body) {
       body: body.body,
       createdAt: "2026-11-01T01:00:00Z",
     });
+    order.version++;
+    return order;
+  }
+  if (p === "/orders") return { items: [order], total: 1 };
+  if (p === "/orders/reports")
+    return {
+      totalOrders: 1,
+      grossSales: order.grandTotal,
+      netSales: order.grandTotal,
+      paidTotal: order.paidTotal,
+      unpaidTotal: "0",
+      codOutstanding: "0",
+      refundTotal: "0",
+      cancellationRate: 0,
+      returnRate: 0,
+      basis: "Fixture",
+      summaries: [],
+    };
+  if (p === `/orders/${orderId}/status` && method === "PATCH") {
+    assert.equal(body.version, order.version);
+    assert.equal(body.status, "PROCESSING");
+    statusUpdates++;
+    order.status = body.status;
     order.version++;
     return order;
   }
@@ -483,6 +511,15 @@ try {
     if (event.method === "Fetch.requestPaused")
       void (async () => {
         const request = event.params.request;
+        if (new URL(request.url).pathname === "/uploads/order-fixture.png") {
+          await command("Fetch.fulfillRequest", {
+            requestId: event.params.requestId,
+            responseCode: 200,
+            responseHeaders: [{ name: "Content-Type", value: "image/png" }],
+            body: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1ZsAAAAASUVORK5CYII=",
+          });
+          return;
+        }
         const body =
           request.method === "OPTIONS"
             ? {}
@@ -534,7 +571,10 @@ try {
   await command("Page.enable");
   await command("Runtime.enable");
   await command("Fetch.enable", {
-    patterns: [{ urlPattern: "*://*/api/v1/*" }],
+    patterns: [
+      { urlPattern: "*://*/api/v1/*" },
+      { urlPattern: "*://*/uploads/order-fixture.png" },
+    ],
   });
   await command("Emulation.setDeviceMetricsOverride", {
     width: 1366,
@@ -797,8 +837,8 @@ try {
   await shot("success-light", 1366);
   await navigate(3039, `/orders/${orderId}`);
   await until(
-    'document.body.innerText.includes("Submit payment review")',
-    "admin review",
+    'document.body.innerText.includes("Order items")',
+    "admin detail",
   );
   for (const heading of [
     "Order items",
@@ -815,7 +855,7 @@ try {
   ])
     assert(
       await evaluate(
-        `document.body.innerText.includes(${JSON.stringify(heading)})`,
+        `document.body.textContent.includes(${JSON.stringify(heading)})`,
       ),
     );
   assert(
@@ -835,6 +875,17 @@ try {
     'document.documentElement.dataset.theme="dark"; document.documentElement.classList.add("dark")',
   );
 
+  assert.equal(
+    await evaluate('!!document.querySelector("select[name=action]")'),
+    false,
+    "Approval must be absent from order details",
+  );
+  await navigate(3039, `/orders?manage=${orderId}`);
+  await until(
+    'document.body.innerText.includes("Submit payment review")',
+    "review from All Orders",
+  );
+  for (const width of [1366, 390]) await shot("all-orders-review", width);
   await evaluate(
     '(()=>{let el=document.querySelector("select[name=action]");el.value="reject";el.dispatchEvent(new Event("change",{bubbles:true}))})()',
   );
@@ -851,6 +902,10 @@ try {
     'document.body.innerText.includes("No matching receipt")',
     "customer rejection",
   );
+  await until(
+    'Array.from(document.querySelectorAll(".ordered-product img")).some(img => img.complete && img.naturalWidth > 0 && img.src.includes("/uploads/order-fixture.png"))',
+    "customer order image resolves and loads",
+  );
   await fill("[name=sender]", "01711111111");
   await fill("[name=reference]", "TX456");
   await click("Resubmit payment reference");
@@ -858,7 +913,7 @@ try {
     'document.body.innerText.includes("Awaiting Verification")',
     "resubmitted",
   );
-  await navigate(3039, `/orders/${orderId}`);
+  await navigate(3039, `/orders?manage=${orderId}`);
   await until(
     'document.body.innerText.includes("Submit payment review")',
     "second review",
@@ -879,6 +934,32 @@ try {
     await evaluate('!!document.querySelector("[name=reference]")'),
     false,
   );
+  await navigate(3039, "/orders");
+  await until(
+    'document.body.innerText.includes("Update status")',
+    "All Orders actions",
+  );
+  await click("Update status");
+  await until(
+    'document.body.innerText.includes("Save order status")',
+    "quick status form",
+  );
+  await evaluate(
+    '(() => { const button = [...document.querySelectorAll("dialog button")].find(element => element.textContent.trim() === "Save order status"); button.click(); button.click(); })()',
+  );
+  await until(
+    'document.body.innerText.includes("Order updated successfully.")',
+    "status update saved",
+  );
+  assert.equal(order.status, "PROCESSING");
+  assert.equal(
+    statusUpdates,
+    1,
+    "Rapid duplicate status submissions must mutate once",
+  );
+  await click("Close");
+  await until('!document.querySelector("dialog[open]")', "actions dismissed");
+  for (const width of [1366, 390]) await shot("all-orders-actions", width);
   await navigate(3039, `/orders/${orderId}`);
   await until(
     '!!document.querySelector("#order-internal-note")',
@@ -901,14 +982,40 @@ try {
     ),
   );
   await navigate(3038, `/orders/${orderId}?payment=success`);
-  await until('location.pathname.includes("/order-success/") && !!document.querySelector(".order-success")', "gateway return uses actual order confirmation");
+  await until(
+    'location.pathname.includes("/order-success/") && !!document.querySelector(".order-success")',
+    "gateway return uses actual order confirmation",
+  );
   await navigate(3038, "/cart");
-  await until('!!document.querySelector(".cart-drawer[open]")', "legacy cart entry opens drawer");
-  await command("Emulation.setDeviceMetricsOverride", { width:1366, height:950, deviceScaleFactor:1, mobile:false });
+  await until(
+    '!!document.querySelector(".cart-drawer[open]")',
+    "legacy cart entry opens drawer",
+  );
+  await command("Emulation.setDeviceMetricsOverride", {
+    width: 1366,
+    height: 950,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
   await pause(300);
-  await command("Input.dispatchMouseEvent", { type:"mousePressed", x:10, y:300, button:"left", clickCount:1 });
-  await command("Input.dispatchMouseEvent", { type:"mouseReleased", x:10, y:300, button:"left", clickCount:1 });
-  await until('!document.querySelector(".cart-drawer[open]")', "outside click closes drawer");
+  await command("Input.dispatchMouseEvent", {
+    type: "mousePressed",
+    x: 10,
+    y: 300,
+    button: "left",
+    clickCount: 1,
+  });
+  await command("Input.dispatchMouseEvent", {
+    type: "mouseReleased",
+    x: 10,
+    y: 300,
+    button: "left",
+    clickCount: 1,
+  });
+  await until(
+    '!document.querySelector(".cart-drawer[open]")',
+    "outside click closes drawer",
+  );
   await navigate(3038, "/order-success/invalid-order");
   await until(
     '!!document.querySelector("[role=alert]")',
@@ -925,7 +1032,7 @@ try {
   );
   if (interceptionError) throw interceptionError;
   console.log(
-    "PASS: Plans settings, Methods form, all three checkout plans, no online gateways, duplicate feedback with retained input, awaiting verification, admin rejection, customer resubmission, approval and paid state; 1366px/390px overflow checks and screenshots. Fixtures only; no real database or transfers.",
+    "PASS: Cart and checkout flow, payment plans, order image loading, All Orders payment review/reject/approve, resubmission, single status mutation on rapid clicks, refreshed list, compact detail view, gateway returns and invalid-order handling; desktop/mobile overflow checks and screenshots. Fixtures only; no real database or transfers.",
   );
 } catch (error) {
   console.error(error);

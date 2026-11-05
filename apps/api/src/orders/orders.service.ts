@@ -174,6 +174,11 @@ export class OrdersService {
             customerPhone: true,
             status: true,
             paymentStatus: true,
+            manualPayments: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: { status: true },
+            },
             paymentMethod: true,
             paymentOption: true,
             paidTotal: true,
