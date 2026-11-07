@@ -36,6 +36,13 @@ export class DashboardController {
     return this.dashboard.overview(query, role);
   }
 
+  @Get('notifications')
+  @Header('Cache-Control', 'no-store')
+  notifications(@Req() req: AdminRequest) {
+    const role = req.admin?.role ?? 'ADMIN';
+    return this.dashboard.getNotifications(role);
+  }
+
   @Sse('stream')
   stream(): Observable<{ data: string }> {
     return this.dashboard.eventStream();

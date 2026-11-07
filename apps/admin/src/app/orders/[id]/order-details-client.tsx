@@ -32,6 +32,7 @@ import {
   readable,
 } from "../order-detail-sections";
 import { useParams } from "next/navigation";
+import { NotificationHighlightBanner } from "@/components/admin/notification-highlight-banner";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   formatDate,
@@ -195,6 +196,7 @@ export default function OrderDetailsClient() {
       <Link className="od-back od-no-print" href="/orders">
         <ArrowLeft size={15} /> All orders
       </Link>
+      <NotificationHighlightBanner />
       <header className="od-hero">
         <div>
           <p className="od-eyebrow">ORDER DETAILS</p>

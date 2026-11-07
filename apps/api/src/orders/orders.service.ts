@@ -184,6 +184,7 @@ export class OrdersService {
             paidTotal: true,
             grandTotal: true,
             createdAt: true,
+            version: true,
           },
         }),
         this.db.order.count({ where }),

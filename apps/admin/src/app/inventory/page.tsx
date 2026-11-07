@@ -5,6 +5,8 @@ import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import { Modal, useCatalogRole } from "@/components/catalog/catalog-ui";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { NotificationHighlightBanner } from "@/components/admin/notification-highlight-banner";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
@@ -43,6 +45,9 @@ type Movement = {
 };
 
 export default function InventoryPage() {
+  const searchParams = useSearchParams();
+  const highlightParam =
+    searchParams?.get("highlight") ?? searchParams?.get("q") ?? "";
   const { canEdit } = useCatalogRole();
   const [thresholdItem, setThresholdItem] = useState<InventoryItem | null>(
     null,
@@ -50,7 +55,7 @@ export default function InventoryPage() {
   const [thresholdValue, setThresholdValue] = useState("");
   const [data, setData] = useState<Overview | null>(null);
   const [movements, setMovements] = useState<Movement[]>([]);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(highlightParam);
   const [filter, setFilter] = useState("ALL");
   const [selected, setSelected] = useState<InventoryItem | null>(null);
   const [type, setType] = useState<"IN" | "OUT">("IN");
@@ -189,6 +194,7 @@ export default function InventoryPage() {
     "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-indigo-500";
   return (
     <main className="space-y-7 text-slate-900">
+      <NotificationHighlightBanner />
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-sm font-semibold text-indigo-600">
@@ -272,7 +278,17 @@ export default function InventoryPage() {
                       ? "Low stock"
                       : "Healthy";
                 return (
-                  <tr key={item.id} className="border-t">
+                  <tr
+                    key={item.id}
+                    data-highlight={item.name}
+                    className={`border-t transition-colors ${
+                      highlightParam &&
+                      (item.name.toLowerCase().includes(highlightParam.toLowerCase()) ||
+                        item.sku.toLowerCase().includes(highlightParam.toLowerCase()))
+                        ? "bg-indigo-50/90 dark:bg-indigo-950/60 ring-2 ring-indigo-500 ring-inset"
+                        : ""
+                    }`}
+                  >
                     <td className="p-4 font-medium">
                       {item.name}
                       <div className="text-xs font-normal text-slate-500">

@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { NotificationHighlightBanner } from "@/components/admin/notification-highlight-banner";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import {
   Star,
@@ -80,13 +82,15 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
 
 export default function ReviewsPage() {
+  const searchParams = useSearchParams();
+  const initialStatus = searchParams?.get("status") || "ALL";
   const [activeTab, setActiveTab] = useState<"REVIEWS" | "QA">("REVIEWS");
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<ReviewStats | null>(null);
 
   // Reviews State
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
   const [ratingFilter, setRatingFilter] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -324,6 +328,8 @@ export default function ReviewsPage() {
           </button>
         </div>
       </div>
+
+      <NotificationHighlightBanner />
 
       {/* Toast Alert */}
       {toast && (

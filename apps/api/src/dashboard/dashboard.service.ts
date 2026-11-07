@@ -624,56 +624,101 @@ export class DashboardService {
     ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 8);
 
     // Notifications
-    const notifications = [
-      ...(pendingOrdersCount > 0
-        ? [
-            {
-              id: 'pending-orders',
-              type: 'order' as const,
-              title: `${pendingOrdersCount} pending order${pendingOrdersCount > 1 ? 's' : ''}`,
-              message: 'Orders requiring confirmation or processing',
-              time: 'Action required',
-              read: false,
-            },
-          ]
-        : []),
-      ...(Number(inv.low_stock) > 0
-        ? [
-            {
-              id: 'low-stock',
-              type: 'low_stock' as const,
-              title: `${inv.low_stock} item${Number(inv.low_stock) > 1 ? 's' : ''} low on stock`,
-              message: 'Inventory count at or below reorder threshold',
-              time: 'Inventory alert',
-              read: false,
-            },
-          ]
-        : []),
-      ...(failedPaymentsCount > 0
-        ? [
-            {
-              id: 'failed-payments',
-              type: 'payment_failed' as const,
-              title: `${failedPaymentsCount} payment attempt${failedPaymentsCount > 1 ? 's' : ''} failed`,
-              message: 'Transactions flagged as failed in gateway',
-              time: 'Finance alert',
-              read: false,
-            },
-          ]
-        : []),
-      ...(pendingReviewsCount > 0
-        ? [
-            {
-              id: 'pending-reviews',
-              type: 'review' as const,
-              title: `${pendingReviewsCount} review${pendingReviewsCount > 1 ? 's' : ''} awaiting moderation`,
-              message: 'Customer submitted reviews pending approval',
-              time: 'Community',
-              read: false,
-            },
-          ]
-        : []),
-    ];
+    const notifications: Array<{
+      id: string;
+      type: 'order' | 'low_stock' | 'payment_failed' | 'review';
+      title: string;
+      message: string;
+      time: string;
+      createdAt: string;
+      read: boolean;
+      link: string;
+      targetUrl: string;
+    }> = [];
+
+    // 1. Recent & Pending Orders
+    for (const o of (recentOrdersRows || []).slice(0, 8)) {
+      const displayNo = this.getOrderDisplay(o.orderNumber, o.id);
+      const isPending = o.status === 'PENDING';
+      const title = isPending ? `New Order: ${displayNo}` : `Order ${displayNo} (${o.status.replaceAll('_', ' ')})`;
+      const amount = Number(o.grandTotal ?? 0).toLocaleString();
+      const message = `${o.customerName} placed order for BDT ${amount}${isPending ? ' — Awaiting confirmation' : ''}`;
+      const targetUrl = `/orders?highlight=${encodeURIComponent(displayNo)}&notiTitle=${encodeURIComponent(title)}&notiMsg=${encodeURIComponent(message)}`;
+
+      notifications.push({
+        id: `order-${o.id}`,
+        type: 'order',
+        title,
+        message,
+        time: this.formatTimeAgo(o.createdAt),
+        createdAt: new Date(o.createdAt).toISOString(),
+        read: false,
+        link: targetUrl,
+        targetUrl,
+      });
+    }
+
+    // 2. Low Stock Alerts
+    for (const item of (lowStockRows || []).slice(0, 6)) {
+      const isOut = Number(item.quantity) <= 0;
+      const prodName = item.variantName ? `${item.productName} (${item.variantName})` : item.productName;
+      const title = isOut ? `Out of Stock: ${prodName}` : `Low Stock Alert: ${prodName}`;
+      const message = isOut
+        ? 'Product is completely sold out! Restock needed immediately.'
+        : `Only ${item.quantity} units remaining in inventory (Threshold: ${item.lowStockAt})`;
+      const targetUrl = `/inventory?highlight=${encodeURIComponent(item.productName)}&q=${encodeURIComponent(item.sku || item.productName)}&notiTitle=${encodeURIComponent(title)}&notiMsg=${encodeURIComponent(message)}`;
+
+      notifications.push({
+        id: `stock-${item.productId}-${item.sku}`,
+        type: 'low_stock',
+        title,
+        message,
+        time: isOut ? 'Out of stock' : 'Low stock',
+        createdAt: new Date().toISOString(),
+        read: false,
+        link: targetUrl,
+        targetUrl,
+      });
+    }
+
+    // 3. Pending Reviews
+    for (const r of (reviewsRows || []).slice(0, 5)) {
+      const prodName = r.product?.name || 'Product';
+      const title = `New Review (${r.rating}★): ${prodName}`;
+      const snippet = r.title || (r.content ? r.content.slice(0, 45) : 'Customer review');
+      const message = `"${snippet}" awaiting review moderation`;
+      const targetUrl = `/reviews?status=PENDING&highlight=${encodeURIComponent(r.id)}&notiTitle=${encodeURIComponent(title)}&notiMsg=${encodeURIComponent(message)}`;
+
+      notifications.push({
+        id: `review-${r.id}`,
+        type: 'review',
+        title,
+        message,
+        time: this.formatTimeAgo(r.createdAt),
+        createdAt: new Date(r.createdAt).toISOString(),
+        read: false,
+        link: targetUrl,
+        targetUrl,
+      });
+    }
+
+    // 4. Failed payments
+    if (failedPaymentsCount > 0) {
+      const title = `${failedPaymentsCount} payment attempt${failedPaymentsCount > 1 ? 's' : ''} failed`;
+      const message = 'Transactions flagged as failed in payment gateway';
+      const targetUrl = `/orders?paymentStatus=UNPAID&notiTitle=${encodeURIComponent(title)}&notiMsg=${encodeURIComponent(message)}`;
+      notifications.push({
+        id: 'failed-payments-summary',
+        type: 'payment_failed',
+        title,
+        message,
+        time: 'Finance alert',
+        createdAt: new Date().toISOString(),
+        read: false,
+        link: targetUrl,
+        targetUrl,
+      });
+    }
 
     // Response structure
     const isStaff = role === 'STAFF';
@@ -887,5 +932,204 @@ export class DashboardService {
       });
       return { ok: true };
     });
+  }
+
+  formatTimeAgo(date: Date | string) {
+    const ms = Date.now() - new Date(date).getTime();
+    const mins = Math.floor(ms / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  }
+
+  getOrderDisplay(orderNumber: string, id: string) {
+    if (/^ORD-[a-f0-9]{8}-[a-f0-9-]{27}$/i.test(orderNumber)) {
+      return `ORD-${id.slice(-8).toUpperCase()}`;
+    }
+    return orderNumber;
+  }
+
+  async getNotifications(role: string = 'ADMIN') {
+    const isStaff = role === 'STAFF';
+    const [recentOrders, lowStockRows, reviews, failedPayments] = await Promise.all([
+      this.db.order.findMany({
+        take: 12,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          orderNumber: true,
+          customerName: true,
+          status: true,
+          paymentStatus: true,
+          grandTotal: true,
+          createdAt: true,
+          manualPayments: {
+            take: 1,
+            orderBy: { createdAt: 'desc' },
+            select: { status: true },
+          },
+        },
+      }),
+      this.db.$queryRaw<
+        {
+          productId: string;
+          productName: string;
+          variantName: string | null;
+          sku: string;
+          quantity: number;
+          lowStockAt: number;
+        }[]
+      >(Prisma.sql`
+        SELECT
+          p.id AS "productId",
+          p.name AS "productName",
+          v.name AS "variantName",
+          COALESCE(v.sku, p.sku) AS sku,
+          i.quantity,
+          i."lowStockAt"
+        FROM inventories i
+        JOIN products p ON p.id=i."productId"
+        LEFT JOIN product_variants v ON v.id=i."variantId"
+        WHERE p."deletedAt" IS NULL
+          AND i.quantity <= i."lowStockAt"
+        ORDER BY i.quantity ASC, i."updatedAt" DESC LIMIT 8`),
+      this.db.productReview.findMany({
+        take: 8,
+        orderBy: { createdAt: 'desc' },
+        include: { product: { select: { name: true } } },
+      }),
+      this.db.orderPaymentTransaction.findMany({
+        where: { status: 'FAILED' },
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        include: { order: { select: { id: true, orderNumber: true, customerName: true } } },
+      }),
+    ]);
+
+    const items: Array<{
+      id: string;
+      type: 'order' | 'low_stock' | 'payment_failed' | 'review';
+      title: string;
+      message: string;
+      time: string;
+      createdAt: string;
+      read: boolean;
+      link: string;
+      targetUrl: string;
+    }> = [];
+
+    // Orders
+    for (const o of recentOrders) {
+      const displayNo = this.getOrderDisplay(o.orderNumber, o.id);
+      const isPending = o.status === 'PENDING';
+      const manualPending = o.manualPayments?.[0]?.status === 'awaiting_verification';
+
+      if (manualPending) {
+        const title = `Verify Payment: ${displayNo}`;
+        const message = `${o.customerName} submitted manual payment awaiting verification`;
+        const targetUrl = `/orders?paymentStatus=AWAITING_VERIFICATION&highlight=${encodeURIComponent(displayNo)}&notiTitle=${encodeURIComponent(title)}&notiMsg=${encodeURIComponent(message)}`;
+        items.push({
+          id: `pay-verify-${o.id}`,
+          type: 'payment_failed',
+          title,
+          message,
+          time: this.formatTimeAgo(o.createdAt),
+          createdAt: new Date(o.createdAt).toISOString(),
+          read: false,
+          link: targetUrl,
+          targetUrl,
+        });
+      }
+
+      const title = isPending ? `New Order: ${displayNo}` : `Order ${displayNo} (${o.status.replaceAll('_', ' ')})`;
+      const amount = !isStaff ? ` for BDT ${Number(o.grandTotal ?? 0).toLocaleString()}` : '';
+      const message = `${o.customerName} placed order${amount}${isPending ? ' — Action required' : ''}`;
+      const targetUrl = `/orders?highlight=${encodeURIComponent(displayNo)}&notiTitle=${encodeURIComponent(title)}&notiMsg=${encodeURIComponent(message)}`;
+
+      items.push({
+        id: `order-${o.id}`,
+        type: 'order',
+        title,
+        message,
+        time: this.formatTimeAgo(o.createdAt),
+        createdAt: new Date(o.createdAt).toISOString(),
+        read: false,
+        link: targetUrl,
+        targetUrl,
+      });
+    }
+
+    // Low stock
+    for (const item of lowStockRows) {
+      const isOut = Number(item.quantity) <= 0;
+      const prodName = item.variantName ? `${item.productName} (${item.variantName})` : item.productName;
+      const title = isOut ? `Out of Stock: ${prodName}` : `Low Stock: ${prodName}`;
+      const message = isOut
+        ? 'Item is completely sold out! Restock immediately.'
+        : `Only ${item.quantity} units left (Threshold: ${item.lowStockAt})`;
+      const targetUrl = `/inventory?highlight=${encodeURIComponent(item.productName)}&q=${encodeURIComponent(item.sku || item.productName)}&notiTitle=${encodeURIComponent(title)}&notiMsg=${encodeURIComponent(message)}`;
+
+      items.push({
+        id: `stock-${item.productId}-${item.sku}`,
+        type: 'low_stock',
+        title,
+        message,
+        time: isOut ? 'Out of stock' : 'Low stock',
+        createdAt: new Date().toISOString(),
+        read: false,
+        link: targetUrl,
+        targetUrl,
+      });
+    }
+
+    // Reviews
+    for (const r of reviews) {
+      const title = `New Review (${r.rating}★): ${r.product.name}`;
+      const snippet = r.title || (r.content ? r.content.slice(0, 45) : 'Review submitted');
+      const message = `"${snippet}" ${r.status === 'PENDING' ? 'awaiting moderation' : ''}`;
+      const targetUrl = `/reviews?status=${r.status}&highlight=${encodeURIComponent(r.id)}&notiTitle=${encodeURIComponent(title)}&notiMsg=${encodeURIComponent(message)}`;
+
+      items.push({
+        id: `review-${r.id}`,
+        type: 'review',
+        title,
+        message,
+        time: this.formatTimeAgo(r.createdAt),
+        createdAt: new Date(r.createdAt).toISOString(),
+        read: false,
+        link: targetUrl,
+        targetUrl,
+      });
+    }
+
+    // Failed payments
+    for (const tx of failedPayments) {
+      const title = `Payment Failed (${tx.provider})`;
+      const message = `Payment failed for ${tx.order?.orderNumber || 'order'}`;
+      const targetUrl = `/orders?highlight=${encodeURIComponent(tx.order?.orderNumber || '')}&notiTitle=${encodeURIComponent(title)}&notiMsg=${encodeURIComponent(message)}`;
+
+      items.push({
+        id: `pay-failed-${tx.id}`,
+        type: 'payment_failed',
+        title,
+        message,
+        time: this.formatTimeAgo(tx.createdAt),
+        createdAt: new Date(tx.createdAt).toISOString(),
+        read: false,
+        link: targetUrl,
+        targetUrl,
+      });
+    }
+
+    // Sort by createdAt descending
+    items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return {
+      unreadCount: items.length,
+      items,
+    };
   }
 }
