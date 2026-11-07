@@ -661,15 +661,15 @@ export class DashboardService {
     // 2. Low Stock Alerts
     for (const item of (lowStockRows || []).slice(0, 6)) {
       const isOut = Number(item.quantity) <= 0;
-      const prodName = item.variantName ? `${item.productName} (${item.variantName})` : item.productName;
+      const prodName = item.name;
       const title = isOut ? `Out of Stock: ${prodName}` : `Low Stock Alert: ${prodName}`;
       const message = isOut
         ? 'Product is completely sold out! Restock needed immediately.'
         : `Only ${item.quantity} units remaining in inventory (Threshold: ${item.lowStockAt})`;
-      const targetUrl = `/inventory?highlight=${encodeURIComponent(item.productName)}&q=${encodeURIComponent(item.sku || item.productName)}&notiTitle=${encodeURIComponent(title)}&notiMsg=${encodeURIComponent(message)}`;
+      const targetUrl = `/inventory?highlight=${encodeURIComponent(prodName)}&q=${encodeURIComponent(item.sku || prodName)}&notiTitle=${encodeURIComponent(title)}&notiMsg=${encodeURIComponent(message)}`;
 
       notifications.push({
-        id: `stock-${item.productId}-${item.sku}`,
+        id: `stock-${item.id}-${item.sku}`,
         type: 'low_stock',
         title,
         message,
