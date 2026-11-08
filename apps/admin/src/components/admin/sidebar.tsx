@@ -28,7 +28,6 @@ import {
   Receipt,
   ShieldCheck,
   User,
-  Crown,
   BarChart3,
   type LucideIcon,
 } from "lucide-react";
@@ -148,7 +147,7 @@ export function Sidebar({
   onClose: () => void;
 }) {
   const pathname = usePathname();
-  const { user } = useAdminAuth();
+  const { user, loading } = useAdminAuth();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     "/products": false,
     "/categories": false,
@@ -160,7 +159,8 @@ export function Sidebar({
 
   const visibleNavigation = navigation.filter((item) => {
     if (!item.roles) return true;
-    return user ? item.roles.includes(user.role) : false;
+    if (loading) return true;
+    return user ? item.roles.includes(user.role) : true;
   });
 
   return (
@@ -214,7 +214,7 @@ export function Sidebar({
         {/* Navigation list */}
         <nav
           aria-label="Main navigation"
-          className="flex-1 space-y-1.5 overflow-y-auto px-3 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          className="flex-1 space-y-1 overflow-y-auto px-3 py-3 [scrollbar-width:thin]"
         >
           {visibleNavigation.map((item) => {
             const Icon = item.icon;
@@ -356,29 +356,6 @@ export function Sidebar({
             );
           })}
         </nav>
-
-        {/* Upgrade to Pro Card */}
-        <div className="p-3 block md:hidden lg:block">
-          <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-white/[0.08] bg-slate-50 dark:bg-gradient-to-br dark:from-[#FF7900]/12 dark:via-[#111622] dark:to-[#0E131F] p-3.5">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FF7900]/20 text-[#FF7900]">
-                <Crown size={15} />
-              </div>
-              <p className="text-xs font-bold text-slate-900 dark:text-white">
-                Upgrade to Pro
-              </p>
-            </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-              Unlock advanced reports and automation.
-            </p>
-            <button
-              type="button"
-              className="mt-3 w-full rounded-xl bg-[#FF7900] hover:bg-[#e66d00] text-white py-2 text-xs font-bold shadow-md shadow-[#FF7900]/20 transition"
-            >
-              Upgrade Now
-            </button>
-          </div>
-        </div>
 
         {/* Footer info & Current user role */}
         <div className="border-t border-slate-200 p-3 text-[11px] text-slate-400 dark:border-white/10 dark:text-slate-400 block md:hidden lg:block">
