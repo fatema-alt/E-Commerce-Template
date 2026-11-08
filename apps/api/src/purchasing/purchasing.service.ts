@@ -484,7 +484,16 @@ export class PurchasingService {
       const variantMap = new Map(variants.map((v) => [v.id, v]));
 
       let subtotal = new Prisma.Decimal(0);
-      const preparedItems = [];
+      const preparedItems: Array<{
+        productId: string;
+        variantId?: string | null;
+        sku: string;
+        productName: string;
+        variantName?: string | null;
+        orderedQuantity: number;
+        unitCost: Prisma.Decimal;
+        totalCost: Prisma.Decimal;
+      }> = [];
 
       for (const item of dto.items) {
         const prod = productMap.get(item.productId);
