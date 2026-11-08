@@ -135,48 +135,59 @@ export function RecentOrdersWidget() {
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="border-b border-slate-100 dark:border-white/[0.06] text-slate-400">
-              <th className="pb-3 font-medium">Order ID</th>
-              <th className="pb-3 font-medium">Customer</th>
-              <th className="pb-3 font-medium">Amount</th>
-              <th className="pb-3 font-medium">Status</th>
-              <th className="pb-3 text-right font-medium">Time</th>
+              <th className="pb-3 pr-3 font-medium whitespace-nowrap">Order ID</th>
+              <th className="pb-3 px-2 font-medium">Customer</th>
+              <th className="pb-3 px-3 font-medium whitespace-nowrap">Amount</th>
+              <th className="pb-3 px-2 font-medium">Status</th>
+              <th className="pb-3 pl-2 text-right font-medium whitespace-nowrap">Time</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-white/[0.06]">
-            {orders.map((o) => (
-              <tr
-                key={o.id}
-                className="group hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors"
-              >
-                <td className="py-3 font-bold text-slate-800 dark:text-white">
-                  <Link
-                    href={`/orders/${o.id}`}
-                    className="hover:text-[#FF7900] transition"
-                  >
-                    #{o.orderNumber}
-                  </Link>
-                </td>
-                <td className="py-3">
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${o.avatarColor}`}
+            {orders.map((o) => {
+              const displayOrderNo =
+                o.orderNumber && o.orderNumber.length > 14
+                  ? `${o.orderNumber.slice(0, 10)}…`
+                  : o.orderNumber;
+
+              return (
+                <tr
+                  key={o.id}
+                  className="group hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors"
+                >
+                  <td className="py-3 pr-3 font-bold text-slate-800 dark:text-white whitespace-nowrap">
+                    <Link
+                      href={`/orders/${o.id}`}
+                      className="hover:text-[#FF7900] transition"
+                      title={`#${o.orderNumber}`}
                     >
-                      {o.initials}
+                      #{displayOrderNo}
+                    </Link>
+                  </td>
+                  <td className="py-3 px-2 max-w-[150px]">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${o.avatarColor}`}
+                      >
+                        {o.initials}
+                      </div>
+                      <span
+                        className="font-semibold text-slate-800 dark:text-slate-200 truncate"
+                        title={o.customerName}
+                      >
+                        {o.customerName}
+                      </span>
                     </div>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
-                      {o.customerName}
-                    </span>
-                  </div>
-                </td>
-                <td className="py-3 font-bold text-slate-900 dark:text-white tabular-nums">
-                  {o.amount}
-                </td>
-                <td className="py-3">{renderStatusBadge(o.status)}</td>
-                <td className="py-3 text-right text-slate-400 dark:text-[#8E9BAE] tabular-nums">
-                  {o.time}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="py-3 px-3 font-bold text-slate-900 dark:text-white tabular-nums whitespace-nowrap">
+                    {o.amount}
+                  </td>
+                  <td className="py-3 px-2 whitespace-nowrap">{renderStatusBadge(o.status)}</td>
+                  <td className="py-3 pl-2 text-right text-slate-400 dark:text-[#8E9BAE] tabular-nums whitespace-nowrap">
+                    {o.time}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

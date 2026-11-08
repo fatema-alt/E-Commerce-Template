@@ -49,7 +49,7 @@ function DashboardContent() {
       {/* Row 1: 4 KPI Cards */}
       <section
         aria-label="Key Performance Indicators"
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 items-stretch"
       >
         {/* 1. Total Sales */}
         <KPICard

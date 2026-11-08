@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 import { useDashboard } from "../dashboard-context";
 
 const CATEGORY_COLORS = ["#FF7900", "#FFA347", "#FFC285", "#FFE0B8"];
@@ -21,16 +20,46 @@ export function TopCategoriesWidget() {
 
   const categories =
     rawCategories.length > 0
-      ? rawCategories.map((c, i) => ({
-          name: c.name,
-          percentage: Number(c.percentage ?? c.share ?? defaultCategories[i % 4].percentage),
-          revenue: Number(c.revenue ?? c.amount ?? defaultCategories[i % 4].revenue),
-        }))
+      ? rawCategories.slice(0, 4).map((c, i) => {
+          const pct = Number(c.percentage ?? c.share ?? defaultCategories[i % 4].percentage);
+          return {
+            name: c.name,
+            percentage: isNaN(pct) || pct <= 0 ? defaultCategories[i % 4].percentage : pct,
+            revenue: Number(c.revenue ?? c.amount ?? defaultCategories[i % 4].revenue),
+          };
+        })
       : defaultCategories;
 
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const totalSales = 3400000;
+
+  // Donut geometry: radius 56, circumference = 2 * PI * 56 ≈ 351.86
+  const radius = 56;
+  const circumference = 2 * Math.PI * radius;
+
+  // Normalize percentages so sum = 100 for proper donut ring
+  const sumPct = categories.reduce((sum, item) => sum + item.percentage, 0) || 100;
+  const normalizedSlices = categories.map((c, i) => {
+    const normPct = (c.percentage / sumPct) * 100;
+    return {
+      ...c,
+      normPct,
+      color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
+    };
+  });
+
+  // Calculate cumulative offsets
+  let cumulative = 0;
+  const slicesWithOffset = normalizedSlices.map((slice) => {
+    const offset = cumulative;
+    cumulative += slice.normPct;
+    return {
+      ...slice,
+      dashArray: `${Math.max((slice.normPct / 100) * circumference - 3, 1)} ${circumference}`,
+      dashOffset: -((offset / 100) * circumference),
+    };
+  });
 
   return (
     <div className="relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#0E131F] p-5 shadow-sm transition-all h-full">
@@ -48,62 +77,50 @@ export function TopCategoriesWidget() {
         </Link>
       </div>
 
-      {/* Donut Chart with Center Text */}
-      <div className="relative flex items-center justify-center my-auto py-1">
-        <div className="relative h-40 w-40">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={categories}
-                dataKey="percentage"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                innerRadius={50}
-                outerRadius={68}
-                paddingAngle={3}
-                onMouseEnter={(_, idx) => setActiveIndex(idx)}
-                onMouseLeave={() => setActiveIndex(null)}
-              >
-                {categories.map((entry, index) => {
-                  const color = CATEGORY_COLORS[index % CATEGORY_COLORS.length];
-                  const isHovered = activeIndex === index;
-                  return (
-                    <Cell
-                      key={`cat-cell-${entry.name}`}
-                      fill={color}
-                      stroke="transparent"
-                      opacity={activeIndex !== null && !isHovered ? 0.45 : 1}
-                      className="cursor-pointer transition-opacity"
-                    />
-                  );
-                })}
-              </Pie>
-              <Tooltip
-                content={({ active, payload }) => {
-                  if (!active || !payload || !payload.length) return null;
-                  const item = payload[0].payload as (typeof categories)[0];
-                  return (
-                    <div className="rounded-xl border border-slate-200 bg-white/95 px-3 py-1.5 shadow-xl backdrop-blur-md dark:border-white/10 dark:bg-[#0E131F]/95 text-xs">
-                      <p className="font-bold text-slate-900 dark:text-white">
-                        {item.name}
-                      </p>
-                      <p className="text-[#FF7900] font-semibold">
-                        {item.percentage}%
-                      </p>
-                    </div>
-                  );
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+      {/* Rock-solid SVG Donut Chart with Center Text */}
+      <div className="relative flex items-center justify-center my-auto py-2">
+        <div className="relative h-44 w-44 flex items-center justify-center">
+          <svg viewBox="0 0 160 160" className="w-full h-full transform -rotate-90 overflow-visible">
+            {/* Background track circle */}
+            <circle
+              cx="80"
+              cy="80"
+              r={radius}
+              fill="transparent"
+              stroke="currentColor"
+              strokeWidth="15"
+              className="text-slate-100 dark:text-[#151B2B]"
+            />
 
-          {/* Donut Center */}
+            {/* Donut Segments */}
+            {slicesWithOffset.map((slice, idx) => {
+              const isHovered = activeIndex === idx;
+              return (
+                <circle
+                  key={`donut-slice-${slice.name}`}
+                  cx="80"
+                  cy="80"
+                  r={radius}
+                  fill="transparent"
+                  stroke={slice.color}
+                  strokeWidth={isHovered ? 18 : 15}
+                  strokeDasharray={slice.dashArray}
+                  strokeDashoffset={slice.dashOffset}
+                  opacity={activeIndex !== null && !isHovered ? 0.45 : 1}
+                  onMouseEnter={() => setActiveIndex(idx)}
+                  onMouseLeave={() => setActiveIndex(null)}
+                  className="transition-all duration-300 cursor-pointer"
+                />
+              );
+            })}
+          </svg>
+
+          {/* Donut Center Display */}
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
             <span className="text-[10px] font-medium text-slate-400">
               Total Sales
             </span>
-            <span className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">
+            <span className="text-sm font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">
               ${totalSales.toLocaleString()}
             </span>
           </div>

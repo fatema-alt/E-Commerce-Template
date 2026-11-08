@@ -171,7 +171,7 @@ export function KPICard({
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#0E131F] p-5 shadow-sm animate-pulse">
+      <div className="h-full min-h-[126px] flex flex-col justify-between rounded-2xl border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#0E131F] p-5 shadow-sm animate-pulse">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-xl bg-slate-200 dark:bg-white/10" />
@@ -186,26 +186,26 @@ export function KPICard({
 
   const CardContent = (
     <div
-      className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 dark:border-white/[0.07] p-5 shadow-sm transition-all duration-300 ${style.cardBg} ${style.borderHover}`}
+      className={`group relative flex h-full min-h-[126px] flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 dark:border-white/[0.07] p-5 shadow-sm transition-all duration-300 ${style.cardBg} ${style.borderHover}`}
     >
       {/* Top row: Left (Icon + Title), Right (Change pill + subtext) */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <div
             className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${style.iconBg} ${style.iconColor} transition-transform group-hover:scale-105`}
           >
             <Icon size={16} />
           </div>
-          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+          <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">
             {title}
           </span>
         </div>
 
         {/* Change pill & vs previous period */}
-        <div className="flex flex-col items-end">
+        <div className="flex flex-col items-end shrink-0">
           {change !== null ? (
             <span
-              className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums ${
+              className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums whitespace-nowrap ${
                 change >= 0
                   ? "bg-emerald-500/15 text-emerald-500 dark:text-emerald-400"
                   : "bg-rose-500/15 text-rose-500 dark:text-rose-400"
@@ -216,18 +216,18 @@ export function KPICard({
           ) : (
             <span className="text-xs text-slate-400">—</span>
           )}
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 whitespace-nowrap">
             {changeLabel}
           </span>
         </div>
       </div>
 
       {/* Value Row: Large bold text */}
-      <div className="mt-4 min-w-0">
+      <div className="mt-3 min-w-0">
         <div
           title={tooltipValue || formattedValue}
           aria-label={`${title}: ${tooltipValue || formattedValue}`}
-          className={`truncate font-extrabold tracking-tight text-slate-900 dark:text-white tabular-nums transition-colors duration-300 text-2xl sm:text-[28px] ${
+          className={`truncate font-extrabold tracking-tight text-slate-900 dark:text-white tabular-nums transition-colors duration-300 text-2xl sm:text-[26px] ${
             pulse ? "text-[#FF7900] scale-[1.01]" : ""
           }`}
         >
@@ -242,7 +242,7 @@ export function KPICard({
     return (
       <Link
         href={href}
-        className="block outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-2xl"
+        className="block h-full outline-none focus-visible:ring-2 focus-visible:ring-[#FF7900] rounded-2xl"
       >
         {CardContent}
       </Link>
