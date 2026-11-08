@@ -215,3 +215,23 @@ export const ManualPaymentStatus = {
 } as const
 
 export type ManualPaymentStatus = (typeof ManualPaymentStatus)[keyof typeof ManualPaymentStatus]
+
+
+export const PurchaseOrderStatus = {
+  DRAFT: 'DRAFT',
+  ORDERED: 'ORDERED',
+  PARTIALLY_RECEIVED: 'PARTIALLY_RECEIVED',
+  RECEIVED: 'RECEIVED',
+  CANCELLED: 'CANCELLED'
+} as const
+
+export type PurchaseOrderStatus = (typeof PurchaseOrderStatus)[keyof typeof PurchaseOrderStatus]
+
+
+export const PurchaseOrderPaymentStatus = {
+  UNPAID: 'UNPAID',
+  PARTIALLY_PAID: 'PARTIALLY_PAID',
+  PAID: 'PAID'
+} as const
+
+export type PurchaseOrderPaymentStatus = (typeof PurchaseOrderPaymentStatus)[keyof typeof PurchaseOrderPaymentStatus]

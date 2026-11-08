@@ -22,6 +22,8 @@ import {
   Palette,
   Image as ImageIcon,
   Activity,
+  Truck,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 
@@ -56,6 +58,17 @@ const navigation: NavItem[] = [
     ],
   },
   { label: "Inventory", href: "/inventory", icon: Boxes },
+  {
+    label: "Purchasing",
+    href: "/purchasing",
+    icon: Truck,
+    children: [
+      { label: "Purchase Orders", href: "/purchasing", icon: ClipboardList },
+      { label: "New Order", href: "/purchasing/new", icon: Plus },
+      { label: "Suppliers", href: "/purchasing/suppliers", icon: Users },
+      { label: "Goods Receipts", href: "/purchasing/receipts", icon: Boxes },
+    ],
+  },
   { label: "Orders", href: "/orders", icon: ShoppingCart },
   { label: "Promotions", href: "/promotions", icon: Tag },
   { label: "Customers", href: "/customers", icon: Users },
