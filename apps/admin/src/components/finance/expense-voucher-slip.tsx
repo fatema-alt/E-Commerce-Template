@@ -44,11 +44,11 @@ export function ExpenseVoucherSlip({ expense, onClose }: Props) {
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto print:p-0 print:bg-white print:static print:inset-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static print:inset-auto">
       {/* Outer Card */}
-      <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden dark:bg-slate-900 dark:border-slate-800 print:shadow-none print:border-none print:max-w-none print:w-full">
+      <div className="relative w-full max-w-2xl max-h-[calc(100vh-2rem)] sm:max-h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden dark:bg-slate-900 dark:border-slate-800 my-auto print:max-h-none print:shadow-none print:border-none print:max-w-none print:w-full">
         {/* Top Action Bar (hidden on print) */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50 dark:bg-slate-800/60 dark:border-slate-800 print:hidden">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-6 py-3.5 bg-slate-50 dark:bg-slate-800/80 dark:border-slate-800 print:hidden">
           <div className="flex items-center gap-2">
             <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
             <h3 className="text-base font-bold text-slate-900 dark:text-white">
@@ -80,7 +80,7 @@ export function ExpenseVoucherSlip({ expense, onClose }: Props) {
         </div>
 
         {/* Printable Voucher Content */}
-        <div className="p-8 font-sans text-slate-800 dark:text-slate-200 print:text-black print:p-6 print:m-0">
+        <div className="p-6 sm:p-8 font-sans text-slate-800 dark:text-slate-200 overflow-y-auto flex-1 min-h-0 overscroll-contain print:text-black print:p-6 print:m-0 print:overflow-visible">
           {/* Header */}
           <div className="border-b-2 border-slate-900 pb-5 dark:border-slate-600 print:border-black">
             <div className="flex items-start justify-between">
