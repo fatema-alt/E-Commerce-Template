@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 import { useCart } from "../lib/cart";
 import type { Product } from "../lib/storefront";
+import { useLanguage } from "../lib/i18n";
 
 const iconProps = {
   viewBox: "0 0 24 24",
@@ -15,23 +16,24 @@ const iconProps = {
 };
 export function ShoppingLinks() {
   const cart = useCart();
+  const { t, formatNumber, isBn } = useLanguage();
   return (
     <nav aria-label="Shopping" className="shopping-links">
-      <Link href="/account" aria-label="Account" title="Account">
+      <Link href="/account" aria-label={t("nav_account")} title={t("nav_account")}>
         <svg {...iconProps}>
           <circle cx="12" cy="8" r="4" />
           <path d="M4 21c0-4 3.6-6 8-6s8 2 8 6" />
         </svg>
       </Link>
-      <Link href="/wishlist" aria-label="Wishlist" title="Wishlist">
+      <Link href="/wishlist" aria-label={t("nav_wishlist")} title={t("nav_wishlist")}>
         <svg {...iconProps}>
           <path d="M12 20.5s-8-4.9-8-11A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8 2.5c0 6.1-8 11-8 11z" />
         </svg>
       </Link>
       <Link
         href="/cart"
-        aria-label={`Cart, ${cart.count} items`}
-        title="Cart"
+        aria-label={isBn ? `ব্যাগ, ${formatNumber(cart.count)}টি পণ্য` : `Cart, ${cart.count} items`}
+        title={t("nav_cart")}
         className="header-cart-anchor"
         data-cart-target="true"
         data-cart-icon="true"
@@ -43,7 +45,7 @@ export function ShoppingLinks() {
           <path d="M5 8h14l-1 12H6L5 8z" />
           <path d="M9 8V7a3 3 0 0 1 6 0v1" />
         </svg>
-        {cart.count > 0 && <span className="cart-count">{cart.count}</span>}
+        {cart.count > 0 && <span className="cart-count">{formatNumber(cart.count)}</span>}
       </Link>
     </nav>
   );
@@ -67,6 +69,7 @@ function wishlistSubscribe(callback: () => void) {
 }
 export function WishlistButton({ product }: { product: Product }) {
   const [notice, setNotice] = useState("");
+  const { isBn } = useLanguage();
   const raw = useSyncExternalStore(
     wishlistSubscribe,
     wishlistSnapshot,
@@ -108,13 +111,13 @@ export function WishlistButton({ product }: { product: Product }) {
               JSON.stringify(exists ? items : [...items, product]),
             );
             window.dispatchEvent(new Event(wishlistEvent));
-            setNotice(exists ? "Removed from wishlist." : "Saved to wishlist.");
+            setNotice(exists ? (isBn ? "উইশলিস্ট থেকে সরানো হয়েছে।" : "Removed from wishlist.") : (isBn ? "উইশলিস্টে যুক্ত করা হয়েছে।" : "Saved to wishlist."));
           } catch {
-            setNotice("Unable to save on this browser.");
+            setNotice(isBn ? "ব্রাউজারে সেভ করা সম্ভব হয়নি।" : "Unable to save on this browser.");
           }
         }}
       >
-        {saved ? "♥ Saved to wishlist" : "♡ Save to wishlist"}
+        {saved ? (isBn ? "♥ উইশলিস্টে যুক্ত" : "♥ Saved to wishlist") : (isBn ? "♡ উইশলিস্টে রাখুন" : "♡ Save to wishlist")}
       </button>
       <span className="small" role="status">
         {notice}

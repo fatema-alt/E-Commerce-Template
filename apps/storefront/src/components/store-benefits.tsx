@@ -1,8 +1,34 @@
+"use client";
+
 import Link from "next/link";
+import { useLanguage } from "../lib/i18n";
+
 export function StoreBenefits() {
-  return <div className="container store-benefits" aria-label="Explore your store">
-    <Link href="/categories"><span className="benefit-symbol" aria-hidden="true">↗</span><span><strong>More to discover</strong><small>Find your everyday favourites</small></span></Link>
-    <Link href="/wishlist"><span className="benefit-symbol" aria-hidden="true">♡</span><span><strong>Save what you love</strong><small>Keep your favourites in one place</small></span></Link>
-    <Link href="/orders"><span className="benefit-symbol" aria-hidden="true">↦</span><span><strong>Your orders, in view</strong><small>Follow your shopping journey</small></span></Link>
-  </div>;
+  const { t } = useLanguage();
+
+  return (
+    <div className="container store-benefits" aria-label="Explore your store">
+      <Link href="/categories">
+        <span className="benefit-symbol" aria-hidden="true">↗</span>
+        <span>
+          <strong>{t("benefit_discovery_title")}</strong>
+          <small>{t("benefit_discovery_sub")}</small>
+        </span>
+      </Link>
+      <Link href="/wishlist">
+        <span className="benefit-symbol" aria-hidden="true">♡</span>
+        <span>
+          <strong>{t("benefit_wishlist_title")}</strong>
+          <small>{t("benefit_wishlist_sub")}</small>
+        </span>
+      </Link>
+      <Link href="/orders">
+        <span className="benefit-symbol" aria-hidden="true">↦</span>
+        <span>
+          <strong>{t("benefit_orders_title")}</strong>
+          <small>{t("benefit_orders_sub")}</small>
+        </span>
+      </Link>
+    </div>
+  );
 }

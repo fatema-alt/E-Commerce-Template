@@ -18,6 +18,7 @@ import {
 import { PaymentMethodSelector } from "./payment-method-selector";
 import { SectionCard, PriceSummary, ProductThumbnail } from "./shopping-ui";
 import { shippingSummary } from "../lib/shipping-copy";
+import { useLanguage } from "../lib/i18n";
 import {
   getTrackingItemId,
   trackAddToCart,
@@ -91,6 +92,7 @@ export function CartCheckout({
 }) {
   const cart = useCart();
   const router = useRouter();
+  const { t, formatPrice, formatNumber, isBn } = useLanguage();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quotedKey, setQuotedKey] = useState("");
   const [error, setError] = useState("");
@@ -703,12 +705,14 @@ export function CartCheckout({
             ? "Choose Your Payment Method"
             : checkout
               ? "Checkout"
-              : "Your cart"}
+              : (isBn ? "আপনার শপিং ব্যাগ" : "Your cart")}
         </h1>
         <p className="muted">
           {checkout
             ? "Complete your details and review your order."
-            : `${cart.count} ${cart.count === 1 ? "item" : "items"} in your shopping bag`}
+            : isBn
+              ? `${formatNumber(cart.count)}টি পণ্য আপনার শপিং ব্যাগে আছে`
+              : `${cart.count} ${cart.count === 1 ? "item" : "items"} in your shopping bag`}
         </p>
       </header>
       {payment && (
@@ -745,10 +749,10 @@ export function CartCheckout({
       {!cart.lines.length ? (
         <div className="empty-content">
           <ProductThumbnail name="Shopping bag" />
-          <h2>Your cart is empty</h2>
-          <p>Explore the catalog and find something you love.</p>
+          <h2>{t("drawer_empty")}</h2>
+          <p>{isBn ? "ক্যাটালগ ঘুরে দেখুন এবং পছন্দের পণ্যটি বেছে নিন।" : "Explore the catalog and find something you love."}</p>
           <Link className="primary-button" href="/shop">
-            Explore Products
+            {isBn ? "পণ্য দেখুন" : "Explore Products"}
           </Link>
         </div>
       ) : (
@@ -851,7 +855,7 @@ export function CartCheckout({
                           >
                             <path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" />
                           </svg>
-                          Remove
+                          {t("drawer_remove")}
                         </button>
                       </div>
                     </article>
@@ -864,7 +868,7 @@ export function CartCheckout({
                   : "Prices and stock are checked with the store."}
               </p>
               <Link className="shopping-back" href="/shop">
-                ← Continue Shopping
+                ← {t("drawer_continue")}
               </Link>
             </SectionCard>
           )}
@@ -1310,7 +1314,7 @@ export function CartCheckout({
                       if (locked) e.preventDefault();
                     }}
                   >
-                    Proceed to Checkout →
+                    {isBn ? `${t("drawer_checkout_btn")} →` : "Proceed to Checkout →"}
                   </Link>
                 )}
               </>

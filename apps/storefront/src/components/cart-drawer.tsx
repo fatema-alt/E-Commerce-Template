@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { CartCheckout } from "./cart-checkout";
+import { useLanguage } from "../lib/i18n";
 
 /** Native modal supplies focus containment, Escape handling and focus restoration. */
 export function CartDrawer() {
   const dialog = useRef<HTMLDialogElement>(null);
   const pathname = usePathname();
   const [loaded, setLoaded] = useState(false);
+  const { t } = useLanguage();
   useEffect(() => {
     const element = dialog.current;
     if (!element) return;
@@ -50,14 +52,14 @@ export function CartDrawer() {
       ref={dialog}
       id="shopping-bag-drawer"
       className="cart-drawer"
-      aria-label="Your shopping bag"
+      aria-label={t("drawer_title")}
       onClick={(event) => {
         if (event.target === event.currentTarget) event.currentTarget.close();
       }}
     >
       <div className="cart-drawer-content">
         <header className="cart-drawer-heading">
-          <strong>DS Mart · Shopping bag</strong>
+          <strong>{t("drawer_title")}</strong>
           <button
             type="button"
             className="secondary-button"

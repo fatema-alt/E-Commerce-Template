@@ -84,6 +84,16 @@ p{margin:0 0 1em}
 :root[data-theme=dark] .theme-switcher .sun{color:var(--c-muted)}
 :root[data-theme=dark] .theme-switcher .moon{color:var(--lime-ink)}
 
+/* language-switcher */
+.language-switcher{position:relative;flex:none;display:inline-flex;align-items:center;background:var(--glass-solid);border:1px solid var(--c-line);border-radius:var(--r-pill);padding:3px;height:44px;gap:2px}
+.language-switcher .lang-btn{border:0;background:transparent;color:var(--c-muted);font-family:inherit;font-size:.82rem;font-weight:600;padding:0 10px;height:36px;border-radius:var(--r-pill);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .2s cubic-bezier(.3,.9,.3,1);white-space:nowrap}
+.language-switcher .lang-btn:hover{color:var(--c-ink)}
+.language-switcher .lang-btn.active{background:var(--lime);color:var(--lime-ink);font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+:root[data-theme=dark] .language-switcher .lang-btn.active{background:var(--lime);color:var(--lime-ink)}
+@media(max-width:560px){.language-switcher{height:40px;padding:2px}.language-switcher .lang-btn{height:34px;padding:0 7px;font-size:.76rem}}
+
+:root[data-locale=bn]{--font-sans:var(--font-hind),"Hind Siliguri","Noto Sans Bengali",var(--font-hanken),system-ui,sans-serif}
+
 
 .search-below{margin-top:8px}
 .category-nav{margin-top:0;margin-bottom:0;padding:6px 0 10px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}

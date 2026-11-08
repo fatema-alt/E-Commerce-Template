@@ -2,7 +2,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ProductThumbnail } from "./shopping-ui";
-import { money } from "../lib/shop-client";
+import { useLanguage } from "../lib/i18n";
 type Suggestion = {
   id: string;
   name: string;
@@ -16,6 +16,7 @@ export function SearchCombobox() {
   const root = useRef<HTMLFormElement>(null);
   const path = usePathname();
   const router = useRouter();
+  const { t, formatPrice, formatNumber, isBn } = useLanguage();
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -93,7 +94,7 @@ export function SearchCombobox() {
       }}
     >
       <label className="sr-only" htmlFor={id}>
-        Search products
+        {t("search_placeholder")}
       </label>
       <input
         ref={input}
@@ -109,7 +110,7 @@ export function SearchCombobox() {
         aria-activedescendant={
           opened && active >= 0 && items[active] ? `${id}-${active}` : undefined
         }
-        placeholder="Search products…"
+        placeholder={t("search_placeholder")}
         minLength={1}
         maxLength={200}
         value={query}
@@ -149,21 +150,23 @@ export function SearchCombobox() {
           }
         }}
       />
-      <button type="submit" aria-label="Search all products">
-        Search
+      <button type="submit" aria-label={t("search_btn")}>
+        {t("search_btn")}
       </button>
       {opened && (
         <div className="search-panel">
-          <p className="search-panel-label">Product suggestions</p>
+          <p className="search-panel-label">{t("search_suggestions")}</p>
           <div role="status" className="search-feedback">
             {loading
-              ? "Searching the catalog…"
+              ? t("searching_catalog")
               : state.error ||
                 (!items.length
-                  ? "No matching products. Try a different search."
-                  : `${items.length} suggestions`)}
+                  ? t("no_matching_products")
+                  : isBn
+                    ? `${formatNumber(items.length)}টি পণ্য পাওয়া গেছে`
+                    : `${items.length} suggestions`)}
           </div>
-          <ul id={`${id}-list`} role="listbox" aria-label="Product suggestions">
+          <ul id={`${id}-list`} role="listbox" aria-label={t("search_suggestions")}>
             {items.map((item, index) => (
               <li
                 key={item.id}
@@ -183,7 +186,7 @@ export function SearchCombobox() {
                 <ProductThumbnail src={item.imageUrl} name={item.name} />
                 <span>
                   <strong>{item.name}</strong>
-                  <small>{money(item.price)}</small>
+                  <small>{formatPrice(item.price)}</small>
                 </span>
               </li>
             ))}
@@ -193,7 +196,9 @@ export function SearchCombobox() {
             href={`/search?q=${encodeURIComponent(term)}`}
             onClick={() => setDismissed(true)}
           >
-            View all results for “{term}” →
+            {isBn
+              ? `“${term}”-এর সব ফলাফল দেখুন →`
+              : `View all results for “${term}” →`}
           </a>
         </div>
       )}

@@ -1,21 +1,39 @@
+"use client";
+
 import Link from "next/link";
 import { SearchCombobox } from "./search-combobox";
 import { AnnouncementRibbon } from "./store-engagement";
 import { ThemeSwitcher } from "./theme-switcher";
+import { LanguageSwitcher } from "./language-switcher";
 import { ShoppingLinks } from "./shopping-actions";
 import { BrandLogo } from "./brand-logo";
 import { safeHref, type CmsConfig, type MenuItem } from "../lib/cms";
+import { useLanguage } from "../lib/i18n";
+
 function Menu({ items }: { items: MenuItem[] }) {
+  const { t, locale } = useLanguage();
+
+  const translateMenuLabel = (label: string): string => {
+    if (locale !== "bn") return label;
+    const lower = label.trim().toLowerCase();
+    if (lower === "shop all" || lower === "all products" || lower === "shop") return t("nav_shop_all");
+    if (lower === "categories" || lower === "browse categories" || lower === "shop by category") return t("nav_categories");
+    if (lower === "wishlist" || lower === "saved favourites" || lower === "your wishlist") return t("nav_wishlist");
+    if (lower === "track order" || lower === "track your order" || lower === "track") return t("nav_track");
+    if (lower === "shopping help" || lower === "help" || lower === "support") return t("nav_help");
+    return label;
+  };
+
   return (
     <ul className="cms-menu">
       {items.map((item) => (
         <li key={item.id}>
           {safeHref(item.href) && (
-            <Link href={safeHref(item.href)!}>{item.label}</Link>
+            <Link href={safeHref(item.href)!}>{translateMenuLabel(item.label)}</Link>
           )}
           {item.children?.length ? (
             <details>
-              <summary>More: {item.label}</summary>
+              <summary>More: {translateMenuLabel(item.label)}</summary>
               <Menu items={item.children} />
             </details>
           ) : null}
@@ -24,12 +42,15 @@ function Menu({ items }: { items: MenuItem[] }) {
     </ul>
   );
 }
+
 export function Header({ config }: { config: CmsConfig }) {
   const { settings } = config;
+  const { t } = useLanguage();
   const menu = config.menus[settings.header?.menuKey || "main"] || [];
   const categoryMenu = settings.header?.categoryMenuKey
     ? config.menus[settings.header.categoryMenuKey]
     : [];
+
   return (
     <>
       <AnnouncementRibbon
@@ -57,6 +78,7 @@ export function Header({ config }: { config: CmsConfig }) {
           {(!settings.header ||
             settings.header.searchPlacement === "header") && <SearchCombobox />}
           <ShoppingLinks />
+          <LanguageSwitcher />
           <ThemeSwitcher />
         </div>
         {settings.header?.searchPlacement === "below" && (
@@ -69,11 +91,11 @@ export function Header({ config }: { config: CmsConfig }) {
             <Menu items={menu} />
           ) : (
             <>
-              <Link href="/shop">Shop all</Link>
-              <Link href="/categories">Browse categories</Link>
-              <Link href="/wishlist">Your wishlist</Link>
-              <Link href="/track">Track order</Link>
-              <Link href="/help">Shopping help</Link>
+              <Link href="/shop">{t("nav_shop_all")}</Link>
+              <Link href="/categories">{t("nav_categories")}</Link>
+              <Link href="/wishlist">{t("nav_wishlist")}</Link>
+              <Link href="/track">{t("nav_track")}</Link>
+              <Link href="/help">{t("nav_help")}</Link>
             </>
           )}
         </nav>
@@ -89,8 +111,11 @@ export function Header({ config }: { config: CmsConfig }) {
     </>
   );
 }
+
 export function Footer({ config }: { config: CmsConfig }) {
   const { settings } = config;
+  const { t, formatNumber } = useLanguage();
+
   return (
     <footer className={`footer tone-${config.tokens.footerStyle || "light"}`}>
       <div className="container footer-layout">
@@ -98,8 +123,8 @@ export function Footer({ config }: { config: CmsConfig }) {
           <Link href="/" className="wordmark" aria-label="DS Mart homepage">
             <BrandLogo />
           </Link>
-          <p className="footer-tagline">Shop smart. Live smart.</p>
-          <p>Everyday essentials and fresh discoveries, delivered.</p>
+          <p className="footer-tagline">{t("footer_tagline")}</p>
+          <p>{t("footer_desc")}</p>
           {settings.contact?.address && <p>{settings.contact.address}</p>}
           {settings.contact?.email && (
             <p>
@@ -117,18 +142,18 @@ export function Footer({ config }: { config: CmsConfig }) {
           </nav>
         ))}
         <nav aria-label="Shopping help">
-          <h2>Customer care</h2>
-          <Link href="/help">Shopping help</Link>
-          <Link href="/contact">Contact us</Link>
-          <Link href="/track">Track your order</Link>
-          <Link href="/account">Your account</Link>
+          <h2>{t("footer_customer_care")}</h2>
+          <Link href="/help">{t("footer_shopping_help")}</Link>
+          <Link href="/contact">{t("footer_contact_us")}</Link>
+          <Link href="/track">{t("footer_track_order")}</Link>
+          <Link href="/account">{t("footer_your_account")}</Link>
         </nav>
         <nav aria-label="Explore DS Mart">
-          <h2>Explore DS Mart</h2>
-          <Link href="/shop">All products</Link>
-          <Link href="/categories">Shop by category</Link>
-          <Link href="/wishlist">Saved favourites</Link>
-          <Link href="/cart">Your shopping bag</Link>
+          <h2>{t("footer_explore")}</h2>
+          <Link href="/shop">{t("footer_all_products")}</Link>
+          <Link href="/categories">{t("footer_by_category")}</Link>
+          <Link href="/wishlist">{t("footer_saved")}</Link>
+          <Link href="/cart">{t("footer_bag")}</Link>
         </nav>
         <nav aria-label="Social and legal links">
           {[
@@ -145,9 +170,9 @@ export function Footer({ config }: { config: CmsConfig }) {
       </div>
       <div className="container footer-bottom">
         <span>
-          © {new Date().getUTCFullYear()} DS Mart. All rights reserved.
+          © {formatNumber(new Date().getUTCFullYear())} DS Mart. {t("footer_rights")}
         </span>
-        <span>Shop smart. Live smart.</span>
+        <span>{t("footer_tagline")}</span>
       </div>
     </footer>
   );

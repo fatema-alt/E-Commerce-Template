@@ -4,6 +4,7 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import type { Category } from "../lib/storefront";
+import { useLanguage } from "../lib/i18n";
 
 export interface DepartmentItem {
   id: string;
@@ -315,6 +316,18 @@ export function DepartmentBento({
   columns = 4,
   featuredCategoryId,
 }: DepartmentBentoProps) {
+  const { t, formatNumber, isBn } = useLanguage();
+
+  const displayTitle =
+    title === "Shop by Department" && isBn
+      ? t("dept_section_title")
+      : title;
+
+  const displaySubtitle =
+    subtitle === "Explore curated collections across everyday essentials." && isBn
+      ? t("dept_section_subtitle")
+      : subtitle;
+
   const departments = resolveDynamicDepartments(categories, {
     layoutType,
     featuredCategoryId,
@@ -341,17 +354,17 @@ export function DepartmentBento({
         <div className="department-bento-heading-row">
           <div>
             <h2 id="department-heading" className="department-bento-title">
-              {title}
+              {displayTitle}
             </h2>
-            {subtitle && (
+            {displaySubtitle && (
               <p className="department-bento-subtitle">
-                {subtitle}
+                {displaySubtitle}
               </p>
             )}
           </div>
           {showViewAll && hasMore && (
             <Link href="/categories" className="department-bento-all-btn">
-              <span>All Categories</span>
+              <span>{isBn ? t("dept_view_all") : "All Categories"}</span>
               <span aria-hidden="true">→</span>
             </Link>
           )}
@@ -395,7 +408,13 @@ export function DepartmentBento({
                 <div className="bento-card-caption">
                   <span className="bento-card-name">{dept.name}</span>
                   {dept.productCountFormatted && (
-                    <span className="bento-card-count">{dept.productCountFormatted}</span>
+                    <span className="bento-card-count">
+                      {isBn
+                        ? dept.productCountFormatted
+                            .replace(/\d+/g, (m) => formatNumber(m))
+                            .replace(/Products?/i, t("dept_products_suffix"))
+                        : dept.productCountFormatted}
+                    </span>
                   )}
                 </div>
               )}

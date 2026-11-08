@@ -5,6 +5,7 @@ import { useState, useSyncExternalStore, type MouseEvent } from "react";
 import type { Product } from "../lib/storefront";
 import { useCart } from "../lib/cart";
 import { getTrackingItemId, trackAddToCart } from "../lib/gtm";
+import { useLanguage } from "../lib/i18n";
 
 const money = new Intl.NumberFormat("en-BD", {
   style: "currency",
@@ -64,6 +65,7 @@ export function ProductCard({
   compact?: boolean;
 }) {
   const cart = useCart();
+  const { t, formatPrice, formatNumber } = useLanguage();
   const [adding, setAdding] = useState(false);
   const [addedNotice, setAddedNotice] = useState(false);
   const [cartError, setCartError] = useState("");
@@ -195,12 +197,12 @@ export function ProductCard({
         <div className="product-card-badges">
           {hasDiscount && discountPercent > 0 && (
             <span className="card-badge badge-sale">
-              -{discountPercent}%
+              -{formatNumber(discountPercent)}%
             </span>
           )}
           {!product.inStock && (
             <span className="card-badge badge-out">
-              Out of Stock
+              {t("card_out_of_stock")}
             </span>
           )}
         </div>
@@ -209,7 +211,7 @@ export function ProductCard({
         <button
           type="button"
           onClick={handleToggleWishlist}
-          aria-label={isWishlisted ? "Remove from wishlist" : "Save to wishlist"}
+          aria-label={isWishlisted ? t("card_remove_wishlist") : t("card_save_wishlist")}
           className={`card-wishlist-btn ${isWishlisted ? "active" : ""}`}
         >
           <svg
@@ -240,7 +242,7 @@ export function ProductCard({
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
-                  <span>Added to Cart!</span>
+                  <span>{t("card_added")}</span>
                 </>
               ) : (
                 <>
@@ -249,7 +251,7 @@ export function ProductCard({
                     <circle cx="19" cy="21" r="1" />
                     <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
                   </svg>
-                  <span>Quick Add</span>
+                  <span>{t("card_quick_add")}</span>
                 </>
               )}
             </button>
@@ -273,9 +275,9 @@ export function ProductCard({
 
         {/* Price Row */}
         <div className="price-row">
-          <strong className="current-price">{money.format(product.price)}</strong>
+          <strong className="current-price">{formatPrice(product.price)}</strong>
           {hasDiscount && discountPercent > 0 && (
-            <del className="compare-price">{money.format(product.compareAtPrice!)}</del>
+            <del className="compare-price">{formatPrice(product.compareAtPrice)}</del>
           )}
         </div>
 
@@ -283,7 +285,7 @@ export function ProductCard({
         <div className="product-card-footer">
           <span className={`stock-indicator ${product.inStock ? "in-stock" : "out-of-stock"}`}>
             <span className="stock-dot" />
-            {product.inStock ? "In Stock" : "Unavailable"}
+            {product.inStock ? t("card_in_stock") : t("card_unavailable")}
           </span>
 
           {cartError && (

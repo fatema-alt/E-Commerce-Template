@@ -1,2 +1,2 @@
-// Static, application-owned bootstrap: preserve published CMS colors in light mode.
-export const themeScript = `(function(){var p='system';try{var v=localStorage.getItem('commerce-storefront-theme');if(v==='dark'||v==='light')p=v}catch(e){}document.documentElement.dataset.theme=p==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):p})()`;
+// Static, application-owned bootstrap: preserve published CMS colors and language preference.
+export const themeScript = `(function(){var p='system';try{var v=localStorage.getItem('commerce-storefront-theme');if(v==='dark'||v==='light')p=v}catch(e){}document.documentElement.dataset.theme=p==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):p;try{var loc=localStorage.getItem('commerce-storefront-locale');if(loc==='bn'||loc==='en'){document.documentElement.lang=loc;document.documentElement.dataset.locale=loc}}catch(e){}})()`;

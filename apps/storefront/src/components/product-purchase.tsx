@@ -8,6 +8,7 @@ import type { Product } from "../lib/storefront";
 import { money } from "../lib/shop-client";
 import { getTrackingItemId, trackAddToCart } from "../lib/gtm";
 import { WishlistButton } from "./shopping-actions";
+import { useLanguage } from "../lib/i18n";
 
 export function ProductPurchase({
   product,
@@ -20,6 +21,7 @@ export function ProductPurchase({
 }) {
   const cart = useCart();
   const router = useRouter();
+  const { t, formatPrice, formatNumber, isBn } = useLanguage();
   const variants = product.variants || [];
   const [quantity, setQuantity] = useState("1");
   const [message, setMessage] = useState("");
@@ -255,25 +257,25 @@ export function ProductPurchase({
         <div className="pdp-price-line flex flex-wrap items-baseline gap-3">
           <span className="purchase-price text-2xl sm:text-3xl font-extrabold text-[var(--c-ink)] tracking-tight">
             {needsVariant && variants.length > 1 ? "From " : ""}
-            {money(needsVariant ? Math.min(...variants.map((v) => v.price)) : price)}
+            {formatPrice(needsVariant ? Math.min(...variants.map((v) => v.price)) : price)}
           </span>
 
           {compare && compare > price && (
             <del className="text-sm sm:text-base text-[var(--c-muted)] font-normal line-through">
-              {money(compare)}
+              {formatPrice(compare)}
             </del>
           )}
 
           {discountPercent > 0 && (
             <span className="pdp-discount inline-flex items-center px-2.5 py-0.5 rounded-full bg-lime-400/25 border border-lime-400/40 text-[var(--c-ink)] text-xs font-black uppercase tracking-wider">
-              {discountPercent}% OFF
+              {formatNumber(discountPercent)}% {isBn ? "ছাড়" : "OFF"}
             </span>
           )}
         </div>
 
         {saving > 0 && (
           <p className="pdp-savings text-xs font-semibold text-emerald-600 dark:text-emerald-400 m-0">
-            You save {money(saving)} per item
+            {isBn ? `${t("pdp_save")} ${formatPrice(saving)} (${t("pdp_per_item")})` : `You save ${formatPrice(saving)} per item`}
           </p>
         )}
 
@@ -304,14 +306,14 @@ export function ProductPurchase({
           aria-hidden="true"
         />
         {totalStock < 1
-          ? "Currently out of stock"
+          ? t("pdp_out_of_stock")
           : needsVariant
-            ? "Choose an option to check availability"
+            ? (isBn ? "উপলব্ধতা যাচাই করতে ভ্যারিয়েন্ট নির্বাচন করুন" : "Choose an option to check availability")
             : available < 1
-              ? "This option is out of stock"
+              ? (isBn ? "এই ভ্যারিয়েন্টটির স্টক শেষ" : "This option is out of stock")
               : available <= 5
-                ? `Only ${available} left in stock — order soon`
-                : "In stock and ready to ship"}
+                ? (isBn ? `মাত্র ${formatNumber(available)}টি অবশিষ্ট আছে — দ্রুত অর্ডার করুন` : `Only ${available} left in stock — order soon`)
+                : t("pdp_in_stock")}
       </div>
 
       {/* 3. Product Variants Selection Chips */}
@@ -343,7 +345,7 @@ export function ProductPurchase({
                 >
                   <strong className="text-xs block leading-tight">{v.name}</strong>
                   <small className={`text-[10px] block mt-0.5 ${isSelected ? "opacity-90" : "text-[var(--c-muted)]"}`}>
-                    {!isOut ? money(v.price) : "Out of stock"}
+                    {!isOut ? formatPrice(v.price) : t("card_out_of_stock")}
                   </small>
                 </button>
               );
@@ -475,10 +477,10 @@ export function ProductPurchase({
               <path d="M16 10a4 4 0 0 1-8 0" />
             </svg>
             {busy
-              ? "Adding…"
+              ? t("pdp_adding")
               : available < 1 && !needsVariant
-                ? "Out of stock"
-                : "Add to cart"}
+                ? t("card_out_of_stock")
+                : t("pdp_add_to_cart")}
           </button>
 
           <button
@@ -487,7 +489,7 @@ export function ProductPurchase({
             disabled={busy || !valid || needsVariant || available < 1}
             onClick={() => add(true)}
           >
-            <span>Buy now</span>
+            <span>{t("pdp_buy_now")}</span>
             <span aria-hidden="true">↗</span>
           </button>
         </div>
@@ -502,7 +504,7 @@ export function ProductPurchase({
               href="/cart"
               className="underline font-bold hover:text-emerald-600 ml-2"
             >
-              View cart →
+              {t("pdp_view_cart")}
             </Link>
           </p>
         )}
@@ -536,7 +538,7 @@ export function ProductPurchase({
             {product.name}
           </span>
           <span className="mobile-price">
-            {money(price)}
+            {formatPrice(price)}
           </span>
         </div>
 
@@ -547,7 +549,7 @@ export function ProductPurchase({
             disabled={busy || !valid || needsVariant || available < 1}
             onClick={() => add(false)}
           >
-            <span>{busy ? "Adding…" : available < 1 ? "Sold out" : "Add to cart"}</span>
+            <span>{busy ? t("pdp_adding") : available < 1 ? t("pdp_sold_out") : t("pdp_add_to_cart")}</span>
             <svg
               width="14"
               height="14"
