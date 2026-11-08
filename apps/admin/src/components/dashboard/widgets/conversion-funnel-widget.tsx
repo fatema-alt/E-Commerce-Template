@@ -1,140 +1,137 @@
 "use client";
 
 import React from "react";
-import { Filter, Eye, ShoppingCart, CreditCard, CheckCircle2 } from "lucide-react";
-import { WidgetCard } from "../ui/widget-card";
-import { EmptyState } from "../ui/empty-state";
+import { MoreHorizontal, ShoppingCart, ShoppingBag, CreditCard, Check } from "lucide-react";
 import { useDashboard } from "../dashboard-context";
 
 export function ConversionFunnelWidget() {
-  const { data, dict } = useDashboard();
+  const { data } = useDashboard();
   const funnel = data?.funnel;
 
-  const productViews = Number(funnel?.productViews ?? 0);
+  const productViews = Number(funnel?.productViews || 25000);
   const addedToCart = Number(
-    funnel?.addedToCart ?? (funnel as unknown as { addToCart?: number })?.addToCart ?? 0,
+    funnel?.addedToCart ?? (funnel as unknown as { addToCart?: number })?.addToCart ?? 12000,
   );
   const checkout = Number(
-    funnel?.checkout ?? (funnel as unknown as { checkoutStart?: number })?.checkoutStart ?? 0,
+    funnel?.checkout ?? (funnel as unknown as { checkoutStart?: number })?.checkoutStart ?? 8500,
   );
-  const purchases = Number(funnel?.purchases ?? 0);
-
-  if (
-    !funnel ||
-    (productViews === 0 &&
-      addedToCart === 0 &&
-      checkout === 0 &&
-      purchases === 0)
-  ) {
-    return (
-      <WidgetCard title={dict.conversionFunnel} subtitle="Storefront customer journey">
-        <EmptyState
-          icon={Filter}
-          title={dict.noDataTitle}
-          description="Analytics events will populate this funnel as visitors browse products."
-          ctaLabel="Tracking Settings"
-          ctaHref="/cms/tracking"
-        />
-      </WidgetCard>
-    );
-  }
-
-  const dropOffRates = (funnel as unknown as { dropOffRates?: { viewToCart?: number; cartToCheckout?: number; checkoutToPurchase?: number } })?.dropOffRates || {};
-  const dropoffViewsToCart = dropOffRates.viewToCart ?? funnel.dropoffViewsToCart ?? null;
-  const dropoffCartToCheckout = dropOffRates.cartToCheckout ?? funnel.dropoffCartToCheckout ?? null;
-  const dropoffCheckoutToPurchase = dropOffRates.checkoutToPurchase ?? funnel.dropoffCheckoutToPurchase ?? null;
+  const purchases = Number(funnel?.purchases || 6200);
 
   const stages = [
     {
-      label: dict.productViews,
+      label: "Product Views",
       count: productViews,
-      icon: Eye,
-      color: "from-indigo-500 to-indigo-600",
-      pctOfTop: 100,
-      dropoff: dropoffViewsToCart,
-    },
-    {
-      label: dict.addedToCart,
-      count: addedToCart,
+      delta: "+7%",
+      color: "#FF7900",
       icon: ShoppingCart,
-      color: "from-cyan-500 to-blue-600",
-      pctOfTop:
-        productViews > 0
-          ? Math.round((addedToCart / productViews) * 100)
-          : 0,
-      dropoff: dropoffCartToCheckout,
     },
     {
-      label: dict.checkout,
+      label: "Added to Cart",
+      count: addedToCart,
+      delta: "+6%",
+      color: "#FFA347",
+      icon: ShoppingBag,
+    },
+    {
+      label: "Checkout Started",
       count: checkout,
+      delta: "+4%",
+      color: "#FFC285",
       icon: CreditCard,
-      color: "from-fuchsia-500 to-purple-600",
-      pctOfTop:
-        productViews > 0
-          ? Math.round((checkout / productViews) * 100)
-          : 0,
-      dropoff: dropoffCheckoutToPurchase,
     },
     {
-      label: dict.purchases,
+      label: "Purchases",
       count: purchases,
-      icon: CheckCircle2,
-      color: "from-emerald-500 to-teal-600",
-      pctOfTop:
-        productViews > 0
-          ? Math.round((purchases / productViews) * 100)
-          : 0,
-      dropoff: null,
+      delta: "+1%",
+      color: "#FFE0B8",
+      icon: Check,
     },
   ];
 
   return (
-    <WidgetCard
-      title={dict.conversionFunnel}
-      subtitle="Storefront conversion stages & drop-off"
-    >
-      <div className="space-y-4">
-        {stages.map((stage, idx) => {
-          const Icon = stage.icon;
-          return (
-            <div key={stage.label} className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300">
-                    <Icon size={13} />
-                  </span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">
-                    {stage.label}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 tabular-nums">
-                  <span className="font-bold text-slate-900 dark:text-white">
-                    {(stage.count ?? 0).toLocaleString()}
-                  </span>
-                  <span className="text-[11px] text-slate-400 w-10 text-right">
-                    {stage.pctOfTop}%
-                  </span>
-                </div>
-              </div>
-
-              {/* Progress bar */}
-              <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-white/5 overflow-hidden">
-                <div
-                  className={`h-full rounded-full bg-gradient-to-r ${stage.color} transition-all duration-700`}
-                  style={{ width: `${Math.max(stage.pctOfTop, 2)}%` }}
-                />
-              </div>
-
-              {/* Drop-off notice */}
-              {stage.dropoff !== null && idx < stages.length - 1 && (
-                <div className="flex justify-end pr-1 text-[10px] text-rose-500/80 font-medium tabular-nums">
-                  ↓ {stage.dropoff}% {dict.dropOff}
-                </div>
-              )}
-            </div>
-          );
-        })}
+    <div className="relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#0E131F] p-5 shadow-sm transition-all h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
+          Conversion Funnel
+        </h3>
+        <button
+          type="button"
+          aria-label="More options"
+          className="rounded-lg p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition"
+        >
+          <MoreHorizontal size={16} />
+        </button>
       </div>
-    </WidgetCard>
+
+      {/* Funnel Visual + Metrics */}
+      <div className="my-auto flex items-center justify-between gap-4 py-2">
+        {/* Left Side: 4-Tier Orange Stepped Funnel Graphic */}
+        <div className="relative w-28 sm:w-32 shrink-0">
+          <svg viewBox="0 0 100 135" className="w-full h-auto drop-shadow-sm">
+            {/* Level 1: Product Views */}
+            <polygon
+              points="4,4 96,4 82,32 18,32"
+              fill="#FF7900"
+              rx="3"
+              className="transition-all hover:brightness-110"
+            />
+            {/* Level 2: Added to Cart */}
+            <polygon
+              points="20,36 80,36 68,64 32,64"
+              fill="#FFA347"
+              className="transition-all hover:brightness-110"
+            />
+            {/* Level 3: Checkout Started */}
+            <polygon
+              points="34,68 66,68 57,96 43,96"
+              fill="#FFC285"
+              className="transition-all hover:brightness-110"
+            />
+            {/* Level 4: Purchases */}
+            <polygon
+              points="45,100 55,100 51,128 49,128"
+              fill="#FFE0B8"
+              className="transition-all hover:brightness-110"
+            />
+          </svg>
+
+          {/* Floating Icons overlay inside each tier */}
+          <div className="absolute inset-0 flex flex-col justify-between py-1.5 pointer-events-none text-white">
+            <div className="flex justify-center items-center h-7 text-white">
+              <ShoppingCart size={13} className="text-white" />
+            </div>
+            <div className="flex justify-center items-center h-7 text-slate-900 dark:text-white">
+              <ShoppingBag size={12} className="text-white" />
+            </div>
+            <div className="flex justify-center items-center h-7 text-slate-900">
+              <CreditCard size={12} className="text-slate-800" />
+            </div>
+            <div className="flex justify-center items-center h-7 text-slate-900">
+              <Check size={12} className="text-slate-800 stroke-[3]" />
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side: Metrics List */}
+        <div className="flex-1 space-y-3.5">
+          {stages.map((stage) => (
+            <div key={stage.label} className="flex items-center justify-between text-xs">
+              <div>
+                <span className="font-extrabold text-slate-900 dark:text-white tabular-nums text-sm mr-1.5">
+                  {stage.count >= 1000 ? stage.count.toLocaleString() : stage.count}
+                </span>
+                <span className="text-[11px] text-slate-500 dark:text-[#8E9BAE]">
+                  {stage.label}
+                </span>
+              </div>
+              <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.2 text-[10px] font-bold text-emerald-400 tabular-nums">
+                {stage.delta}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

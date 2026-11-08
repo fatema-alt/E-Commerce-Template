@@ -17,14 +17,12 @@ export interface DonutSegment {
 }
 
 const DEFAULT_PALETTE = [
-  "#6366F1", // Indigo
-  "#38BDF8", // Sky
-  "#10B981", // Emerald
-  "#F59E0B", // Amber
-  "#EC4899", // Pink
-  "#8B5CF6", // Violet
-  "#14B8A6", // Teal
-  "#F97316", // Orange
+  "#FF7900", // Vibrant Orange
+  "#FFA347", // Medium Orange
+  "#FFC285", // Peach Orange
+  "#FFE0B8", // Cream Orange
+  "#D96600", // Deep Amber
+  "#FFB770", // Light Amber
 ];
 
 export function DonutChart({

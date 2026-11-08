@@ -28,6 +28,8 @@ import {
   Receipt,
   ShieldCheck,
   User,
+  Crown,
+  BarChart3,
   type LucideIcon,
 } from "lucide-react";
 import { useAdminAuth, type AdminRole } from "@/lib/auth-context";
@@ -45,6 +47,7 @@ type NavItem = {
 // 2. "Site Settings" and "Tracking & Pixels" live exclusively under Settings.
 const navigation: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
+  { label: "Orders", href: "/orders", icon: ShoppingCart },
   {
     label: "Products",
     href: "/products",
@@ -64,6 +67,18 @@ const navigation: NavItem[] = [
     ],
   },
   { label: "Inventory", href: "/inventory", icon: Boxes },
+  { label: "Customers", href: "/customers", icon: Users, roles: ["SUPER_ADMIN", "ADMIN", "MANAGER"] },
+  { label: "Reports", href: "/reports", icon: BarChart3, roles: ["SUPER_ADMIN", "ADMIN"] },
+  {
+    label: "Finance",
+    href: "/finance",
+    icon: Wallet,
+    roles: ["SUPER_ADMIN", "ADMIN", "MANAGER"],
+    children: [
+      { label: "Expense Ledger", href: "/finance/expenses", icon: Receipt },
+      { label: "Categories", href: "/finance/categories", icon: FolderTree },
+    ],
+  },
   {
     label: "Purchasing",
     href: "/purchasing",
@@ -76,19 +91,7 @@ const navigation: NavItem[] = [
       { label: "Goods Receipts", href: "/purchasing/receipts", icon: Boxes },
     ],
   },
-  { label: "Orders", href: "/orders", icon: ShoppingCart },
-  {
-    label: "Finance",
-    href: "/finance",
-    icon: Wallet,
-    roles: ["SUPER_ADMIN", "ADMIN", "MANAGER"],
-    children: [
-      { label: "Expense Ledger", href: "/finance/expenses", icon: Receipt },
-      { label: "Categories", href: "/finance/categories", icon: FolderTree },
-    ],
-  },
   { label: "Promotions", href: "/promotions", icon: Tag, roles: ["SUPER_ADMIN", "ADMIN", "MANAGER"] },
-  { label: "Customers", href: "/customers", icon: Users, roles: ["SUPER_ADMIN", "ADMIN", "MANAGER"] },
   { label: "Reviews & Q&A", href: "/reviews", icon: Star },
   {
     label: "Storefront CMS",
@@ -181,13 +184,13 @@ export function Sidebar({
         }`}
       >
         {/* Header Branding */}
-        <div className="flex h-16 items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-white/10 md:justify-center lg:justify-between lg:px-6">
+        <div className="flex h-16 items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-white/[0.07] md:justify-center lg:justify-between lg:px-6">
           <Link
             href="/"
-            className="flex items-center gap-2.5 outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-lg"
+            className="flex items-center gap-2.5 outline-none focus-visible:ring-2 focus-visible:ring-[#FF7900] rounded-lg"
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white font-extrabold shadow-sm">
-              CS
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#FF7900] text-white shadow-sm shadow-[#FF7900]/30">
+              <ShoppingCart size={18} />
             </div>
             <div className="block md:hidden lg:block">
               <p className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">
@@ -241,9 +244,9 @@ export function Sidebar({
                         [item.href]: !isGroupExpanded,
                       }))
                     }
-                    className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 md:justify-center lg:justify-start ${
+                    className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7900] md:justify-center lg:justify-start ${
                       active
-                        ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold"
+                        ? "bg-[#FF7900] text-white font-semibold shadow-sm shadow-[#FF7900]/25"
                         : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
                     }`}
                   >
@@ -251,13 +254,22 @@ export function Sidebar({
                       size={19}
                       className={`shrink-0 transition-colors ${
                         active
-                          ? "text-indigo-600 dark:text-indigo-400"
+                          ? "text-white"
                           : "text-slate-400 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-200"
                       }`}
                     />
                     <span className="flex-1 text-left block md:hidden lg:block truncate">
                       {item.label}
                     </span>
+                    {item.label === "Orders" && (
+                      <span
+                        className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold block md:hidden lg:block ${
+                          active ? "bg-white/20 text-white" : "bg-[#FF7900] text-white"
+                        }`}
+                      >
+                        7
+                      </span>
+                    )}
                     <ChevronDown
                       size={15}
                       className={`block shrink-0 transition-transform md:hidden lg:block ${
@@ -289,9 +301,9 @@ export function Sidebar({
                               href={child.href}
                               onClick={onClose}
                               aria-current={childActive ? "page" : undefined}
-                              className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                              className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7900] ${
                                 childActive
-                                  ? "bg-indigo-600/10 font-bold text-indigo-600 dark:text-indigo-400"
+                                  ? "bg-[#FF7900]/15 font-bold text-[#FF7900]"
                                   : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-100"
                               }`}
                             >
@@ -314,9 +326,9 @@ export function Sidebar({
                 onClick={onClose}
                 title={item.label}
                 aria-current={active ? "page" : undefined}
-                className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 md:justify-center lg:justify-start ${
+                className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7900] md:justify-center lg:justify-start ${
                   active
-                    ? "bg-gradient-to-r from-indigo-500/10 to-violet-500/10 text-indigo-600 dark:text-indigo-400 font-semibold border-l-2 border-indigo-600 dark:border-indigo-400"
+                    ? "bg-[#FF7900] text-white font-semibold shadow-sm shadow-[#FF7900]/25"
                     : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
                 }`}
               >
@@ -324,17 +336,49 @@ export function Sidebar({
                   size={19}
                   className={`shrink-0 ${
                     active
-                      ? "text-indigo-600 dark:text-indigo-400"
+                      ? "text-white"
                       : "text-slate-400 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-200"
                   }`}
                 />
                 <span className="block md:hidden lg:block truncate">
                   {item.label}
                 </span>
+                {item.label === "Orders" && (
+                  <span
+                    className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold block md:hidden lg:block ${
+                      active ? "bg-white/20 text-white" : "bg-[#FF7900] text-white"
+                    }`}
+                  >
+                    7
+                  </span>
+                )}
               </Link>
             );
           })}
         </nav>
+
+        {/* Upgrade to Pro Card */}
+        <div className="p-3 block md:hidden lg:block">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-white/[0.08] bg-slate-50 dark:bg-gradient-to-br dark:from-[#FF7900]/12 dark:via-[#111622] dark:to-[#0E131F] p-3.5">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FF7900]/20 text-[#FF7900]">
+                <Crown size={15} />
+              </div>
+              <p className="text-xs font-bold text-slate-900 dark:text-white">
+                Upgrade to Pro
+              </p>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+              Unlock advanced reports and automation.
+            </p>
+            <button
+              type="button"
+              className="mt-3 w-full rounded-xl bg-[#FF7900] hover:bg-[#e66d00] text-white py-2 text-xs font-bold shadow-md shadow-[#FF7900]/20 transition"
+            >
+              Upgrade Now
+            </button>
+          </div>
+        </div>
 
         {/* Footer info & Current user role */}
         <div className="border-t border-slate-200 p-3 text-[11px] text-slate-400 dark:border-white/10 dark:text-slate-400 block md:hidden lg:block">
@@ -344,11 +388,11 @@ export function Sidebar({
               onClick={onClose}
               className="flex items-center gap-2 mb-2.5 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition group"
             >
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-[11px] font-bold text-white shadow-xs">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#FF7900] text-[11px] font-bold text-white shadow-xs">
                 {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-[#FF7900]">
                   {user.name || user.email.split("@")[0]}
                 </p>
                 <p className="text-[10px] text-slate-400 font-mono uppercase tracking-wider font-medium">

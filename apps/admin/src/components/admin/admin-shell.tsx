@@ -120,52 +120,69 @@ function AdminShellContent({ children }: { children: ReactNode }) {
 
       <div className="min-h-screen md:pl-20 lg:pl-64 transition-all duration-300">
         {/* Sticky Header */}
-        <header className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white/80 px-4 py-3 backdrop-blur-md dark:border-white/10 dark:bg-[#121A30]/85 md:px-8">
+        <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 dark:border-white/[0.07] bg-white/90 dark:bg-[#080B0F]/90 px-4 py-3.5 backdrop-blur-md md:px-8">
           <div className="flex items-center gap-3">
             <button
               type="button"
               aria-label="Open navigation drawer"
               onClick={() => setSidebarOpen(true)}
-              className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white md:hidden"
+              className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7900] dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white md:hidden"
             >
               <Menu size={22} />
             </button>
 
-            {/* Quick Search Trigger */}
-            <button
-              type="button"
-              onClick={() => setPaletteOpen(true)}
-              className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs text-slate-500 transition hover:border-slate-300 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:hover:border-white/20 dark:hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-            >
-              <Search size={14} />
-              <span className="hidden sm:inline">Search (Ctrl+K)</span>
-              <span className="sm:hidden">Search</span>
-              <kbd className="hidden sm:inline-block rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 dark:border-white/10 dark:bg-white/10 dark:text-slate-300">
-                ⌘K
-              </kbd>
-            </button>
+            {/* Title / Subtitle on Dashboard */}
+            {pathname === "/" ? (
+              <div className="hidden sm:block">
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white leading-tight">
+                  Dashboard
+                </h1>
+                <p className="text-xs text-slate-500 dark:text-[#8E9BAE]">
+                  Store operations overview, insights and performance
+                </p>
+              </div>
+            ) : (
+              <span className="font-bold text-slate-800 dark:text-white text-base capitalize">
+                {pathname.split("/")[1] || "Dashboard"}
+              </span>
+            )}
           </div>
 
           {/* Right Header Actions */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <ThemeSwitcher />
+          <div className="flex items-center gap-2.5 sm:gap-3.5">
+            {/* Global Search Pill Bar */}
+            <button
+              type="button"
+              onClick={() => setPaletteOpen(true)}
+              className="flex items-center gap-2.5 rounded-full border border-slate-200 dark:border-white/[0.08] bg-slate-100/80 dark:bg-[#0E131F] px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs text-slate-400 transition hover:border-slate-300 dark:hover:border-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7900] w-40 sm:w-64 md:w-72"
+            >
+              <Search size={14} className="shrink-0 text-slate-400" />
+              <span className="truncate text-left flex-1 text-slate-400">
+                Search orders, products, customers...
+              </span>
+              <kbd className="hidden md:inline-block rounded border border-slate-300 dark:border-white/10 bg-white dark:bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">
+                ⌘K
+              </kbd>
+            </button>
+
             <NotificationsPopover />
+            <ThemeSwitcher />
 
             {/* User Profile & Role Dropdown */}
-            <div className="relative pl-2 border-l border-slate-200 dark:border-white/10" ref={dropdownRef}>
+            <div className="relative pl-1 sm:pl-2 border-l border-slate-200 dark:border-white/[0.08]" ref={dropdownRef}>
               <button
                 type="button"
                 onClick={() => setUserDropdownOpen((v) => !v)}
-                className="flex items-center gap-2 rounded-xl p-1.5 transition hover:bg-slate-100 dark:hover:bg-white/5 outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                className="flex items-center gap-2.5 rounded-xl p-1 transition hover:bg-slate-100 dark:hover:bg-white/5 outline-none focus-visible:ring-2 focus-visible:ring-[#FF7900]"
               >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xs font-bold text-white shadow-xs">
+                <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#FF7900] to-[#FFA347] text-xs font-bold text-white shadow-xs overflow-hidden ring-2 ring-[#FF7900]/20">
                   {initials}
                 </div>
                 <div className="hidden sm:flex flex-col text-left">
-                  <span className="text-xs font-semibold text-slate-800 dark:text-white leading-tight line-clamp-1">
-                    {user?.name || user?.email?.split("@")[0] || "Admin"}
+                  <span className="text-xs font-bold text-slate-800 dark:text-white leading-tight line-clamp-1">
+                    {user?.name || "Shakil Rahim"}
                   </span>
-                  <span className={`inline-block text-[10px] font-bold px-1.5 py-0.2 rounded border uppercase tracking-wider ${roleInfo.classes}`}>
+                  <span className="text-[10px] text-slate-400 dark:text-[#8E9BAE]">
                     {roleInfo.label}
                   </span>
                 </div>

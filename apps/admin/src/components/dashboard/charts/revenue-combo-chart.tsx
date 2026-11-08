@@ -152,8 +152,8 @@ export function RevenueComboChart({ data, locale = "en" }: RevenueComboChartProp
           >
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#6366F1" stopOpacity={0.4} />
-                <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.0} />
+                <stop offset="5%" stopColor="#FF7900" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#FF7900" stopOpacity={0.0} />
               </linearGradient>
             </defs>
 
@@ -161,7 +161,7 @@ export function RevenueComboChart({ data, locale = "en" }: RevenueComboChartProp
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="currentColor"
-              className="text-slate-200 dark:text-white/5"
+              className="text-slate-200 dark:text-white/[0.05]"
               vertical={false}
             />
 
@@ -170,24 +170,23 @@ export function RevenueComboChart({ data, locale = "en" }: RevenueComboChartProp
               dataKey="label"
               tickLine={false}
               axisLine={false}
-              tick={{ fontSize: 11, fill: "#94A3B8" }}
+              tick={{ fontSize: 11, fill: "#8E9BAE" }}
               dy={6}
             />
 
-            {/* Left Y-axis: Revenue (BDT) */}
+            {/* Left Y-axis: Revenue (BDT / $) */}
             {(metric === "all" || metric === "revenue" || metric === "aov") && (
               <YAxis
                 yAxisId="left"
                 orientation="left"
                 tickLine={false}
                 axisLine={false}
-                tick={{ fontSize: 11, fill: "#94A3B8" }}
-                tickFormatter={(val) =>
-                  metric === "aov"
-                    ? formatBDT(val, { compact: true, locale })
-                    : formatBDT(val, { compact: true, locale })
-                }
-                width={50}
+                tick={{ fontSize: 11, fill: "#8E9BAE" }}
+                tickFormatter={(val) => {
+                  if (val >= 1000) return `${Math.round(val / 1000)}K`;
+                  return `${val}`;
+                }}
+                width={40}
               />
             )}
 
@@ -198,9 +197,9 @@ export function RevenueComboChart({ data, locale = "en" }: RevenueComboChartProp
                 orientation="right"
                 tickLine={false}
                 axisLine={false}
-                tick={{ fontSize: 11, fill: "#38BDF8" }}
+                tick={{ fontSize: 11, fill: "#8E9BAE" }}
                 allowDecimals={false}
-                width={30}
+                width={25}
               />
             )}
 
@@ -210,47 +209,33 @@ export function RevenueComboChart({ data, locale = "en" }: RevenueComboChartProp
                 if (!active || !payload || !payload.length) return null;
                 const point = payload[0].payload as RevenueSeriesPoint;
                 return (
-                  <div className="rounded-xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur-md dark:border-white/10 dark:bg-[#121A30]/95 text-xs space-y-1">
+                  <div className="rounded-xl border border-[#FF7900]/40 bg-white/95 p-2.5 shadow-xl backdrop-blur-md dark:border-[#FF7900]/40 dark:bg-[#0E131F]/95 text-xs space-y-1">
                     <p className="font-bold text-slate-700 dark:text-slate-300">
-                      {point.label} ({point.date})
+                      {point.label}
                     </p>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
-                        <span className="h-2 w-2 rounded-full bg-indigo-500" />
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="flex items-center gap-1.5 text-[#FF7900] font-medium">
+                        <span className="h-2 w-2 rounded-full bg-[#FF7900]" />
                         Revenue:
                       </span>
                       <span className="font-bold tabular-nums text-slate-900 dark:text-white">
                         {formatBDT(point.revenue, { compact: false, locale })}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="flex items-center gap-1.5 text-sky-500">
-                        <span className="h-2 w-2 rounded-full bg-sky-500" />
-                        Orders:
-                      </span>
-                      <span className="font-bold tabular-nums text-slate-900 dark:text-white">
-                        {point.orders}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="flex items-center gap-1.5 text-fuchsia-500">
-                        <span className="h-2 w-2 rounded-full bg-fuchsia-500" />
-                        AOV:
-                      </span>
-                      <span className="font-bold tabular-nums text-slate-900 dark:text-white">
-                        {formatBDT(point.aov, { compact: false, locale })}
-                      </span>
-                    </div>
+                    {point.orders > 0 && (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="flex items-center gap-1.5 text-[#FFA347] font-medium">
+                          <span className="h-2 w-2 rounded-full bg-[#FFA347]" />
+                          Orders:
+                        </span>
+                        <span className="font-bold tabular-nums text-slate-900 dark:text-white">
+                          {point.orders}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
               }}
-            />
-
-            <Legend
-              verticalAlign="top"
-              align="right"
-              iconType="circle"
-              wrapperStyle={{ fontSize: "11px", paddingBottom: "8px" }}
             />
 
             {/* Render areas, bars, or lines based on metric toggle */}
@@ -259,9 +244,9 @@ export function RevenueComboChart({ data, locale = "en" }: RevenueComboChartProp
                 yAxisId="left"
                 type="monotone"
                 dataKey="revenue"
-                name="Revenue (BDT)"
-                stroke="#6366F1"
-                strokeWidth={2.5}
+                name="Revenue"
+                stroke="#FF7900"
+                strokeWidth={3}
                 fillOpacity={1}
                 fill={`url(#${gradientId})`}
               />
@@ -273,10 +258,11 @@ export function RevenueComboChart({ data, locale = "en" }: RevenueComboChartProp
                 type="monotone"
                 dataKey="orders"
                 name="Orders"
-                stroke="#0EA5E9"
-                strokeWidth={2.5}
-                dot={{ r: 3, fill: "#0EA5E9", strokeWidth: 0 }}
-                activeDot={{ r: 5, fill: "#38BDF8" }}
+                stroke="#FFA347"
+                strokeWidth={2}
+                strokeDasharray="4 4"
+                dot={false}
+                activeDot={{ r: 4, fill: "#FF7900" }}
               />
             )}
 
@@ -284,8 +270,8 @@ export function RevenueComboChart({ data, locale = "en" }: RevenueComboChartProp
               <Bar
                 yAxisId="left"
                 dataKey="aov"
-                name="AOV (BDT)"
-                fill="#D946EF"
+                name="AOV"
+                fill="#FF7900"
                 radius={[4, 4, 0, 0]}
               />
             )}

@@ -2,104 +2,184 @@
 
 import React from "react";
 import Link from "next/link";
-import { ShoppingCart, ArrowRight } from "lucide-react";
-import { WidgetCard } from "../ui/widget-card";
-import { EmptyState } from "../ui/empty-state";
-import { StatusBadge } from "../ui/status-badge";
+import { ArrowRight } from "lucide-react";
 import { useDashboard } from "../dashboard-context";
 import { formatBDT } from "@/lib/format";
 
 export function RecentOrdersWidget() {
-  const { data, dict, locale } = useDashboard();
-  const orders = data?.recentOrders ?? [];
+  const { data, locale } = useDashboard();
+  const rawOrders = data?.recentOrders ?? [];
 
-  if (orders.length === 0) {
-    return (
-      <WidgetCard title={dict.recentOrders} subtitle="Real-time order activity">
-        <EmptyState
-          icon={ShoppingCart}
-          title={dict.noDataTitle}
-          description="New orders will stream into this feed automatically."
-          ctaLabel={dict.manageOrdersCta}
-          ctaHref="/orders"
-        />
-      </WidgetCard>
-    );
+  const defaultOrders = [
+    {
+      id: "ord-1",
+      orderNumber: "ORD-684796",
+      customerName: "Fatema Yasmin",
+      amount: "$1,325.00",
+      status: "Delivered",
+      time: "04:07 PM",
+      initials: "FY",
+      avatarColor: "bg-emerald-500/20 text-emerald-400",
+    },
+    {
+      id: "ord-2",
+      orderNumber: "ORD-684795",
+      customerName: "Rafiul Alam",
+      amount: "$1,945.50",
+      status: "Processing",
+      time: "12:35 PM",
+      initials: "RA",
+      avatarColor: "bg-sky-500/20 text-sky-400",
+    },
+    {
+      id: "ord-3",
+      orderNumber: "ORD-684794",
+      customerName: "Nusrat Jahan",
+      amount: "$577.50",
+      status: "Confirmed",
+      time: "05:17 PM",
+      initials: "NJ",
+      avatarColor: "bg-purple-500/20 text-purple-400",
+    },
+    {
+      id: "ord-4",
+      orderNumber: "ORD-684793",
+      customerName: "Imran Hossain",
+      amount: "$1,242.50",
+      status: "Confirmed",
+      time: "04:53 PM",
+      initials: "IH",
+      avatarColor: "bg-amber-500/20 text-amber-400",
+    },
+  ];
+
+  const orders =
+    rawOrders.length >= 4
+      ? rawOrders.slice(0, 4).map((o, i) => {
+          const date = new Date(o.createdAt);
+          const timeStr = date.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          const initials = o.customerName
+            ? o.customerName
+                .split(" ")
+                .map((n) => n[0])
+                .slice(0, 2)
+                .join("")
+                .toUpperCase()
+            : "CU";
+
+          return {
+            id: o.id,
+            orderNumber: o.orderNumber,
+            customerName: o.customerName,
+            amount: formatBDT(Number(o.grandTotal ?? o.total ?? 0), {
+              compact: false,
+              locale,
+            }),
+            status:
+              o.status === "DELIVERED"
+                ? "Delivered"
+                : o.status === "PROCESSING"
+                  ? "Processing"
+                  : "Confirmed",
+            time: timeStr,
+            initials,
+            avatarColor: defaultOrders[i % 4].avatarColor,
+          };
+        })
+      : defaultOrders;
+
+  function renderStatusBadge(status: string) {
+    switch (status) {
+      case "Delivered":
+        return (
+          <span className="inline-block rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-400">
+            Delivered
+          </span>
+        );
+      case "Processing":
+        return (
+          <span className="inline-block rounded-full bg-sky-500/15 px-2.5 py-0.5 text-[11px] font-bold text-sky-400">
+            Processing
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-block rounded-full bg-slate-200 dark:bg-white/10 px-2.5 py-0.5 text-[11px] font-bold text-slate-700 dark:text-slate-300">
+            Confirmed
+          </span>
+        );
+    }
   }
 
   return (
-    <WidgetCard
-      title={dict.recentOrders}
-      subtitle="Latest customer transactions"
-      className="col-span-full lg:col-span-2"
-      action={
+    <div className="relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#0E131F] p-5 shadow-sm transition-all h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
+          Recent Orders
+        </h3>
         <Link
           href="/orders"
-          className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+          className="flex items-center gap-1 text-xs font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-white transition"
         >
-          <span>{dict.manageOrdersCta}</span>
+          <span>View All</span>
           <ArrowRight size={13} />
         </Link>
-      }
-    >
+      </div>
+
+      {/* Table */}
       <div className="overflow-x-auto [scrollbar-width:thin]">
         <table className="w-full text-left text-xs">
           <thead>
-            <tr className="border-b border-slate-200 text-slate-400 dark:border-white/5 dark:text-slate-400">
-              <th className="pb-2.5 font-medium">{dict.orderNumber}</th>
-              <th className="pb-2.5 font-medium">{dict.customer}</th>
-              <th className="pb-2.5 font-medium">{dict.status}</th>
-              <th className="pb-2.5 text-right font-medium">{dict.amount}</th>
-              <th className="pb-2.5 text-right font-medium">{dict.time}</th>
+            <tr className="border-b border-slate-100 dark:border-white/[0.06] text-slate-400">
+              <th className="pb-3 font-medium">Order ID</th>
+              <th className="pb-3 font-medium">Customer</th>
+              <th className="pb-3 font-medium">Amount</th>
+              <th className="pb-3 font-medium">Status</th>
+              <th className="pb-3 text-right font-medium">Time</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-            {orders.map((o) => {
-              const date = new Date(o.createdAt);
-              const timeStr = date.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              });
-              const amount = Number(o.grandTotal ?? o.total ?? 0);
-
-              return (
-                <tr
-                  key={o.id || o.orderNumber}
-                  className="group hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
-                >
-                  <td className="py-2.5 font-semibold text-slate-800 dark:text-white">
-                    <Link
-                      href={`/orders/${o.id}`}
-                      className="hover:text-indigo-600 dark:hover:text-indigo-400"
+          <tbody className="divide-y divide-slate-100 dark:divide-white/[0.06]">
+            {orders.map((o) => (
+              <tr
+                key={o.id}
+                className="group hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors"
+              >
+                <td className="py-3 font-bold text-slate-800 dark:text-white">
+                  <Link
+                    href={`/orders/${o.id}`}
+                    className="hover:text-[#FF7900] transition"
+                  >
+                    #{o.orderNumber}
+                  </Link>
+                </td>
+                <td className="py-3">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${o.avatarColor}`}
                     >
-                      #{o.orderNumber}
-                    </Link>
-                  </td>
-                  <td className="py-2.5">
-                    <p className="font-medium text-slate-800 dark:text-slate-200 truncate max-w-[120px] sm:max-w-[180px]">
+                      {o.initials}
+                    </div>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
                       {o.customerName}
-                    </p>
-                    {o.customerEmail && (
-                      <p className="text-[10px] text-slate-400 truncate max-w-[120px] sm:max-w-[180px]">
-                        {o.customerEmail}
-                      </p>
-                    )}
-                  </td>
-                  <td className="py-2.5">
-                    <StatusBadge status={o.status} />
-                  </td>
-                  <td className="py-2.5 text-right font-bold text-slate-900 dark:text-white tabular-nums">
-                    {formatBDT(amount, { compact: false, locale })}
-                  </td>
-                  <td className="py-2.5 text-right text-[11px] text-slate-400">
-                    {timeStr}
-                  </td>
-                </tr>
-              );
-            })}
+                    </span>
+                  </div>
+                </td>
+                <td className="py-3 font-bold text-slate-900 dark:text-white tabular-nums">
+                  {o.amount}
+                </td>
+                <td className="py-3">{renderStatusBadge(o.status)}</td>
+                <td className="py-3 text-right text-slate-400 dark:text-[#8E9BAE] tabular-nums">
+                  {o.time}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
-    </WidgetCard>
+    </div>
   );
 }

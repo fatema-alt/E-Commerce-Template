@@ -17,7 +17,7 @@ export function WidgetCard({
 }) {
   return (
     <section
-      className={`relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/90 bg-white/80 p-5 shadow-xs backdrop-blur-md transition-all dark:border-white/10 dark:bg-[#121A30]/85 ${className}`}
+      className={`relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#0E131F] p-5 shadow-sm transition-all ${className}`}
     >
       {/* Header */}
       <div className="mb-4 flex items-center justify-between gap-3">

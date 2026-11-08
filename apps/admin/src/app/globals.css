@@ -15,8 +15,8 @@
   --chart-tooltip-text: #0f172a;
 
   /* Accent Gradients (per-card) */
-  --grad-sales-from: #6366f1;
-  --grad-sales-to: #8b5cf6;
+  --grad-sales-from: #FF7900;
+  --grad-sales-to: #FFA347;
   --grad-orders-from: #22d3ee;
   --grad-orders-to: #3b82f6;
   --grad-customers-from: #10b981;
@@ -25,8 +25,8 @@
   --grad-inventory-to: #f97316;
   --grad-aov-from: #d946ef;
   --grad-aov-to: #a855f7;
-  --grad-alerts-from: #ec4899;
-  --grad-alerts-to: #f43f5e;
+  --grad-refund-from: #ec4899;
+  --grad-refund-to: #f43f5e;
 }
 
 @theme inline {
@@ -110,44 +110,44 @@ html[data-theme=dark] .product-editor-help{color:#adbbce}
 html{color-scheme:light}
 html[data-theme=dark]{
   color-scheme:dark;
-  --background:#0B1020;
-  --foreground:#e2e8f0;
-  --surface:#121A30;
-  --surface-elevated:#1A2342;
-  --border:rgba(255,255,255,0.08);
+  --background:#080B0F;
+  --foreground:#ffffff;
+  --surface:#0E131F;
+  --surface-elevated:#151B2B;
+  --border:rgba(255,255,255,0.07);
   --border-subtle:rgba(255,255,255,0.04);
-  --chart-grid:rgba(255,255,255,0.06);
-  --chart-axis:#94a3b8;
-  --chart-tooltip-bg:#121A30;
+  --chart-grid:rgba(255,255,255,0.05);
+  --chart-axis:#8E9BAE;
+  --chart-tooltip-bg:#0E131F;
   --chart-tooltip-border:rgba(255,255,255,0.12);
-  --chart-tooltip-text:#f1f5f9;
+  --chart-tooltip-text:#ffffff;
 }
 
 .theme-switcher{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-size:12px;color:inherit}
 .theme-switcher select{border:1px solid #cbd5e1;border-radius:8px;padding:6px 8px;background:#fff;color:#334155;font:inherit;cursor:pointer}
-.theme-switcher select:focus-visible{outline:2px solid #818cf8;outline-offset:2px}
+.theme-switcher select:focus-visible{outline:2px solid #FF7900;outline-offset:2px}
 .admin-login-theme{position:absolute;top:20px;right:20px;z-index:10}
 
-html[data-theme=dark] :is(.bg-white,.bg-slate-50){background-color:#121A30}
-html[data-theme=dark] :is(.bg-slate-100,.bg-slate-200){background-color:#1A2342}
-html[data-theme=dark] .min-h-screen.bg-slate-50{background-color:#0B1020}
-html[data-theme=dark] :is(.text-slate-900,.text-slate-800,.text-slate-700){color:#e2e8f0}
-html[data-theme=dark] :is(.text-slate-600,.text-slate-500){color:#adbbce}
-html[data-theme=dark] :is(.border-slate-100,.border-slate-200,.border-slate-300){border-color:rgba(255,255,255,0.08)}
-html[data-theme=dark] :is(.border,.border-b,.border-r,.border-t){border-color:rgba(255,255,255,0.08)}
-html[data-theme=dark] :is(input,select,textarea){background-color:#0B1020;color:#e2e8f0;border-color:rgba(255,255,255,0.12)}
+html[data-theme=dark] :is(.bg-white,.bg-slate-50){background-color:#0E131F}
+html[data-theme=dark] :is(.bg-slate-100,.bg-slate-200){background-color:#151B2B}
+html[data-theme=dark] .min-h-screen.bg-slate-50{background-color:#080B0F}
+html[data-theme=dark] :is(.text-slate-900,.text-slate-800,.text-slate-700){color:#ffffff}
+html[data-theme=dark] :is(.text-slate-600,.text-slate-500){color:#8E9BAE}
+html[data-theme=dark] :is(.border-slate-100,.border-slate-200,.border-slate-300){border-color:rgba(255,255,255,0.07)}
+html[data-theme=dark] :is(.border,.border-b,.border-r,.border-t){border-color:rgba(255,255,255,0.07)}
+html[data-theme=dark] :is(input,select,textarea){background-color:#080B0F;color:#ffffff;border-color:rgba(255,255,255,0.1)}
 html[data-theme=dark] input::placeholder,html[data-theme=dark] textarea::placeholder{color:#64748b}
-html[data-theme=dark] .theme-switcher select{background:#121A30;color:#e2e8f0;border-color:rgba(255,255,255,0.12)}
+html[data-theme=dark] .theme-switcher select{background:#0E131F;color:#ffffff;border-color:rgba(255,255,255,0.12)}
 html[data-theme=dark] :is(.bg-indigo-50,.bg-violet-50,.bg-blue-50){background-color:#1E1B4B}
-html[data-theme=dark] :is(.text-indigo-500,.text-indigo-600,.text-indigo-700,.text-indigo-800,.text-indigo-900,.text-violet-700,.text-blue-700){color:#b4b8ff}
+html[data-theme=dark] :is(.text-indigo-500,.text-indigo-600,.text-indigo-700,.text-indigo-800,.text-indigo-900,.text-violet-700,.text-blue-700){color:#FFA347}
 html[data-theme=dark] :is(.bg-emerald-50,.bg-green-50){background-color:#064E3B}
 html[data-theme=dark] :is(.text-emerald-700,.text-emerald-800,.text-green-700){color:#93e4bc}
 html[data-theme=dark] .bg-amber-50{background-color:#451A03}
 html[data-theme=dark] .text-amber-700{color:#fde68a}
 html[data-theme=dark] :is(.bg-red-50,.bg-rose-50){background-color:#4C0519}
 html[data-theme=dark] :is(.text-red-600,.text-red-700,.text-red-800,.text-rose-700){color:#fecdd3}
-html[data-theme=dark] .hover\:bg-slate-100:hover{background-color:#1A2342}
-html[data-theme=dark] .hover\:bg-slate-50:hover{background-color:#16203A}
+html[data-theme=dark] .hover\:bg-slate-100:hover{background-color:#151B2B}
+html[data-theme=dark] .hover\:bg-slate-50:hover{background-color:#121826}
 html[data-theme=dark] .hover\:text-slate-900:hover{color:#f8fafc}
 @media(max-width:580px){.theme-switcher-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.theme-switcher{gap:3px}}
 

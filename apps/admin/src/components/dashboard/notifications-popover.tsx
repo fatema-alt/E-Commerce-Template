@@ -237,14 +237,10 @@ export function NotificationsPopover({
           setOpen((prev) => !prev);
           if (!open) void loadNotifications();
         }}
-        className="relative rounded-xl p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white"
+        className="relative rounded-xl p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF7900] dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white"
       >
         <Bell size={19} />
-        {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-extrabold text-white shadow-sm ring-2 ring-white dark:ring-[#121A30] animate-in zoom-in-75 duration-150">
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </span>
-        )}
+        <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#FF7900] ring-2 ring-white dark:ring-[#080B0F]" />
       </button>
 
       {open && (
