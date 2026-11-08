@@ -103,7 +103,9 @@ export const ModelName = {
   PurchaseOrder: 'PurchaseOrder',
   PurchaseOrderItem: 'PurchaseOrderItem',
   GoodsReceipt: 'GoodsReceipt',
-  GoodsReceiptItem: 'GoodsReceiptItem'
+  GoodsReceiptItem: 'GoodsReceiptItem',
+  ExpenseCategory: 'ExpenseCategory',
+  Expense: 'Expense'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -1021,6 +1023,42 @@ export const GoodsReceiptItemScalarFieldEnum = {
 } as const
 
 export type GoodsReceiptItemScalarFieldEnum = (typeof GoodsReceiptItemScalarFieldEnum)[keyof typeof GoodsReceiptItemScalarFieldEnum]
+
+
+export const ExpenseCategoryScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  code: 'code',
+  description: 'description',
+  color: 'color',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ExpenseCategoryScalarFieldEnum = (typeof ExpenseCategoryScalarFieldEnum)[keyof typeof ExpenseCategoryScalarFieldEnum]
+
+
+export const ExpenseScalarFieldEnum = {
+  id: 'id',
+  voucherNo: 'voucherNo',
+  title: 'title',
+  amount: 'amount',
+  categoryId: 'categoryId',
+  expenseDate: 'expenseDate',
+  paymentMethod: 'paymentMethod',
+  paidTo: 'paidTo',
+  spentBy: 'spentBy',
+  receiptNumber: 'receiptNumber',
+  receiptUrl: 'receiptUrl',
+  notes: 'notes',
+  status: 'status',
+  createdBy: 'createdBy',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ExpenseScalarFieldEnum = (typeof ExpenseScalarFieldEnum)[keyof typeof ExpenseScalarFieldEnum]
 
 
 export const SortOrder = {

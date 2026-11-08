@@ -235,3 +235,27 @@ export const PurchaseOrderPaymentStatus = {
 } as const
 
 export type PurchaseOrderPaymentStatus = (typeof PurchaseOrderPaymentStatus)[keyof typeof PurchaseOrderPaymentStatus]
+
+
+export const ExpensePaymentMethod = {
+  CASH: 'CASH',
+  BKASH: 'BKASH',
+  NAGAD: 'NAGAD',
+  ROCKET: 'ROCKET',
+  UPAY: 'UPAY',
+  BANK_TRANSFER: 'BANK_TRANSFER',
+  CARD: 'CARD',
+  CHEQUE: 'CHEQUE',
+  OTHER: 'OTHER'
+} as const
+
+export type ExpensePaymentMethod = (typeof ExpensePaymentMethod)[keyof typeof ExpensePaymentMethod]
+
+
+export const ExpenseStatus = {
+  PAID: 'PAID',
+  PENDING: 'PENDING',
+  VOID: 'VOID'
+} as const
+
+export type ExpenseStatus = (typeof ExpenseStatus)[keyof typeof ExpenseStatus]

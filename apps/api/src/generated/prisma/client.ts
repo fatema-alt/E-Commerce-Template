@@ -323,3 +323,13 @@ export type GoodsReceipt = Prisma.GoodsReceiptModel
  * 
  */
 export type GoodsReceiptItem = Prisma.GoodsReceiptItemModel
+/**
+ * Model ExpenseCategory
+ * 
+ */
+export type ExpenseCategory = Prisma.ExpenseCategoryModel
+/**
+ * Model Expense
+ * 
+ */
+export type Expense = Prisma.ExpenseModel

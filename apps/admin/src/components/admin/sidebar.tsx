@@ -24,6 +24,8 @@ import {
   Activity,
   Truck,
   ClipboardList,
+  Wallet,
+  Receipt,
   type LucideIcon,
 } from "lucide-react";
 
@@ -70,6 +72,15 @@ const navigation: NavItem[] = [
     ],
   },
   { label: "Orders", href: "/orders", icon: ShoppingCart },
+  {
+    label: "Finance",
+    href: "/finance",
+    icon: Wallet,
+    children: [
+      { label: "Expense Ledger", href: "/finance/expenses", icon: Receipt },
+      { label: "Categories", href: "/finance/categories", icon: FolderTree },
+    ],
+  },
   { label: "Promotions", href: "/promotions", icon: Tag },
   { label: "Customers", href: "/customers", icon: Users },
   { label: "Reviews & Q&A", href: "/reviews", icon: Star },
@@ -123,6 +134,8 @@ export function Sidebar({
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     "/products": false,
     "/categories": false,
+    "/purchasing": false,
+    "/finance": false,
     "/cms": false,
     "/settings": false,
   });
