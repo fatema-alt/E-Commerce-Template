@@ -276,7 +276,7 @@ export class AuthService {
         name: dto.name?.trim() || null,
         phone: dto.phone?.trim() || null,
         role: dto.role,
-        isActive: true,
+        isActive: dto.isActive !== undefined ? dto.isActive : true,
       },
       select: {
         id: true,

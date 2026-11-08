@@ -61,6 +61,10 @@ export class CreateAdminUserDto {
   @IsEnum(AdminRole)
   @IsNotEmpty()
   role!: AdminRole;
+
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
 }
 
 export class UpdateAdminUserDto {
