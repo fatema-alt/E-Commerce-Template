@@ -89,7 +89,7 @@ export class ProductImagesController {
     });
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Post()
   @UseInterceptors(
     FileInterceptor('file', {
@@ -137,7 +137,7 @@ export class ProductImagesController {
     }
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Patch('order')
   async reorder(@Param('productId', ParseUUIDPipe) productId: string, @Body() dto: ImageOrderDto, @Req() req: AdminRequest) {
     await this.product(productId);
@@ -152,7 +152,7 @@ export class ProductImagesController {
     });
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Patch(':imageId')
   async update(
     @Param('productId', ParseUUIDPipe) productId: string,
@@ -208,7 +208,7 @@ export class ProductImagesController {
     }
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Patch(':imageId/primary')
   setPrimary(
     @Param('productId', ParseUUIDPipe) productId: string,
@@ -218,7 +218,7 @@ export class ProductImagesController {
     return this.update(productId, imageId, { isPrimary: true }, req);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Post(':imageId/replace')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -271,7 +271,7 @@ export class ProductImagesController {
     return { image: changed.image, cleanupPending };
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Delete(':imageId')
   async remove(
     @Param('productId', ParseUUIDPipe) productId: string,

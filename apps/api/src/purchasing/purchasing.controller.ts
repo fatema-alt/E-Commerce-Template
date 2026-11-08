@@ -58,13 +58,13 @@ export class PurchasingController {
     return this.service.getSupplier(id);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Post('suppliers')
   createSupplier(@Body() dto: CreateSupplierDto) {
     return this.service.createSupplier(dto);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Patch('suppliers/:id')
   updateSupplier(
     @Param('id', ParseUUIDPipe) id: string,
@@ -73,7 +73,7 @@ export class PurchasingController {
     return this.service.updateSupplier(id, dto);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Delete('suppliers/:id')
   deleteSupplier(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.deleteSupplier(id);
@@ -111,13 +111,13 @@ export class PurchasingController {
     return this.service.getOrder(id);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Post('orders')
   createOrder(@Body() dto: CreatePurchaseOrderDto, @Req() req: AdminRequest) {
     return this.service.createOrder(dto, req.admin?.email || req.admin?.id);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Patch('orders/:id')
   updateOrder(
     @Param('id', ParseUUIDPipe) id: string,
@@ -126,7 +126,7 @@ export class PurchasingController {
     return this.service.updateOrder(id, dto);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Post('orders/:id/status')
   changeOrderStatus(
     @Param('id', ParseUUIDPipe) id: string,
@@ -135,7 +135,7 @@ export class PurchasingController {
     return this.service.changeOrderStatus(id, dto);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Post('orders/:id/payment')
   updateOrderPayment(
     @Param('id', ParseUUIDPipe) id: string,
@@ -148,7 +148,7 @@ export class PurchasingController {
   // Goods Receipts Endpoints
   // ==========================================
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Post('orders/:id/receive')
   receiveGoods(
     @Param('id', ParseUUIDPipe) id: string,

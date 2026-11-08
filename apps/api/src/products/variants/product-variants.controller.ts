@@ -27,7 +27,7 @@ export class ProductVariantsController {
   constructor(private readonly service: ProductVariantsService) {}
 
   @Post('generate')
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   generate(
     @Param('productId', ParseUUIDPipe) productId: string,
     @Body() dto: GenerateVariantsDto,
@@ -37,7 +37,7 @@ export class ProductVariantsController {
   }
 
   @Post('bulk')
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   bulk(
     @Param('productId', ParseUUIDPipe) productId: string,
     @Body() dto: BulkVariantsDto,
@@ -54,7 +54,7 @@ export class ProductVariantsController {
     return this.service.findAll(productId);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Post()
   create(
     @Param('productId', ParseUUIDPipe)
@@ -67,7 +67,7 @@ export class ProductVariantsController {
     return this.service.create(productId, dto, req.admin?.id);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Patch(':variantId')
   update(
     @Param('productId', ParseUUIDPipe) productId: string,
@@ -82,7 +82,7 @@ export class ProductVariantsController {
     return this.service.update(productId, id, dto, req.admin?.id);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Delete(':variantId')
   remove(
     @Param('productId', ParseUUIDPipe) productId: string,
@@ -94,7 +94,7 @@ export class ProductVariantsController {
     return this.service.remove(productId, id, req.admin?.id);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Post(':variantId/stock-adjustments')
   adjustStock(
     @Param('productId', ParseUUIDPipe)

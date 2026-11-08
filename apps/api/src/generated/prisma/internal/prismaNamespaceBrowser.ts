@@ -156,6 +156,8 @@ export const AdminUserScalarFieldEnum = {
   id: 'id',
   email: 'email',
   passwordHash: 'passwordHash',
+  name: 'name',
+  phone: 'phone',
   role: 'role',
   isActive: 'isActive',
   createdAt: 'createdAt',
@@ -1092,6 +1094,14 @@ export const QueryMode = {
 export type QueryMode = (typeof QueryMode)[keyof typeof QueryMode]
 
 
+export const NullsOrder = {
+  first: 'first',
+  last: 'last'
+} as const
+
+export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
 export const JsonNullValueFilter = {
   DbNull: DbNull,
   JsonNull: JsonNull,
@@ -1099,12 +1109,4 @@ export const JsonNullValueFilter = {
 } as const
 
 export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
-
-
-export const NullsOrder = {
-  first: 'first',
-  last: 'last'
-} as const
-
-export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
 

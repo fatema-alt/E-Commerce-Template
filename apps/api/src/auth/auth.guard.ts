@@ -10,7 +10,13 @@ import type { Request } from 'express';
 import { AuthService, SESSION_COOKIE } from './auth.service.js';
 
 export type AdminRequest = Request & {
-  admin?: { id: string; email: string; role: string };
+  admin?: {
+    id: string;
+    email: string;
+    role: string;
+    name?: string | null;
+    phone?: string | null;
+  };
 };
 
 export function getCookie(request: Request, name: string): string | undefined {

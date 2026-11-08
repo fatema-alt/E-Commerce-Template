@@ -71,7 +71,7 @@ export class OrdersController {
   }
 
   @Get('export')
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   async export(
     @Query() filters: Record<string, string>,
     @Req() req: AdminRequest,
@@ -90,7 +90,7 @@ export class OrdersController {
   }
 
   @Post()
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   create(
     @Body() dto: CreateOrderDto,
     @Headers('idempotency-key') key: string | undefined,
@@ -100,7 +100,7 @@ export class OrdersController {
   }
 
   @Patch(':id/status')
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   changeStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ChangeOrderStatusDto,
@@ -111,7 +111,7 @@ export class OrdersController {
   }
 
   @Post(':id/notes')
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   addNote(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AddOrderNoteDto,
@@ -122,7 +122,7 @@ export class OrdersController {
   }
 
   @Post(':id/cancel')
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   cancel(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: OrderMutationDto,
@@ -132,7 +132,7 @@ export class OrdersController {
     return this.orders.cancel(id, dto, key, req.admin!);
   }
   @Post(':id/shipments/manual')
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   bookManualShipment(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: BookManualShipmentDto,
@@ -143,7 +143,7 @@ export class OrdersController {
   }
 
   @Post(':id/returns/request')
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   requestReturn(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ReturnRequestDto,
@@ -154,7 +154,7 @@ export class OrdersController {
   }
 
   @Post(':id/returns/:returnId/receive')
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   receiveReturn(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('returnId', ParseUUIDPipe) returnId: string,
@@ -166,7 +166,7 @@ export class OrdersController {
   }
 
   @Patch(':id/shipments/:shipmentId')
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   updateShipment(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('shipmentId', ParseUUIDPipe) shipmentId: string,
@@ -178,7 +178,7 @@ export class OrdersController {
   }
 
   @Post(':id/returns/:returnId/decision')
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   decideReturn(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('returnId', ParseUUIDPipe) returnId: string,

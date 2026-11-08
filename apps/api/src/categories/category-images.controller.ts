@@ -63,7 +63,7 @@ export class CategoryImagesController {
       await this.storage.remove('categories', key);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Post()
   @UseInterceptors(
     FileInterceptor('file', {
@@ -99,7 +99,7 @@ export class CategoryImagesController {
     return { ...changed.result, cleanupPending };
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Delete()
   async remove(
     @Param('categoryId', ParseUUIDPipe) categoryId: string,

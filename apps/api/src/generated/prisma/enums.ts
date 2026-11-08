@@ -12,6 +12,7 @@
 export const AdminRole = {
   SUPER_ADMIN: 'SUPER_ADMIN',
   ADMIN: 'ADMIN',
+  MANAGER: 'MANAGER',
   STAFF: 'STAFF'
 } as const
 

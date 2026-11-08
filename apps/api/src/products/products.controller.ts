@@ -23,7 +23,7 @@ import type { AdminRequest } from '../auth/auth.guard.js';
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Post()
   create(@Body() dto: CreateProductDto, @Req() req: AdminRequest) {
     return this.productsService.create(dto, req.admin?.id);
@@ -39,7 +39,7 @@ export class ProductsController {
   }
 
   @Post('bulk')
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   bulk(@Body() dto: BulkProductDto, @Req() req: AdminRequest) {
     return this.productsService.bulk(dto, req.admin?.id, req.admin?.role);
   }
@@ -49,7 +49,7 @@ export class ProductsController {
     return this.productsService.findOne(id);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -59,7 +59,7 @@ export class ProductsController {
     return this.productsService.update(id, dto, req.admin?.id);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Post(':id/stock-adjustments')
   adjustStock(
     @Param('id', ParseUUIDPipe) id: string,
@@ -74,7 +74,7 @@ export class ProductsController {
     return this.productsService.getStockMovements(id);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Delete(':id')
   remove(@Param('id', ParseUUIDPipe) id: string, @Req() req: AdminRequest) {
     return this.productsService.remove(id, req.admin?.id);

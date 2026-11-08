@@ -45,6 +45,7 @@ model DashboardTarget {
 enum AdminRole {
   SUPER_ADMIN
   ADMIN
+  MANAGER
   STAFF
 }
 
@@ -52,6 +53,8 @@ model AdminUser {
   id           String @id @default(uuid())
   email        String @unique
   passwordHash String
+  name         String?
+  phone        String?
   role         AdminRole @default(STAFF)
   isActive     Boolean @default(true)
   sessions     AdminSession[]

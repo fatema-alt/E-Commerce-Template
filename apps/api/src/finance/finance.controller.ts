@@ -50,13 +50,13 @@ export class FinanceController {
   }
 
   @Post('expenses')
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   createExpense(@Body() dto: CreateExpenseDto, @Req() req: AdminRequest) {
     return this.service.createExpense(dto, req.admin?.id);
   }
 
   @Patch('expenses/:id')
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   updateExpense(@Param('id') id: string, @Body() dto: UpdateExpenseDto) {
     return this.service.updateExpense(id, dto);
   }

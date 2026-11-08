@@ -26,14 +26,18 @@ import {
   ClipboardList,
   Wallet,
   Receipt,
+  ShieldCheck,
+  User,
   type LucideIcon,
 } from "lucide-react";
+import { useAdminAuth, type AdminRole } from "@/lib/auth-context";
 
 type NavItem = {
   label: string;
   href: string;
   icon: LucideIcon;
-  children?: { label: string; href: string; icon: LucideIcon }[];
+  roles?: AdminRole[];
+  children?: { label: string; href: string; icon: LucideIcon; roles?: AdminRole[] }[];
 };
 
 // Canonical deduplicated navigation items:
@@ -64,6 +68,7 @@ const navigation: NavItem[] = [
     label: "Purchasing",
     href: "/purchasing",
     icon: Truck,
+    roles: ["SUPER_ADMIN", "ADMIN", "MANAGER"],
     children: [
       { label: "Purchase Orders", href: "/purchasing", icon: ClipboardList },
       { label: "New Order", href: "/purchasing/new", icon: Plus },
@@ -76,18 +81,20 @@ const navigation: NavItem[] = [
     label: "Finance",
     href: "/finance",
     icon: Wallet,
+    roles: ["SUPER_ADMIN", "ADMIN", "MANAGER"],
     children: [
       { label: "Expense Ledger", href: "/finance/expenses", icon: Receipt },
       { label: "Categories", href: "/finance/categories", icon: FolderTree },
     ],
   },
-  { label: "Promotions", href: "/promotions", icon: Tag },
-  { label: "Customers", href: "/customers", icon: Users },
+  { label: "Promotions", href: "/promotions", icon: Tag, roles: ["SUPER_ADMIN", "ADMIN", "MANAGER"] },
+  { label: "Customers", href: "/customers", icon: Users, roles: ["SUPER_ADMIN", "ADMIN", "MANAGER"] },
   { label: "Reviews & Q&A", href: "/reviews", icon: Star },
   {
     label: "Storefront CMS",
     href: "/cms",
     icon: Palette,
+    roles: ["SUPER_ADMIN", "ADMIN"],
     children: [
       {
         label: "Homepage Builder",
@@ -107,9 +114,16 @@ const navigation: NavItem[] = [
     ],
   },
   {
+    label: "Team & Roles",
+    href: "/team",
+    icon: ShieldCheck,
+    roles: ["SUPER_ADMIN", "ADMIN"],
+  },
+  {
     label: "Settings",
     href: "/settings",
     icon: Settings,
+    roles: ["SUPER_ADMIN", "ADMIN"],
     children: [
       { label: "Payments", href: "/settings/payments", icon: CreditCard },
       {
@@ -131,6 +145,7 @@ export function Sidebar({
   onClose: () => void;
 }) {
   const pathname = usePathname();
+  const { user } = useAdminAuth();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     "/products": false,
     "/categories": false,
@@ -138,6 +153,11 @@ export function Sidebar({
     "/finance": false,
     "/cms": false,
     "/settings": false,
+  });
+
+  const visibleNavigation = navigation.filter((item) => {
+    if (!item.roles) return true;
+    return user ? item.roles.includes(user.role) : false;
   });
 
   return (
@@ -193,7 +213,7 @@ export function Sidebar({
           aria-label="Main navigation"
           className="flex-1 space-y-1.5 overflow-y-auto px-3 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         >
-          {navigation.map((item) => {
+          {visibleNavigation.map((item) => {
             const Icon = item.icon;
             const itemPath = item.href.split("?")[0];
             const active =
@@ -316,8 +336,27 @@ export function Sidebar({
           })}
         </nav>
 
-        {/* Footer info */}
+        {/* Footer info & Current user role */}
         <div className="border-t border-slate-200 p-3 text-[11px] text-slate-400 dark:border-white/10 dark:text-slate-400 block md:hidden lg:block">
+          {user && (
+            <Link
+              href="/profile"
+              onClick={onClose}
+              className="flex items-center gap-2 mb-2.5 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition group"
+            >
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-[11px] font-bold text-white shadow-xs">
+                {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                  {user.name || user.email.split("@")[0]}
+                </p>
+                <p className="text-[10px] text-slate-400 font-mono uppercase tracking-wider font-medium">
+                  {user.role.replace(/_/g, " ")}
+                </p>
+              </div>
+            </Link>
+          )}
           <p className="font-semibold text-slate-600 dark:text-slate-300">
             Commerce Suite
           </p>

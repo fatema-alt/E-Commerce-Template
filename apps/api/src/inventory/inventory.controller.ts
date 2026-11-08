@@ -35,7 +35,7 @@ export class InventoryController {
     return this.service.movements(parsed);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Post(':id/adjust')
   adjust(
     @Param('id', ParseUUIDPipe) id: string,
@@ -45,7 +45,7 @@ export class InventoryController {
     return this.service.adjust(id, body, req.admin?.id);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Patch(':id/threshold')
   threshold(
     @Param('id', ParseUUIDPipe) id: string,

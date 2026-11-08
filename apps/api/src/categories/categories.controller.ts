@@ -22,7 +22,7 @@ import type { AdminRequest } from '../auth/auth.guard.js';
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Post()
   create(@Body() dto: CreateCategoryDto, @Req() req: AdminRequest) {
     return this.categoriesService.create(dto, req.admin?.id);
@@ -45,7 +45,7 @@ export class CategoriesController {
     return this.categoriesService.findOne(id);
   }
 
-  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN'])
+  @SetMetadata('roles', ['SUPER_ADMIN', 'ADMIN', 'MANAGER'])
   @Patch(':id')
   update(
     @Param('id', new ParseUUIDPipe()) id: string,
