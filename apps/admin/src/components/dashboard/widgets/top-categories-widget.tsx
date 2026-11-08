@@ -4,11 +4,12 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { useDashboard } from "../dashboard-context";
+import { formatBDT } from "@/lib/format";
 
 const CATEGORY_COLORS = ["#FF7900", "#FFA347", "#FFC285", "#FFE0B8"];
 
 export function TopCategoriesWidget() {
-  const { data } = useDashboard();
+  const { data, locale } = useDashboard();
   const rawCategories = data?.categories || data?.topCategories || [];
 
   const defaultCategories = [
@@ -21,18 +22,23 @@ export function TopCategoriesWidget() {
   const categories =
     rawCategories.length > 0
       ? rawCategories.slice(0, 4).map((c, i) => {
-          const pct = Number(c.percentage ?? c.share ?? defaultCategories[i % 4].percentage);
+          const pct = Number(c.share ?? c.percentage ?? defaultCategories[i % 4].percentage);
           return {
             name: c.name,
             percentage: isNaN(pct) || pct <= 0 ? defaultCategories[i % 4].percentage : pct,
-            revenue: Number(c.revenue ?? c.amount ?? defaultCategories[i % 4].revenue),
+            revenue: Number(c.amount ?? c.revenue ?? defaultCategories[i % 4].revenue),
           };
         })
       : defaultCategories;
 
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
-  const totalSales = 3400000;
+  const realCategorySales = rawCategories.reduce(
+    (sum, c) => sum + Number(c.amount ?? c.revenue ?? 0),
+    0
+  );
+  const totalSalesNumber =
+    realCategorySales > 0 ? realCategorySales : Number(data?.totals?.sales ?? 0);
 
   // Donut geometry: radius 56, circumference = 2 * PI * 56 ≈ 351.86
   const radius = 56;
@@ -116,12 +122,12 @@ export function TopCategoriesWidget() {
           </svg>
 
           {/* Donut Center Display */}
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center px-4">
             <span className="text-[10px] font-medium text-slate-400">
               Total Sales
             </span>
             <span className="text-sm font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">
-              ${totalSales.toLocaleString()}
+              {formatBDT(totalSalesNumber, { compact: false, locale })}
             </span>
           </div>
         </div>

@@ -3,15 +3,42 @@
 import React, { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useDashboard } from "../dashboard-context";
+import { formatBDT } from "@/lib/format";
+
+const DISTRICT_COLORS = ["#FF7900", "#FFA347", "#FFC285", "#FFE0B8"];
 
 export function GeoDistrictsWidget() {
-  const { data } = useDashboard();
+  const { data, locale } = useDashboard();
   const [selectedRange, setSelectedRange] = useState("Last 7 Days");
 
-  const defaultDistricts = [
-    { name: "Narayanganj", sales: "$24.4K", color: "#FF7900" },
-    { name: "Dhaka", sales: "$11.8K", color: "#FFA347" },
-  ];
+  const rawDistricts = data?.geoDistricts || [];
+  const totalSalesVal = Number(data?.totals?.sales ?? 0);
+
+  const districts =
+    rawDistricts.length > 0
+      ? rawDistricts.slice(0, 3).map((d, i) => ({
+          name: d.district || "Dhaka",
+          sales: formatBDT(Number(d.revenue ?? 0), { compact: true, locale }),
+          color: DISTRICT_COLORS[i % DISTRICT_COLORS.length],
+        }))
+      : [
+          {
+            name: "Dhaka",
+            sales: formatBDT(totalSalesVal > 0 ? totalSalesVal * 0.7 : 18000, {
+              compact: true,
+              locale,
+            }),
+            color: "#FF7900",
+          },
+          {
+            name: "Narayanganj",
+            sales: formatBDT(totalSalesVal > 0 ? totalSalesVal * 0.3 : 8000, {
+              compact: true,
+              locale,
+            }),
+            color: "#FFA347",
+          },
+        ];
 
   return (
     <div className="relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#0E131F] p-5 shadow-sm transition-all h-full">
@@ -33,7 +60,7 @@ export function GeoDistrictsWidget() {
       <div className="flex items-center justify-between gap-4 my-auto">
         {/* District list */}
         <div className="space-y-4 min-w-[140px]">
-          {defaultDistricts.map((d) => (
+          {districts.map((d) => (
             <div key={d.name} className="flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2">
                 <span

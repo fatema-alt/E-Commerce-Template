@@ -15,7 +15,7 @@ export function RecentOrdersWidget() {
       id: "ord-1",
       orderNumber: "ORD-684796",
       customerName: "Fatema Yasmin",
-      amount: "$1,325.00",
+      amount: "৳1,325.00",
       status: "Delivered",
       time: "04:07 PM",
       initials: "FY",
@@ -25,7 +25,7 @@ export function RecentOrdersWidget() {
       id: "ord-2",
       orderNumber: "ORD-684795",
       customerName: "Rafiul Alam",
-      amount: "$1,945.50",
+      amount: "৳1,945.50",
       status: "Processing",
       time: "12:35 PM",
       initials: "RA",
@@ -35,7 +35,7 @@ export function RecentOrdersWidget() {
       id: "ord-3",
       orderNumber: "ORD-684794",
       customerName: "Nusrat Jahan",
-      amount: "$577.50",
+      amount: "৳577.50",
       status: "Confirmed",
       time: "05:17 PM",
       initials: "NJ",
@@ -45,7 +45,7 @@ export function RecentOrdersWidget() {
       id: "ord-4",
       orderNumber: "ORD-684793",
       customerName: "Imran Hossain",
-      amount: "$1,242.50",
+      amount: "৳1,242.50",
       status: "Confirmed",
       time: "04:53 PM",
       initials: "IH",
@@ -54,7 +54,7 @@ export function RecentOrdersWidget() {
   ];
 
   const orders =
-    rawOrders.length >= 4
+    rawOrders.length > 0
       ? rawOrders.slice(0, 4).map((o, i) => {
           const date = new Date(o.createdAt);
           const timeStr = date.toLocaleTimeString([], {

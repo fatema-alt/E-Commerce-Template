@@ -9,13 +9,15 @@ export function MonthlyTargetWidget() {
   const { data, locale, updateMonthlyTarget } = useDashboard();
   const targetData = data?.target || data?.monthlyTarget;
 
-  const targetAmount = Number(targetData?.target ?? targetData?.amount ?? 350000);
-  const actualAmount = Number(targetData?.actual ?? targetData?.achieved ?? 298000);
+  const hasConfiguredTarget = Boolean(targetData?.amount || targetData?.target);
+  const defaultTarget = 50000;
+  const targetAmount = Number(targetData?.amount ?? targetData?.target ?? defaultTarget);
+  const actualAmount = Number(targetData?.achieved ?? targetData?.actual ?? data?.totals?.sales ?? 0);
+
   const progressPct =
-    targetData?.progressPercentage ??
-    targetData?.progress ??
-    Math.round((actualAmount / targetAmount) * 100) ??
-    85;
+    targetAmount > 0
+      ? Math.min(100, Math.max(0, Math.round((actualAmount / targetAmount) * 100)))
+      : 0;
 
   const [modalOpen, setModalOpen] = useState(false);
   const [newTargetInput, setNewTargetInput] = useState(String(targetAmount));
@@ -38,6 +40,8 @@ export function MonthlyTargetWidget() {
       setModalOpen(false);
     }
   }
+
+  const salesChange = data?.changes?.sales;
 
   return (
     <>
@@ -92,29 +96,56 @@ export function MonthlyTargetWidget() {
             </div>
           </div>
 
-          {/* Subtext: +8.2% from last month */}
-          <div className="mt-2.5 flex items-center gap-1 text-xs font-semibold text-emerald-500 dark:text-emerald-400">
-            <span>↑</span>
-            <span>+8.2% from last month</span>
+          {/* Subtext */}
+          <div
+            className={`mt-2.5 flex items-center gap-1 text-xs font-semibold ${
+              salesChange !== null && salesChange !== undefined && salesChange < 0
+                ? "text-rose-500 dark:text-rose-400"
+                : "text-emerald-500 dark:text-emerald-400"
+            }`}
+          >
+            {salesChange !== null && salesChange !== undefined ? (
+              <>
+                <span>{salesChange >= 0 ? "↑" : "↓"}</span>
+                <span>
+                  {salesChange >= 0 ? `+${salesChange.toFixed(1)}%` : `${salesChange.toFixed(1)}%`}{" "}
+                  from previous period
+                </span>
+              </>
+            ) : (
+              <span>
+                {clampedProgress >= 100 ? "Goal Achieved!" : `${100 - clampedProgress}% remaining to target`}
+              </span>
+            )}
           </div>
         </div>
 
         {/* Bottom Two Stats Boxes */}
         <div className="mt-4 grid grid-cols-2 gap-3 pt-3 border-t border-slate-100 dark:border-white/[0.06]">
-          <div className="rounded-xl bg-slate-50 dark:bg-[#151B2B] p-2.5 text-center border border-slate-100 dark:border-white/[0.04]">
-            <p className="text-[11px] font-medium text-slate-500 dark:text-[#8E9BAE]">
-              Target
-            </p>
-            <p className="mt-0.5 text-sm font-bold text-slate-900 dark:text-white tabular-nums">
-              ${targetAmount >= 1000 ? targetAmount.toLocaleString() : targetAmount}
+          <div
+            onClick={() => {
+              setNewTargetInput(String(targetAmount));
+              setModalOpen(true);
+            }}
+            className="rounded-xl bg-slate-50 dark:bg-[#151B2B] p-2.5 text-center border border-slate-100 dark:border-white/[0.04] cursor-pointer hover:border-[#FF7900]/50 transition group"
+            title="Click to edit target"
+          >
+            <div className="flex items-center justify-center gap-1">
+              <p className="text-[11px] font-medium text-slate-500 dark:text-[#8E9BAE]">
+                Target {hasConfiguredTarget ? "" : "(Default)"}
+              </p>
+              <Pencil size={10} className="text-slate-400 group-hover:text-[#FF7900] transition" />
+            </div>
+            <p className="mt-0.5 text-xs sm:text-sm font-bold text-slate-900 dark:text-white tabular-nums truncate">
+              {formatBDT(targetAmount, { compact: false, locale })}
             </p>
           </div>
           <div className="rounded-xl bg-slate-50 dark:bg-[#151B2B] p-2.5 text-center border border-slate-100 dark:border-white/[0.04]">
             <p className="text-[11px] font-medium text-slate-500 dark:text-[#8E9BAE]">
               Achieved
             </p>
-            <p className="mt-0.5 text-sm font-bold text-slate-900 dark:text-white tabular-nums">
-              ${actualAmount >= 1000 ? actualAmount.toLocaleString() : actualAmount}
+            <p className="mt-0.5 text-xs sm:text-sm font-bold text-slate-900 dark:text-white tabular-nums truncate">
+              {formatBDT(actualAmount, { compact: false, locale })}
             </p>
           </div>
         </div>
@@ -147,14 +178,18 @@ export function MonthlyTargetWidget() {
             </div>
             <div className="mt-4 space-y-3">
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-                Target Amount ($)
+                Target Amount (BDT ৳)
               </label>
               <input
                 type="number"
                 value={newTargetInput}
                 onChange={(e) => setNewTargetInput(e.target.value)}
+                placeholder="e.g. 50000"
                 className="w-full rounded-xl border border-slate-300 dark:border-white/10 bg-slate-50 dark:bg-black/30 px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-[#FF7900]"
               />
+              <p className="text-[11px] text-slate-400">
+                Enter your monthly sales target in BDT. This updates real-time tracking across the dashboard.
+              </p>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"

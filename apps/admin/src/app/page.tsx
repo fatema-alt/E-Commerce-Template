@@ -31,18 +31,16 @@ function DashboardContent() {
   const changes = data?.changes ?? (data?.comparison as unknown as { deltas?: Record<string, number | null> })?.deltas;
   const isStaff = data?.role === "STAFF";
 
-  // Formatted sales value (or reference screenshot fallback)
-  const salesVal = totals?.sales ? parseFloat(totals.sales) : 0;
-  const formattedSales =
-    salesVal > 0
-      ? formatBDT(salesVal, { compact: false, locale })
-      : isStaff
-        ? "—"
-        : "$983,410";
+  // Real totals formatted in BDT
+  const formattedSales = totals?.sales
+    ? formatBDT(parseFloat(totals.sales), { compact: false, locale })
+    : isStaff
+      ? "—"
+      : formatBDT(0, { compact: false, locale });
 
-  const ordersVal = totals && totals.orders > 0 ? totals.orders.toLocaleString() : "58,375";
-  const customersVal = totals && totals.customers > 0 ? totals.customers.toLocaleString() : "237,782";
-  const inventoryVal = totals && totals.inventory > 0 ? totals.inventory.toLocaleString() : "814";
+  const ordersVal = totals ? totals.orders.toLocaleString() : "0";
+  const customersVal = totals ? totals.customers.toLocaleString() : "0";
+  const inventoryVal = totals ? totals.inventory.toLocaleString() : "0";
 
   return (
     <div className="space-y-5 pb-6">
@@ -55,7 +53,7 @@ function DashboardContent() {
         <KPICard
           title="Total Sales"
           formattedValue={formattedSales}
-          change={changes?.sales ?? 12.8}
+          change={changes?.sales ?? null}
           changeLabel="vs previous period"
           accent="sales"
           icon={Coins}
@@ -67,7 +65,7 @@ function DashboardContent() {
         <KPICard
           title="Total Orders"
           formattedValue={ordersVal}
-          change={changes?.orders ?? -3.6}
+          change={changes?.orders ?? null}
           changeLabel="vs previous period"
           accent="orders"
           icon={ShoppingCart}
@@ -79,7 +77,7 @@ function DashboardContent() {
         <KPICard
           title="Total Customers"
           formattedValue={customersVal}
-          change={changes?.customers ?? 6.1}
+          change={changes?.customers ?? null}
           changeLabel="vs previous period"
           accent="customers"
           icon={Users}
@@ -91,7 +89,7 @@ function DashboardContent() {
         <KPICard
           title="Inventory Items"
           formattedValue={inventoryVal}
-          change={changes?.inventory ?? 2.4}
+          change={changes?.inventory ?? null}
           changeLabel="vs previous period"
           accent="inventory"
           icon={Boxes}

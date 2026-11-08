@@ -274,7 +274,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       const res = await authenticatedFetch(`${API}/dashboard/target`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target: newTarget }),
+        body: JSON.stringify({
+          amount: Number(newTarget).toFixed(2),
+          target: newTarget,
+        }),
       });
       if (res.ok) {
         void fetchData(true);

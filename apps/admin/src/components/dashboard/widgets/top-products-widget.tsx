@@ -62,7 +62,7 @@ export function TopProductsWidget() {
       id: "prod-1",
       name: "Wireless Bluetooth Headphones",
       sold: "1,980 sold",
-      price: "$1,980.00",
+      price: "৳1,980.00",
       icon: Headphones,
       image: null,
     },
@@ -70,7 +70,7 @@ export function TopProductsWidget() {
       id: "prod-2",
       name: "Smart Watch Pro",
       sold: "1,754 sold",
-      price: "$1,799.00",
+      price: "৳1,799.00",
       icon: Watch,
       image: null,
     },
@@ -78,18 +78,18 @@ export function TopProductsWidget() {
       id: "prod-3",
       name: "Wireless Earbuds",
       sold: "1,420 sold",
-      price: "$1,500.00",
+      price: "৳1,500.00",
       icon: Speaker,
       image: null,
     },
   ];
 
   const products =
-    rawProducts.length >= 3
+    rawProducts.length > 0
       ? rawProducts.slice(0, 3).map((p, i) => ({
           id: p.id || `prod-${i}`,
           name: p.name,
-          sold: `${p.units ?? p.unitsSold ?? 1000} sold`,
+          sold: `${p.units ?? p.unitsSold ?? 1} sold`,
           price: formatBDT(p.revenue, { compact: false, locale }),
           icon: defaultProducts[i % 3].icon,
           image: p.image,
