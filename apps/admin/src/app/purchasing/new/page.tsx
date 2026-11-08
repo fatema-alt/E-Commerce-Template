@@ -82,17 +82,39 @@ export default function NewPurchaseOrderPage() {
       try {
         const [supRes, prodRes] = await Promise.all([
           authenticatedFetch(`${ROOT}/purchasing/suppliers?limit=100&isActive=true`),
-          authenticatedFetch(`${ROOT}/products?limit=100`),
+          authenticatedFetch(`${ROOT}/products?paginated=true&pageSize=100`),
         ]);
 
         if (supRes.ok) {
           const s = await supRes.json();
-          setSuppliers(s.items || []);
-          if (s.items?.length) setSupplierId(s.items[0].id);
+          const list: Supplier[] = Array.isArray(s)
+            ? s
+            : Array.isArray(s?.items)
+              ? s.items
+              : [];
+          setSuppliers(list);
+          if (list.length) setSupplierId(list[0].id);
         }
+
         if (prodRes.ok) {
           const p = await prodRes.json();
-          setProducts(p.items || []);
+          const list: Product[] = Array.isArray(p)
+            ? p
+            : Array.isArray(p?.items)
+              ? p.items
+              : [];
+          setProducts(list);
+        } else {
+          const fallback = await authenticatedFetch(`${ROOT}/products?pageSize=100`);
+          if (fallback.ok) {
+            const fb = await fallback.json();
+            const list: Product[] = Array.isArray(fb)
+              ? fb
+              : Array.isArray(fb?.items)
+                ? fb.items
+                : [];
+            setProducts(list);
+          }
         }
       } catch (err) {
         console.error("Failed to load suppliers/products", err);
@@ -105,19 +127,31 @@ export default function NewPurchaseOrderPage() {
 
   const handleProductChange = (index: number, productId: string) => {
     const prod = products.find((p) => p.id === productId);
-    if (!prod) return;
+    if (!prod) {
+      const newItems = [...items];
+      newItems[index] = {
+        productId: "",
+        productName: "",
+        sku: "",
+        orderedQuantity: items[index]?.orderedQuantity || 1,
+        unitCost: 0,
+      };
+      setItems(newItems);
+      return;
+    }
 
     const newItems = [...items];
     const defaultCost = Number(prod.costPrice || 0);
+    const firstVariant = prod.variants && prod.variants.length > 0 ? prod.variants[0] : null;
 
     newItems[index] = {
       ...newItems[index],
       productId: prod.id,
       productName: prod.name,
-      sku: prod.sku,
-      variantId: undefined,
-      variantName: undefined,
-      unitCost: defaultCost,
+      sku: firstVariant?.sku || prod.sku,
+      variantId: firstVariant?.id,
+      variantName: firstVariant?.name,
+      unitCost: firstVariant?.costPrice ? Number(firstVariant.costPrice) : defaultCost,
     };
     setItems(newItems);
   };
@@ -193,6 +227,15 @@ export default function NewPurchaseOrderPage() {
     const invalidItem = items.find((i) => !i.productId || i.orderedQuantity < 1);
     if (invalidItem) {
       setError("Please select a valid product and quantity for each item");
+      return;
+    }
+
+    const missingVariant = items.find((i) => {
+      const prod = products.find((p) => p.id === i.productId);
+      return prod?.variants && prod.variants.length > 0 && !i.variantId;
+    });
+    if (missingVariant) {
+      setError("Please select a variant for variable products");
       return;
     }
 
@@ -387,10 +430,16 @@ export default function NewPurchaseOrderPage() {
                     required
                     className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-white/10 dark:bg-[#121A30] dark:text-slate-100"
                   >
-                    <option value="">Select a product...</option>
+                    <option value="">
+                      {loadingInitial
+                        ? "Loading products..."
+                        : products.length === 0
+                          ? "No products found in store"
+                          : `Select a product (${products.length} available)...`}
+                    </option>
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name} ({p.sku})
+                        {p.name} {p.sku ? `(${p.sku})` : ""}
                       </option>
                     ))}
                   </select>
